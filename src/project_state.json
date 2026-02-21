@@ -1,39 +1,32 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Jewelry management system with karigar (artisan) mapping functionality that parses Excel files containing design codes, generic names, and karigar names",
+  "summary": "Jewelry order management system with design image uploads and PDF export functionality",
   "architectural_notes": [
-    "Excel file format: Column A = Design Code, Column B = Generic Name, Column C = Karigar Name",
-    "Column headers are exact matches: 'Design Code', 'Generic Name', 'Karigar Name'",
-    "No header rows, empty rows, or special formatting in Excel files"
+    "Design images are uploaded via a Design Image Page and stored by design code",
+    "PDF export functionality exists but currently not embedding images correctly",
+    "Previous PDF format had green headers and visual formatting that needs restoration"
   ],
   "known_issues": [
-    "Karigar mapping Excel parser showing 561 validation errors (Design Code/Generic Name/Karigar Name required) despite data being present in file",
-    "Excel column mapping not recognizing data in columns A, B, and C correctly"
+    "PDF export shows placeholder text like [Design Image: CHTMN40009] instead of actual images",
+    "PDF export lost colorful structure and green headers from previous version",
+    "Design images exist in system but PDF generation not fetching them properly"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-excel-parser-in-frontend-src-utils-excelparser-ts-to-correctly-read-karigar-mapping-data-from-columns-a-design-code-b-generic-name-and-c-karigar-name-with-exact-header-matching",
-      "title": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+      "id": "feature-fix-pdf-export-to-embed-actual-design-images-from-the-design-image-page-instead-of-showing-placeholder-text-like-design-image-chtmn40009-the-system-must-fetch-uploaded-design-images-by-design-code-and-convert-them-to-a-format-suitable-for-pdf-embedding-base64-or-similar",
+      "title": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-enhanced-error-logging-to-the-karigar-mapping-excel-parser-to-show-exactly-what-values-are-being-read-from-each-cell-during-parsing",
-      "title": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+      "id": "feature-restore-the-colorful-pdf-export-structure-from-the-previous-version-including-green-header-rows-for-each-design-group-visual-distinction-between-design-sections-and-sorting-orders-by-design-code-from-lower-to-higher-within-each-group",
+      "title": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
       "reqIds": [
         "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-ensure-the-excel-parser-handles-both-xls-and-xlsx-file-formats-correctly-for-karigar-mapping-uploads",
-      "title": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
-      "reqIds": [
-        "REQ-3"
       ],
       "version": 1
     }
@@ -41,12 +34,18 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix Excel parsing for karigar mapping to correctly read Design Code (Column A), Generic Name (Column B), and Karigar Name (Column C)",
+      "summary": "Fix PDF export to embed actual design images instead of placeholder text",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Restore colorful PDF structure with green headers and design code sorting (lower to higher)",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Fix Excel parser to correctly read karigar mapping columns",
+  "projectName": "Jewellery Order Management",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

@@ -1,30 +1,13 @@
-import { useState } from 'react';
-import { useGetAllOrders } from '@/hooks/useQueries';
-import { OrderStatus } from '@/backend';
-import OrderTable from './OrderTable';
+import OrderTable from "./OrderTable";
+import { useGetOrdersByStatus } from "@/hooks/useQueries";
+import { OrderStatus } from "@/backend";
 
 export default function ReadyTab() {
-  const { data: allOrders = [], isLoading } = useGetAllOrders();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { data: orders = [], isLoading } = useGetOrdersByStatus(OrderStatus.Ready);
 
-  // Filter orders on the frontend since backend doesn't filter by status
-  const orders = allOrders.filter((order) => order.status === OrderStatus.Ready);
+  if (isLoading) {
+    return <div className="text-center py-8">Loading orders...</div>;
+  }
 
-  return (
-    <div className="space-y-4">
-      {selectedIds.length > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md border">
-          <span className="text-sm text-muted-foreground">
-            {selectedIds.length} order(s) selected
-          </span>
-        </div>
-      )}
-      <OrderTable
-        orders={orders}
-        isLoading={isLoading}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-      />
-    </div>
-  );
+  return <OrderTable orders={orders} showDateFilter={true} />;
 }

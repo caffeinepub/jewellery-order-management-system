@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, X } from 'lucide-react';
-import { useDesignImage } from '@/hooks/useQueries';
+import { useGetDesignImage } from '@/hooks/useQueries';
 
 interface DesignImageModalProps {
   designCode: string;
@@ -25,7 +25,7 @@ export default function DesignImageModal({
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   
-  const { data: designData, isLoading, error } = useDesignImage(designCode);
+  const { data: designData, isLoading, error } = useGetDesignImage(designCode);
 
   useEffect(() => {
     if (!open) {

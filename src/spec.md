@@ -1,11 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the Excel parser to correctly read karigar mapping data from the uploaded Excel file and eliminate all 561 validation errors.
+**Goal:** Fix PDF export to display actual design images and restore colorful formatting with green headers and proper sorting.
 
 **Planned changes:**
-- Update the Excel parser in frontend/src/utils/excelParser.ts to correctly identify and read data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching
-- Add enhanced error logging to show actual cell values being parsed and indicate header matching status
-- Ensure the parser handles both .xls and .xlsx file formats correctly
+- Embed actual design images from the Design Image Page into PDF exports by fetching uploaded images by design code
+- Restore green header rows for each design group in the PDF
+- Sort orders by design code numerically from lower to higher within each group
+- Apply visual formatting with clear separation between design sections
 
-**User-visible outcome:** Users can successfully upload the karigar mapping Excel file without encountering the 561 "required" field validation errors, with all data correctly parsed from the three columns.
+**User-visible outcome:** PDF exports will show actual design images (like the gold chain for CHTMN40009) instead of placeholder text, with a colorful structure featuring green headers and properly sorted design groups.

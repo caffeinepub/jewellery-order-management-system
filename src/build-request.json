@@ -1,69 +1,60 @@
 {
   "kind": "build_request",
-  "title": "Fix Excel parser to correctly read karigar mapping columns",
+  "title": "Fix PDF export design images and restore colorful formatting",
+  "projectName": "Jewellery Order Management",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+      "text": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5",
-          "msg-6"
+          "msg-latest"
         ],
         "quotes": [
-          "They have exactly same column headers",
-          "Column A - design code, Column B - generic name, Column C - karigar name"
+          "Why is image not available for design code *CHTMN40009* in export pdf when actually image for that design is already available",
+          "Yes design are uploaded in design page as per design code"
         ]
       },
       "acceptanceCriteria": [
-        "Parser correctly identifies and reads data from columns A, B, and C",
-        "Parser matches exact header names: 'Design Code', 'Generic Name', 'Karigar Name'",
-        "All 561 validation errors are resolved when uploading the same Excel file",
-        "No 'required' errors appear for rows that contain data in all three columns"
+        "PDF export displays actual design images for all design codes that have images uploaded",
+        "Design code CHTMN40009 shows the gold chain image in the PDF export",
+        "If a design image is truly missing, show 'Image Not Available' text instead of placeholder brackets"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+      "text": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-latest"
+        ],
+        "quotes": [
+          "About colourful structure, the data in export pdf was sorted from lower design code to higher and then then it had green headers etc, why did such updated get changed in new deployment?"
         ]
       },
       "acceptanceCriteria": [
-        "Console logs show actual cell values being parsed for each row",
-        "Error messages include the specific row number and column being processed",
-        "Logs indicate whether header matching succeeded or failed"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "text": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-5"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Parser successfully processes .xls files",
-        "Parser successfully processes .xlsx files",
-        "No format-specific parsing errors occur"
+        "Each design group in the PDF has a green header row with the design code",
+        "Orders are sorted by design code numerically (lower to higher)",
+        "Visual formatting matches the previous colorful structure with clear separation between design groups",
+        "Table headers maintain green background color (#4CAF50 or similar)"
       ]
     }
   ],
   "constraints": [
-    "Do not change the backend schema or main.mo file",
-    "Maintain the existing Excel upload UI in frontend/src/pages/MasterDesigns.tsx",
-    "Use the SheetJS library that is already integrated in the project"
+    "Do not change any other features in the app - only modify PDF export functionality",
+    "Maintain all existing order management, dashboard, and design mapping features",
+    "Preserve the current Excel import/export functionality",
+    "Keep all existing UI components and layouts unchanged except for PDF export styling"
   ],
   "nonGoals": [
-    "Adding support for different column orders or flexible header matching",
-    "Changing the data validation logic beyond fixing the parsing",
-    "Modifying the UI layout or styling of the Master Designs page"
+    "Modifying the web interface display of design images",
+    "Changing the Design Image Page upload functionality",
+    "Altering order table row selection or bulk actions",
+    "Modifying any dashboard tabs or summary cards",
+    "Changing barcode scanning or tag printing features"
   ],
   "imageRequirements": {
     "required": [],

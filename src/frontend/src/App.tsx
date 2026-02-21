@@ -1,43 +1,50 @@
-import { createRouter, RouterProvider, createRoute, createRootRoute, Outlet } from '@tanstack/react-router';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import AppSidebar from './components/layout/AppSidebar';
-import Dashboard from './pages/Dashboard';
-import IngestOrders from './pages/IngestOrders';
-import UnmappedCodes from './pages/UnmappedCodes';
-import MasterDesigns from './pages/MasterDesigns';
-import DesignImages from './pages/DesignImages';
-import TagPrinting from './pages/TagPrinting';
-import BarcodeScanning from './pages/BarcodeScanning';
-import { Toaster } from '@/components/ui/sonner';
+import { RouterProvider, createRouter, createRoute, createRootRoute, Outlet } from '@tanstack/react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
+import { Toaster } from '@/components/ui/sonner';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import AppSidebar from '@/components/layout/AppSidebar';
+import Dashboard from '@/pages/Dashboard';
+import IngestOrders from '@/pages/IngestOrders';
+import UnmappedCodes from '@/pages/UnmappedCodes';
+import MasterDesigns from '@/pages/MasterDesigns';
+import DesignImages from '@/pages/DesignImages';
+import TagPrinting from '@/pages/TagPrinting';
+import BarcodeScanning from '@/pages/BarcodeScanning';
+import KarigarDetail from '@/pages/KarigarDetail';
 
-function Layout() {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function RootLayout() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <AppSidebar />
-        <SidebarInset className="flex-1 overflow-x-hidden">
+        <SidebarInset className="flex-1">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 lg:hidden">
             <SidebarTrigger />
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold">Jewellery OMS</h2>
-            </div>
           </header>
-          <main className="flex-1 overflow-x-hidden">
+          <main className="flex-1">
             <Outlet />
           </main>
         </SidebarInset>
       </div>
-      <Toaster />
     </SidebarProvider>
   );
 }
 
 const rootRoute = createRootRoute({
-  component: Layout,
+  component: RootLayout,
 });
 
-const indexRoute = createRoute({
+const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: Dashboard,
@@ -79,14 +86,21 @@ const barcodeScanningRoute = createRoute({
   component: BarcodeScanning,
 });
 
+const karigarDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/karigar/$name',
+  component: KarigarDetail,
+});
+
 const routeTree = rootRoute.addChildren([
-  indexRoute,
+  dashboardRoute,
   ingestOrdersRoute,
   unmappedCodesRoute,
   masterDesignsRoute,
   designImagesRoute,
   tagPrintingRoute,
   barcodeScanningRoute,
+  karigarDetailRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -100,7 +114,10 @@ declare module '@tanstack/react-router' {
 export default function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <RouterProvider router={router} />
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+        <Toaster />
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

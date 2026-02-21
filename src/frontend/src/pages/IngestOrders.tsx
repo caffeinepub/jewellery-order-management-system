@@ -1,23 +1,14 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Upload, FileSpreadsheet, AlertCircle, X } from 'lucide-react';
-import { parseExcelFile } from '@/utils/excelParser';
-import { useIngestOrdersBatch } from '@/hooks/useQueries';
 import { toast } from 'sonner';
-import { OrderType } from '@/backend';
+import { parseOrdersExcel } from '../utils/excelParser';
+import { useSaveOrder, useGetOrders } from '../hooks/useQueries';
+import { useActor } from '../hooks/useActor';
+import type { OrderType } from '../backend';
 
 interface ParsedOrder {
   orderNo: string;
@@ -26,204 +17,253 @@ interface ParsedOrder {
   design: string;
   weight: number;
   size: number;
-  quantity: number;
+  quantity: bigint;
   remarks: string;
+  orderId: string;
 }
 
-interface ParseError {
-  row: number;
-  field: string;
-  message: string;
+interface UploadResult {
+  success: number;
+  failed: number;
+  errors: Array<{ row: number; error: string }>;
 }
+
+const BATCH_SIZE = 50;
 
 export default function IngestOrders() {
+  const [file, setFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState<UploadResult | null>(null);
   const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>([]);
-  const [errors, setErrors] = useState<ParseError[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const ingestOrders = useIngestOrdersBatch();
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const { actor } = useActor();
+  const saveOrderMutation = useSaveOrder();
+  const { refetch: refetchOrders } = useGetOrders();
 
-    setIsUploading(true);
-    setErrors([]);
-    setUploadProgress(0);
-    
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setFile(selectedFile);
+    setResult(null);
+    setParsedOrders([]);
+
     try {
-      const result = await parseExcelFile(file);
-      setParsedOrders(result.data);
-      setErrors(result.errors);
-      
-      if (result.errors.length > 0) {
-        toast.warning(`Parsed ${result.data.length} orders with ${result.errors.length} errors`);
-      } else {
-        toast.success(`Parsed ${result.data.length} orders from Excel`);
-      }
+      const orders = await parseOrdersExcel(selectedFile);
+      setParsedOrders(orders);
+      toast.success(`Parsed ${orders.length} orders from Excel`);
     } catch (error) {
-      toast.error('Failed to parse Excel file');
-      console.error(error);
-      setErrors([{ row: 0, field: 'File', message: 'Failed to read or parse the Excel file' }]);
-    } finally {
-      setIsUploading(false);
-      e.target.value = '';
+      console.error('Error parsing Excel:', error);
+      toast.error('Failed to parse Excel file. Please check the format.');
+      setFile(null);
     }
   };
 
-  const handleSubmit = async () => {
-    if (parsedOrders.length === 0) {
-      toast.error('No orders to submit');
+  const processBatch = async (orders: ParsedOrder[], startIdx: number): Promise<UploadResult> => {
+    const batchResult: UploadResult = { success: 0, failed: 0, errors: [] };
+    const endIdx = Math.min(startIdx + BATCH_SIZE, orders.length);
+    const batch = orders.slice(startIdx, endIdx);
+
+    for (let i = 0; i < batch.length; i++) {
+      const order = batch[i];
+      const currentRow = startIdx + i + 2; // +2 for header row and 0-based index
+
+      try {
+        if (!actor) throw new Error('Actor not initialized');
+
+        // Call backend to save order - backend will handle mapping lookup
+        // If mapping doesn't exist, backend will trap with error
+        await actor.saveOrder(
+          order.orderNo,
+          order.orderType,
+          order.product,
+          order.design,
+          order.weight,
+          order.size,
+          order.quantity,
+          order.remarks,
+          order.orderId
+        );
+
+        batchResult.success++;
+      } catch (error: any) {
+        batchResult.failed++;
+        const errorMsg = error?.message || 'Unknown error';
+        batchResult.errors.push({
+          row: currentRow,
+          error: errorMsg.includes('Design mapping not found')
+            ? `Design code "${order.design}" not found in Master Design Excel. Please upload Master Design Excel first.`
+            : errorMsg,
+        });
+      }
+
+      // Update progress
+      const totalProcessed = startIdx + i + 1;
+      setProgress(Math.round((totalProcessed / orders.length) * 100));
+    }
+
+    return batchResult;
+  };
+
+  const handleUpload = async () => {
+    if (!file || parsedOrders.length === 0) {
+      toast.error('Please select a valid Excel file first');
       return;
     }
 
+    if (!actor) {
+      toast.error('Backend not initialized. Please wait and try again.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProgress(0);
+
+    const finalResult: UploadResult = { success: 0, failed: 0, errors: [] };
+
     try {
-      setUploadProgress(0);
-      await ingestOrders.mutateAsync({
-        orders: parsedOrders,
-        onProgress: (progress) => setUploadProgress(progress),
-      });
-      const count = parsedOrders.length;
+      // Process orders in batches
+      for (let i = 0; i < parsedOrders.length; i += BATCH_SIZE) {
+        const batchResult = await processBatch(parsedOrders, i);
+        finalResult.success += batchResult.success;
+        finalResult.failed += batchResult.failed;
+        finalResult.errors.push(...batchResult.errors);
+
+        // Small delay between batches to prevent overwhelming the backend
+        if (i + BATCH_SIZE < parsedOrders.length) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+
+      setResult(finalResult);
+
+      if (finalResult.success > 0) {
+        await refetchOrders();
+        toast.success(`Successfully uploaded ${finalResult.success} orders`);
+      }
+
+      if (finalResult.failed > 0) {
+        toast.error(`Failed to upload ${finalResult.failed} orders. Check details below.`);
+      }
+
+      // Clear file input
+      setFile(null);
       setParsedOrders([]);
-      setErrors([]);
-      setUploadProgress(0);
-      toast.success(`Successfully ingested ${count} orders`);
     } catch (error) {
-      toast.error('Failed to ingest orders');
-      setUploadProgress(0);
+      console.error('Error during upload:', error);
+      toast.error('An unexpected error occurred during upload');
+    } finally {
+      setIsProcessing(false);
+      setProgress(100);
     }
   };
 
-  const clearErrors = () => {
-    setErrors([]);
-  };
-
   return (
-    <div className="container px-4 sm:px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Ingest Orders</h1>
-        <p className="text-muted-foreground mt-1">
-          Upload daily Excel files to import orders into the system
-        </p>
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Ingest Orders</h1>
+        <p className="text-muted-foreground">Upload Excel file to import orders into the system</p>
       </div>
 
-      <Card className="mb-6 border shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">Upload Excel File</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="excel-file" className="text-sm font-medium">
-                Select Excel File
-              </Label>
-              <div className="mt-2 flex items-center gap-3">
-                <Input
-                  id="excel-file"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileUpload}
-                  disabled={isUploading || ingestOrders.isPending}
-                  className="flex-1"
-                />
-                <Button disabled={isUploading || ingestOrders.isPending} variant="outline">
-                  {isUploading ? (
-                    'Parsing...'
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Upload
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Important:</strong> Before uploading orders, make sure you have uploaded the Master Design Excel
+          with all design code mappings. Orders with unmapped design codes will fail to upload.
+        </AlertDescription>
+      </Alert>
 
-            <div className="rounded-md border border-dashed p-8 text-center bg-muted/30">
-              <FileSpreadsheet className="mx-auto h-10 w-10 text-muted-foreground" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                Expected columns: Order No, Order Type, Product, Design, Weight, Size, Quantity,
-                Remarks
-              </p>
-            </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload Orders Excel</CardTitle>
+          <CardDescription>
+            Select an Excel file containing order data. The file will be parsed and validated before upload.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isProcessing}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <Button onClick={handleUpload} disabled={!file || isProcessing || parsedOrders.length === 0}>
+              <Upload className="mr-2 h-4 w-4" />
+              {isProcessing ? 'Processing...' : 'Upload'}
+            </Button>
           </div>
+
+          {parsedOrders.length > 0 && !isProcessing && (
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm font-medium">Ready to upload: {parsedOrders.length} orders parsed</p>
+            </div>
+          )}
+
+          {isProcessing && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Processing orders...</span>
+                <span>{progress}%</span>
+              </div>
+              <Progress value={progress} />
+            </div>
+          )}
+
+          {result && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-2xl font-bold">{result.success}</p>
+                        <p className="text-sm text-muted-foreground">Successful</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-600" />
+                      <div>
+                        <p className="text-2xl font-bold">{result.failed}</p>
+                        <p className="text-sm text-muted-foreground">Failed</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {result.errors.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Upload Errors</CardTitle>
+                    <CardDescription>The following orders failed to upload:</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {result.errors.map((error, idx) => (
+                        <Alert key={idx} variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            <strong>Row {error.row}:</strong> {error.error}
+                          </AlertDescription>
+                        </Alert>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {errors.length > 0 && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="flex items-center justify-between">
-            <span>Parsing Errors ({errors.length})</span>
-            <Button variant="ghost" size="sm" onClick={clearErrors}>
-              <X className="h-4 w-4" />
-            </Button>
-          </AlertTitle>
-          <AlertDescription>
-            <div className="mt-2 max-h-[200px] overflow-y-auto space-y-1">
-              {errors.map((error, idx) => (
-                <div key={idx} className="text-sm">
-                  <strong>Row {error.row}:</strong> {error.field} - {error.message}
-                </div>
-              ))}
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {parsedOrders.length > 0 && (
-        <Card className="border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-medium">
-              Preview ({parsedOrders.length} orders)
-            </CardTitle>
-            <Button onClick={handleSubmit} disabled={ingestOrders.isPending}>
-              {ingestOrders.isPending ? 'Submitting...' : 'Submit Orders'}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {ingestOrders.isPending && (
-              <div className="mb-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Uploading orders...</span>
-                  <span className="font-medium">{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} className="h-2" />
-              </div>
-            )}
-            <div className="rounded-md border max-h-[500px] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order No</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Design</TableHead>
-                    <TableHead>Weight</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Remarks</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parsedOrders.map((order, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{order.orderNo}</TableCell>
-                      <TableCell>{order.orderType}</TableCell>
-                      <TableCell>{order.product}</TableCell>
-                      <TableCell>{order.design}</TableCell>
-                      <TableCell>{order.weight}g</TableCell>
-                      <TableCell>{order.size}</TableCell>
-                      <TableCell>{order.quantity}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{order.remarks}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

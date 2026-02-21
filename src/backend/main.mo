@@ -1,13 +1,12 @@
-import Text "mo:core/Text";
 import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Array "mo:core/Array";
 import Time "mo:core/Time";
-import List "mo:core/List";
 import Principal "mo:core/Principal";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 import Iter "mo:core/Iter";
+import List "mo:core/List";
 
 
 
@@ -28,7 +27,6 @@ actor {
     #ReturnFromHallmark;
   };
 
-  // Order
   type Order = {
     orderNo : Text;
     orderType : OrderType;
@@ -38,15 +36,29 @@ actor {
     size : Float;
     quantity : Nat;
     remarks : Text;
-    genericName : Text;
-    karigarName : Text;
+    genericName : ?Text;
+    karigarName : ?Text;
     status : OrderStatus;
     orderId : Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
   };
 
-  // Design Mapping
+  type PersistentOrder = {
+    orderNo : Text;
+    orderType : OrderType;
+    product : Text;
+    design : Text;
+    weight : Float;
+    size : Float;
+    quantity : Nat;
+    remarks : Text;
+    status : OrderStatus;
+    orderId : Text;
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+  };
+
   type DesignMapping = {
     designCode : Text;
     genericName : Text;
@@ -63,13 +75,21 @@ actor {
     createdAt : Time.Time;
   };
 
-  // Persistent Storage
-  let orders = Map.empty<Text, Order>();
+  type MappingRecord = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
+  };
+
+  let orders = Map.empty<Text, PersistentOrder>();
   let designMappings = Map.empty<Text, DesignMapping>();
   let designImages = Map.empty<Text, Storage.ExternalBlob>();
   let karigars = Map.empty<Text, Karigar>();
+  let masterDesignMapping = Map.empty<Text, (Text, Text)>();
 
-  // Order Functions
+  var masterDesignExcel : ?Storage.ExternalBlob = null;
+  var activeKarigar : ?Text = null;
+
   public shared ({ caller }) func saveOrder(
     orderNo : Text,
     orderType : OrderType,
@@ -79,13 +99,10 @@ actor {
     size : Float,
     quantity : Nat,
     remarks : Text,
-    genericName : Text,
-    karigarName : Text,
-    status : OrderStatus,
     orderId : Text,
   ) : async () {
     let timestamp = Time.now();
-    let order : Order = {
+    let persistentOrder : PersistentOrder = {
       orderNo;
       orderType;
       product;
@@ -94,17 +111,15 @@ actor {
       size;
       quantity;
       remarks;
-      genericName;
-      karigarName;
-      status;
+      status = #Pending;
       orderId;
       createdAt = timestamp;
       updatedAt = timestamp;
     };
-    orders.add(orderId, order);
+
+    orders.add(orderId, persistentOrder);
   };
 
-  // Karigar Management
   public shared ({ caller }) func addKarigar(name : Text) : async () {
     if (karigars.containsKey(name)) {
       Runtime.trap("Karigar already exists");
@@ -121,7 +136,6 @@ actor {
     karigars.values().toArray();
   };
 
-  // Design Mapping Functions
   public shared ({ caller }) func saveDesignMapping(
     designCode : Text,
     genericName : Text,
@@ -143,6 +157,45 @@ actor {
     designMappings.add(designCode, mapping);
   };
 
+  public shared ({ caller }) func assignOrdersToKarigar(mappings : [MappingRecord]) : async () {
+    var pendingOrders : List.List<PersistentOrder> = List.empty<PersistentOrder>();
+
+    for (mapping in mappings.values()) {
+      switch (activeKarigar) {
+        case (?_) {
+          pendingOrders := List.empty<PersistentOrder>();
+        };
+        case (null) {
+          if (not karigars.containsKey(mapping.karigarName)) {
+            let karigar : Karigar = {
+              name = mapping.karigarName;
+              createdBy = caller;
+              createdAt = Time.now();
+            };
+            karigars.add(mapping.karigarName, karigar);
+          };
+
+          activeKarigar := ?mapping.karigarName;
+        };
+      };
+
+      if (not designMappings.containsKey(mapping.designCode)) {
+        let timestamp = Time.now();
+        let newMapping : DesignMapping = {
+          designCode = mapping.designCode;
+          genericName = mapping.genericName;
+          karigarName = mapping.karigarName;
+          createdBy = caller;
+          updatedBy = null;
+          createdAt = timestamp;
+          updatedAt = timestamp;
+        };
+        designMappings.add(mapping.designCode, newMapping);
+      };
+    };
+    activeKarigar := null;
+  };
+
   public shared ({ caller }) func reassignDesign(designCode : Text, newKarigar : Text) : async () {
     switch (designMappings.get(designCode)) {
       case (null) { Runtime.trap("Design mapping not found") };
@@ -161,16 +214,23 @@ actor {
     };
   };
 
-  // Get Orders with Filters
   public query ({ caller }) func getOrders(
     statusFilter : ?OrderStatus,
     typeFilter : ?OrderType,
     searchText : ?Text,
   ) : async [Order] {
-    orders.values().toArray();
+    orders.values().toArray().map(
+      func(o) {
+        let mapping = designMappings.get(o.design);
+        {
+          o with
+          genericName = mapping.map(func(m) { m.genericName });
+          karigarName = mapping.map(func(m) { m.karigarName });
+        };
+      }
+    );
   };
 
-  // Get Design Mapping
   public query ({ caller }) func getDesignMapping(designCode : Text) : async DesignMapping {
     switch (designMappings.get(designCode)) {
       case (null) { Runtime.trap("Design mapping not found") };
@@ -178,7 +238,12 @@ actor {
     };
   };
 
-  // Delete Order
+  public shared ({ caller }) func batchSaveDesignMappings(mappings : [(Text, DesignMapping)]) : async () {
+    for ((designCode, mapping) in mappings.values()) {
+      designMappings.add(designCode, mapping);
+    };
+  };
+
   public shared ({ caller }) func deleteOrder(orderId : Text) : async () {
     if (not orders.containsKey(orderId)) {
       Runtime.trap("Order not found");
@@ -186,18 +251,65 @@ actor {
     orders.remove(orderId);
   };
 
-  // Design Image Upload
   public shared ({ caller }) func uploadDesignImage(designCode : Text, blob : Storage.ExternalBlob) : async () {
     designImages.add(designCode, blob);
   };
 
-  // Batch Upload Design Images
   public shared ({ caller }) func batchUploadDesignImages(images : [(Text, Storage.ExternalBlob)]) : async () {
     images.forEach(func((designCode, blob)) { designImages.add(designCode, blob) });
   };
 
-  // Get Design Image
   public query ({ caller }) func getDesignImage(designCode : Text) : async ?Storage.ExternalBlob {
     designImages.get(designCode);
+  };
+
+  public type MasterDesignMapping = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
+    createdBy : Principal;
+    updatedBy : ?Principal;
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+  };
+
+  public shared ({ caller }) func uploadMasterDesignExcel(blob : Storage.ExternalBlob) : async () {
+    masterDesignExcel := ?blob;
+  };
+
+  public query ({ caller }) func getMasterDesignExcel() : async ?Storage.ExternalBlob {
+    masterDesignExcel;
+  };
+
+  public query ({ caller }) func isExistingDesignCodes(designCodes : [Text]) : async [Bool] {
+    designCodes.map(func(designCode) { designMappings.containsKey(designCode) });
+  };
+
+  public shared ({ caller }) func uploadDesignMapping(mappingData : [MappingRecord]) : async () {
+    masterDesignMapping.clear();
+    for (record in mappingData.values()) {
+      masterDesignMapping.add(record.designCode, (record.genericName, record.karigarName));
+    };
+  };
+
+  public shared ({ caller }) func updateOrdersStatusToReady(orderIds : [Text]) : async () {
+    for (orderId in orderIds.values()) {
+      switch (orders.get(orderId)) {
+        case (null) { Runtime.trap("Order with id " # orderId # " not found") };
+        case (?order) {
+          switch (order.status) {
+            case (#Pending) {
+              let updatedOrder = {
+                order with
+                status = #Ready;
+                updatedAt = Time.now();
+              };
+              orders.add(orderId, updatedOrder);
+            };
+            case (_) {};
+          };
+        };
+      };
+    };
   };
 };

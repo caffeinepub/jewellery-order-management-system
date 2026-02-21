@@ -1,248 +1,358 @@
-import { Order } from '@/backend';
+import { Order } from "@/backend";
+import { ExternalBlob } from "@/backend";
 
-export async function exportToExcel(orders: Order[]): Promise<void> {
+export async function exportToExcel(orders: Order[]) {
   try {
-    // Dynamic import of xlsx from CDN with type assertion
-    const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
+    // Dynamic import of xlsx from CDN
+    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
     
     const data = orders.map((order) => ({
-      'Order No': order.orderNo,
-      'Order Type': order.orderType,
-      Product: order.product,
       Design: order.design,
-      'Generic Name': order.genericName,
-      Karigar: order.karigarName,
+      "Generic Name": order.genericName || "-",
+      Karigar: order.karigarName || "-",
       Weight: order.weight,
       Size: order.size,
       Quantity: Number(order.quantity),
-      Status: order.status,
-      Remarks: order.remarks,
+      Remarks: order.remarks || "-",
+      "Order No": order.orderNo,
+      Type: order.orderType,
+      Product: order.product,
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders');
-
-    XLSX.writeFile(workbook, `orders-${Date.now()}.xlsx`);
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Orders");
+    XLSX.writeFile(wb, `orders_${new Date().toISOString().split("T")[0]}.xlsx`);
   } catch (error) {
     console.error('Export to Excel failed:', error);
-    // Fallback to CSV if Excel export fails
-    exportToCSV(orders);
-  }
-}
-
-function exportToCSV(orders: Order[]): void {
-  const headers = [
-    'Order No',
-    'Order Type',
-    'Product',
-    'Design',
-    'Generic Name',
-    'Karigar',
-    'Weight',
-    'Size',
-    'Quantity',
-    'Status',
-    'Remarks',
-  ];
-
-  const rows = orders.map((order) => [
-    order.orderNo,
-    order.orderType,
-    order.product,
-    order.design,
-    order.genericName,
-    order.karigarName,
-    order.weight.toString(),
-    order.size.toString(),
-    Number(order.quantity).toString(),
-    order.status,
-    order.remarks,
-  ]);
-
-  const csvContent = [
-    headers.join(','),
-    ...rows.map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ),
-  ].join('\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `orders-${Date.now()}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-export async function exportToPDF(orders: Order[]): Promise<void> {
-  try {
-    // Create a simple HTML table and convert to PDF using browser print
-    const tableHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Order Report</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #333; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-          th { background-color: #4CAF50; color: white; }
-          tr:nth-child(even) { background-color: #f2f2f2; }
-        </style>
-      </head>
-      <body>
-        <h1>Order Report</h1>
-        <p>Generated: ${new Date().toLocaleString()}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Order No</th>
-              <th>Type</th>
-              <th>Product</th>
-              <th>Design</th>
-              <th>Generic</th>
-              <th>Karigar</th>
-              <th>Weight</th>
-              <th>Size</th>
-              <th>Qty</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${orders
-              .map(
-                (order) => `
-              <tr>
-                <td>${order.orderNo}</td>
-                <td>${order.orderType}</td>
-                <td>${order.product}</td>
-                <td>${order.design}</td>
-                <td>${order.genericName}</td>
-                <td>${order.karigarName}</td>
-                <td>${order.weight.toFixed(2)}</td>
-                <td>${order.size}</td>
-                <td>${Number(order.quantity)}</td>
-                <td>${order.status}</td>
-              </tr>
-            `
-              )
-              .join('')}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([tableHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
-    
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print();
-        setTimeout(() => {
-          printWindow.close();
-          URL.revokeObjectURL(url);
-        }, 100);
-      };
-    }
-  } catch (error) {
-    console.error('Export to PDF failed:', error);
     throw error;
   }
 }
 
-export async function exportToJPEG(orders: Order[]): Promise<void> {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas context not available');
+// Helper function to extract numeric portion from design code for sorting
+function extractNumericPortion(designCode: string): number {
+  const match = designCode.match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
 
-  canvas.width = 1200;
-  const rowHeight = 30;
-  const headerHeight = 60;
-  const footerHeight = 20;
-  canvas.height = headerHeight + Math.min(orders.length, 30) * rowHeight + footerHeight;
+// Helper function to fetch and convert design image to base64
+async function fetchDesignImageAsBase64(designCode: string, actor: any): Promise<string | null> {
+  try {
+    if (!actor) return null;
+    const blob = await actor.getDesignImage(designCode);
+    if (!blob) return null;
 
-  // Background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Title
-  ctx.fillStyle = '#2c3e50';
-  ctx.font = 'bold 24px Arial';
-  ctx.fillText('Order Report', 20, 35);
-
-  // Date
-  ctx.font = '12px Arial';
-  ctx.fillStyle = '#7f8c8d';
-  ctx.fillText(`Generated: ${new Date().toLocaleString()}`, 20, 55);
-
-  // Header row
-  ctx.fillStyle = '#34495e';
-  ctx.fillRect(0, headerHeight, canvas.width, rowHeight);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 11px Arial';
-  const headers = ['Order No', 'Type', 'Product', 'Design', 'Karigar', 'Weight', 'Qty', 'Status'];
-  const colWidths = [120, 60, 140, 140, 140, 80, 60, 100];
-  let xPos = 20;
-  headers.forEach((header, i) => {
-    ctx.fillText(header, xPos, headerHeight + 20);
-    xPos += colWidths[i];
-  });
-
-  // Data rows
-  ctx.fillStyle = '#2c3e50';
-  ctx.font = '10px Arial';
-  const displayOrders = orders.slice(0, 30); // Limit to 30 rows for image
-  displayOrders.forEach((order, idx) => {
-    const y = headerHeight + rowHeight + idx * rowHeight + 18;
+    // Get bytes from ExternalBlob
+    const bytes = await blob.getBytes();
     
-    // Alternate row background
-    if (idx % 2 === 0) {
-      ctx.fillStyle = '#ecf0f1';
-      ctx.fillRect(0, headerHeight + rowHeight + idx * rowHeight, canvas.width, rowHeight);
+    // Convert Uint8Array to base64
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
     }
+    const base64 = btoa(binary);
     
-    ctx.fillStyle = '#2c3e50';
-    const values = [
-      order.orderNo.substring(0, 15),
-      order.orderType,
-      order.product.substring(0, 15),
-      order.design.substring(0, 15),
-      order.karigarName.substring(0, 15),
-      order.weight.toFixed(1) + 'g',
-      Number(order.quantity).toString(),
-      order.status,
-    ];
-    
-    xPos = 20;
-    values.forEach((value, i) => {
-      ctx.fillText(value, xPos, y);
-      xPos += colWidths[i];
-    });
+    // Return as data URL (assuming JPEG, adjust if needed)
+    return `data:image/jpeg;base64,${base64}`;
+  } catch (error) {
+    console.error(`Failed to fetch image for ${designCode}:`, error);
+    return null;
+  }
+}
+
+export async function exportToPDF(orders: Order[], actor?: any) {
+  // Group orders by design code
+  const groupedOrders = orders.reduce((acc, order) => {
+    if (!acc[order.design]) {
+      acc[order.design] = [];
+    }
+    acc[order.design].push(order);
+    return acc;
+  }, {} as Record<string, Order[]>);
+
+  // Sort design codes numerically (lower to higher)
+  const sortedDesignCodes = Object.keys(groupedOrders).sort((a, b) => {
+    return extractNumericPortion(a) - extractNumericPortion(b);
   });
 
-  // Footer note if more orders exist
-  if (orders.length > 30) {
-    ctx.fillStyle = '#7f8c8d';
-    ctx.font = 'italic 11px Arial';
-    ctx.fillText(
-      `Showing 30 of ${orders.length} orders. Export to Excel for complete data.`,
-      20,
-      canvas.height - 10
-    );
+  // Fetch all design images in parallel
+  const imagePromises = sortedDesignCodes.map(async (designCode) => {
+    const base64Image = actor ? await fetchDesignImageAsBase64(designCode, actor) : null;
+    return { designCode, base64Image };
+  });
+
+  const imageResults = await Promise.all(imagePromises);
+  const imageMap = new Map(imageResults.map(r => [r.designCode, r.base64Image]));
+
+  let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        @page { size: A4; margin: 20mm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        h1 { text-align: center; margin-bottom: 5px; }
+        h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; font-weight: bold; }
+        .design-group { page-break-after: always; }
+        .design-header { 
+          background-color: #4CAF50; 
+          color: white; 
+          font-weight: bold; 
+          font-size: 16px; 
+          padding: 12px; 
+          margin: 20px 0 10px 0; 
+          border-radius: 4px;
+        }
+        .image-container { text-align: center; margin: 15px 0; }
+        .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
+        .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <h1>Shree I Jewellery</h1>
+      <h2>Orders - ${new Date().toLocaleDateString()}</h2>
+  `;
+
+  for (const designCode of sortedDesignCodes) {
+    const designOrders = groupedOrders[designCode];
+    const base64Image = imageMap.get(designCode);
+
+    html += `<div class="design-group">`;
+    html += `<div class="design-header">Design: ${designCode}</div>`;
+    
+    html += `<div class="image-container">`;
+    if (base64Image) {
+      html += `<img src="${base64Image}" alt="Design ${designCode}" />`;
+    } else {
+      html += `<div class="image-placeholder">Image Not Available</div>`;
+    }
+    html += `</div>`;
+
+    html += `<table>
+      <thead>
+        <tr>
+          <th>Generic Name</th>
+          <th>Weight</th>
+          <th>Qty</th>
+          <th>Size</th>
+          <th>Remarks</th>
+          <th>Order No</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    designOrders.forEach((order) => {
+      html += `<tr>
+        <td>${order.genericName || "-"}</td>
+        <td>${order.weight.toFixed(3)}</td>
+        <td>${order.quantity}</td>
+        <td>${order.size.toFixed(2)}</td>
+        <td>${order.remarks || "-"}</td>
+        <td>${order.orderNo}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
   }
 
-  canvas.toBlob((blob) => {
-    if (!blob) throw new Error('Failed to create image');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `orders-${Date.now()}.jpg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, 'image/jpeg', 0.95);
+  html += `</body></html>`;
+
+  const printWindow = window.open("", "_blank");
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
+}
+
+export async function exportToJPEG(orders: Order[]) {
+  const groupedOrders = orders.reduce((acc, order) => {
+    if (!acc[order.design]) {
+      acc[order.design] = [];
+    }
+    acc[order.design].push(order);
+    return acc;
+  }, {} as Record<string, Order[]>);
+
+  let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; background: white; }
+        h1 { text-align: center; margin-bottom: 5px; }
+        h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .design-header { font-weight: bold; font-size: 14px; margin: 20px 0 10px 0; }
+      </style>
+    </head>
+    <body>
+      <h1>Shree I Jewellery</h1>
+      <h2>Orders - ${new Date().toLocaleDateString()}</h2>
+  `;
+
+  for (const [design, designOrders] of Object.entries(groupedOrders)) {
+    html += `<div class="design-header">Design: ${design}</div>`;
+    html += `<table>
+      <thead>
+        <tr>
+          <th>Generic Name</th>
+          <th>Karigar</th>
+          <th>Weight</th>
+          <th>Size</th>
+          <th>Qty</th>
+          <th>Remarks</th>
+          <th>Order No</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    designOrders.forEach((order) => {
+      html += `<tr>
+        <td>${order.genericName || "-"}</td>
+        <td>${order.karigarName || "-"}</td>
+        <td>${order.weight.toFixed(3)}</td>
+        <td>${order.size.toFixed(2)}</td>
+        <td>${order.quantity}</td>
+        <td>${order.remarks || "-"}</td>
+        <td>${order.orderNo}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>`;
+  }
+
+  html += `</body></html>`;
+
+  const printWindow = window.open("", "_blank");
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
+}
+
+export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any) {
+  // Group orders by design code
+  const groupedOrders = orders.reduce((acc, order) => {
+    if (!acc[order.design]) {
+      acc[order.design] = [];
+    }
+    acc[order.design].push(order);
+    return acc;
+  }, {} as Record<string, Order[]>);
+
+  // Sort design codes numerically (lower to higher)
+  const sortedDesignCodes = Object.keys(groupedOrders).sort((a, b) => {
+    return extractNumericPortion(a) - extractNumericPortion(b);
+  });
+
+  // Fetch all design images in parallel
+  const imagePromises = sortedDesignCodes.map(async (designCode) => {
+    const base64Image = actor ? await fetchDesignImageAsBase64(designCode, actor) : null;
+    return { designCode, base64Image };
+  });
+
+  const imageResults = await Promise.all(imagePromises);
+  const imageMap = new Map(imageResults.map(r => [r.designCode, r.base64Image]));
+
+  let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        @page { size: A4; margin: 20mm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        h1 { text-align: center; margin-bottom: 5px; }
+        h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; font-weight: bold; }
+        .design-group { page-break-after: always; }
+        .design-header { 
+          background-color: #4CAF50; 
+          color: white; 
+          font-weight: bold; 
+          font-size: 16px; 
+          padding: 12px; 
+          margin: 20px 0 10px 0; 
+          border-radius: 4px;
+        }
+        .image-container { text-align: center; margin: 15px 0; }
+        .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
+        .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
+      </style>
+    </head>
+    <body>
+      <h1>Shree I Jewellery</h1>
+      <h2>Orders - ${new Date().toLocaleDateString()}</h2>
+  `;
+
+  for (const designCode of sortedDesignCodes) {
+    const designOrders = groupedOrders[designCode];
+    const base64Image = imageMap.get(designCode);
+
+    html += `<div class="design-group">`;
+    html += `<div class="design-header">Design: ${designCode}</div>`;
+    
+    html += `<div class="image-container">`;
+    if (base64Image) {
+      html += `<img src="${base64Image}" alt="Design ${designCode}" />`;
+    } else {
+      html += `<div class="image-placeholder">Image Not Available</div>`;
+    }
+    html += `</div>`;
+
+    html += `<table>
+      <thead>
+        <tr>
+          <th>Generic Name</th>
+          <th>Weight</th>
+          <th>Qty</th>
+          <th>Size</th>
+          <th>Remarks</th>
+          <th>Design</th>
+          <th>Order No</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    designOrders.forEach((order) => {
+      html += `<tr>
+        <td>${order.genericName || "-"}</td>
+        <td>${order.weight.toFixed(3)}</td>
+        <td>${order.quantity}</td>
+        <td>${order.size.toFixed(2)}</td>
+        <td>${order.remarks || "-"}</td>
+        <td>${order.design}</td>
+        <td>${order.orderNo}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+  }
+
+  html += `</body></html>`;
+
+  const printWindow = window.open("", "_blank");
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
 }

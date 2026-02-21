@@ -1,46 +1,35 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-21T13:14:04.539Z",
+  "generatedAt": "2026-02-21T21:18:18.543Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 3,
+    "total": 2,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+        "summary": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/excelParser.ts"
+          "frontend/src/utils/exportUtils.ts"
         ],
         "matchedFiles": [
-          "frontend/src/utils/excelParser.ts"
+          "frontend/src/utils/exportUtils.ts"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+        "summary": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/excelParser.ts"
+          "frontend/src/utils/exportUtils.ts"
         ],
         "matchedFiles": [
-          "frontend/src/utils/excelParser.ts"
-        ]
-      },
-      {
-        "id": "REQ-3",
-        "summary": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/excelParser.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/excelParser.ts"
+          "frontend/src/utils/exportUtils.ts"
         ]
       }
     ]
@@ -50,7 +39,9 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/utils/excelParser.ts",
+    "frontend/src/components/dashboard/OrderTable.tsx",
+    "frontend/src/pages/KarigarDetail.tsx",
+    "frontend/src/utils/exportUtils.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

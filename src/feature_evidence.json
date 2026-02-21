@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-excel-parser-in-frontend-src-utils-excelparser-ts-to-correctly-read-karigar-mapping-data-from-columns-a-design-code-b-generic-name-and-c-karigar-name-with-exact-header-matching",
-      "featureTitle": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+      "featureId": "feature-fix-pdf-export-to-embed-actual-design-images-from-the-design-image-page-instead-of-showing-placeholder-text-like-design-image-chtmn40009-the-system-must-fetch-uploaded-design-images-by-design-code-and-convert-them-to-a-format-suitable-for-pdf-embedding-base64-or-similar",
+      "featureTitle": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
       "files": [
-        "frontend/src/utils/excelParser.ts"
+        "frontend/src/utils/exportUtils.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -23,10 +23,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-add-enhanced-error-logging-to-the-karigar-mapping-excel-parser-to-show-exactly-what-values-are-being-read-from-each-cell-during-parsing",
-      "featureTitle": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+      "featureId": "feature-restore-the-colorful-pdf-export-structure-from-the-previous-version-including-green-header-rows-for-each-design-group-visual-distinction-between-design-sections-and-sorting-orders-by-design-code-from-lower-to-higher-within-each-group",
+      "featureTitle": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
       "files": [
-        "frontend/src/utils/excelParser.ts"
+        "frontend/src/utils/exportUtils.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -40,27 +40,6 @@
       ],
       "testIds": [
         "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-ensure-the-excel-parser-handles-both-xls-and-xlsx-file-formats-correctly-for-karigar-mapping-uploads",
-      "featureTitle": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
-      "files": [
-        "frontend/src/utils/excelParser.ts"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-3"
       ],
       "confidence": "high"
     }

@@ -1,56 +1,55 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import SummaryCards from '@/components/dashboard/SummaryCards';
-import ReadyTab from '@/components/dashboard/ReadyTab';
-import HallmarkTab from '@/components/dashboard/HallmarkTab';
-import TotalOrdersTab from '@/components/dashboard/TotalOrdersTab';
-import CustomerOrdersTab from '@/components/dashboard/CustomerOrdersTab';
-import KarigarsTab from '@/components/dashboard/KarigarsTab';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SummaryCards from "@/components/dashboard/SummaryCards";
+import TotalOrdersTab from "@/components/dashboard/TotalOrdersTab";
+import ReadyTab from "@/components/dashboard/ReadyTab";
+import HallmarkTab from "@/components/dashboard/HallmarkTab";
+import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
+import KarigarsTab from "@/components/dashboard/KarigarsTab";
+import UnmappedSection from "@/components/dashboard/UnmappedSection";
 
 export default function Dashboard() {
   return (
-    <div className="container px-4 sm:px-6 py-6 sm:py-8 max-w-full overflow-x-hidden">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-          Manage your jewellery orders efficiently
+    <div className="container mx-auto py-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Manage your jewellery orders and production workflow
         </p>
       </div>
 
+      <UnmappedSection />
+
       <SummaryCards />
 
-      <div className="mt-6 sm:mt-8">
-        <Tabs defaultValue="total-orders" className="w-full">
-          <div className="overflow-x-auto pb-2">
-            <TabsList className="inline-flex w-full sm:w-auto min-w-full sm:min-w-0">
-              <TabsTrigger value="total-orders" className="flex-1 sm:flex-none">Total Orders</TabsTrigger>
-              <TabsTrigger value="ready" className="flex-1 sm:flex-none">Ready</TabsTrigger>
-              <TabsTrigger value="hallmark" className="flex-1 sm:flex-none">Hallmark</TabsTrigger>
-              <TabsTrigger value="customer-orders" className="flex-1 sm:flex-none whitespace-nowrap">Customer Orders</TabsTrigger>
-              <TabsTrigger value="karigars" className="flex-1 sm:flex-none">Karigars</TabsTrigger>
-            </TabsList>
-          </div>
+      <Tabs defaultValue="total" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsTrigger value="total">Total Orders</TabsTrigger>
+          <TabsTrigger value="ready">Ready</TabsTrigger>
+          <TabsTrigger value="hallmark">Hallmark</TabsTrigger>
+          <TabsTrigger value="customer">Customer Orders</TabsTrigger>
+          <TabsTrigger value="karigars">Karigars</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="total-orders" className="mt-6">
-            <TotalOrdersTab />
-          </TabsContent>
+        <TabsContent value="total" className="space-y-4">
+          <TotalOrdersTab />
+        </TabsContent>
 
-          <TabsContent value="ready" className="mt-6">
-            <ReadyTab />
-          </TabsContent>
+        <TabsContent value="ready" className="space-y-4">
+          <ReadyTab />
+        </TabsContent>
 
-          <TabsContent value="hallmark" className="mt-6">
-            <HallmarkTab />
-          </TabsContent>
+        <TabsContent value="hallmark" className="space-y-4">
+          <HallmarkTab />
+        </TabsContent>
 
-          <TabsContent value="customer-orders" className="mt-6">
-            <CustomerOrdersTab />
-          </TabsContent>
+        <TabsContent value="customer" className="space-y-4">
+          <CustomerOrdersTab />
+        </TabsContent>
 
-          <TabsContent value="karigars" className="mt-6">
-            <KarigarsTab />
-          </TabsContent>
-        </Tabs>
-      </div>
+        <TabsContent value="karigars" className="space-y-4">
+          <KarigarsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -25,6 +25,11 @@ export interface Karigar {
   'createdAt' : Time,
   'createdBy' : Principal,
 }
+export interface MappingRecord {
+  'karigarName' : string,
+  'genericName' : string,
+  'designCode' : string,
+}
 export interface Order {
   'weight' : number,
   'status' : OrderStatus,
@@ -34,9 +39,9 @@ export interface Order {
   'design' : string,
   'orderId' : string,
   'orderNo' : string,
-  'karigarName' : string,
+  'karigarName' : [] | [string],
   'updatedAt' : Time,
-  'genericName' : string,
+  'genericName' : [] | [string],
   'quantity' : bigint,
   'remarks' : string,
   'product' : string,
@@ -76,6 +81,11 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   'addKarigar' : ActorMethod<[string], undefined>,
+  'assignOrdersToKarigar' : ActorMethod<[Array<MappingRecord>], undefined>,
+  'batchSaveDesignMappings' : ActorMethod<
+    [Array<[string, DesignMapping]>],
+    undefined
+  >,
   'batchUploadDesignImages' : ActorMethod<
     [Array<[string, ExternalBlob]>],
     undefined
@@ -84,30 +94,22 @@ export interface _SERVICE {
   'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
   'getDesignMapping' : ActorMethod<[string], DesignMapping>,
   'getKarigars' : ActorMethod<[], Array<Karigar>>,
+  'getMasterDesignExcel' : ActorMethod<[], [] | [ExternalBlob]>,
   'getOrders' : ActorMethod<
     [[] | [OrderStatus], [] | [OrderType], [] | [string]],
     Array<Order>
   >,
+  'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'reassignDesign' : ActorMethod<[string, string], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'saveOrder' : ActorMethod<
-    [
-      string,
-      OrderType,
-      string,
-      string,
-      number,
-      number,
-      bigint,
-      string,
-      string,
-      string,
-      OrderStatus,
-      string,
-    ],
+    [string, OrderType, string, string, number, number, bigint, string, string],
     undefined
   >,
+  'updateOrdersStatusToReady' : ActorMethod<[Array<string>], undefined>,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,
+  'uploadDesignMapping' : ActorMethod<[Array<MappingRecord>], undefined>,
+  'uploadMasterDesignExcel' : ActorMethod<[ExternalBlob], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useGetUnmappedOrders, useUpdateUnmappedOrder } from '@/hooks/useQueries';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -11,128 +10,161 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UnmappedCodes() {
-  const { data: orders = [], isLoading } = useGetUnmappedOrders();
-  const updateOrder = useUpdateUnmappedOrder();
-  const [editingData, setEditingData] = useState<Record<string, { genericName: string; karigarName: string }>>({});
+  const { data: unmappedOrders = [], isLoading } = useGetUnmappedOrders();
+  const updateMutation = useUpdateUnmappedOrder();
+  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{
+    genericName: string;
+    karigarName: string;
+  }>({ genericName: '', karigarName: '' });
 
-  const handleInputChange = (orderId: string, field: 'genericName' | 'karigarName', value: string) => {
-    setEditingData((prev) => ({
-      ...prev,
-      [orderId]: {
-        ...prev[orderId],
-        [field]: value,
-      },
-    }));
+  // Group by design code
+  const groupedOrders = unmappedOrders.reduce((acc, order) => {
+    if (!acc[order.design]) {
+      acc[order.design] = {
+        designCode: order.design,
+        genericName: order.genericName || '',
+        karigarName: order.karigarName || '',
+        count: 0,
+      };
+    }
+    acc[order.design].count++;
+    return acc;
+  }, {} as Record<string, { designCode: string; genericName: string; karigarName: string; count: number }>);
+
+  const handleEdit = (designCode: string, genericName: string, karigarName: string) => {
+    setEditingRow(designCode);
+    setEditValues({ genericName, karigarName });
   };
 
-  const handleSave = async (orderId: string) => {
-    const data = editingData[orderId];
-    if (!data?.genericName || !data?.karigarName) {
-      toast.error('Please fill in both Generic Name and Karigar Name');
-      return;
-    }
-
+  const handleSave = async (designCode: string) => {
     try {
-      await updateOrder.mutateAsync({
-        orderId,
-        genericName: data.genericName,
-        karigarName: data.karigarName,
+      await updateMutation.mutateAsync({
+        designCode,
+        genericName: editValues.genericName,
+        karigarName: editValues.karigarName,
       });
-      toast.success('Order mapped successfully');
-      setEditingData((prev) => {
-        const newData = { ...prev };
-        delete newData[orderId];
-        return newData;
-      });
+      toast.success('Mapping updated successfully');
+      setEditingRow(null);
     } catch (error) {
-      toast.error('Failed to update order');
+      toast.error('Failed to update mapping');
+      console.error(error);
     }
   };
+
+  const handleCancel = () => {
+    setEditingRow(null);
+    setEditValues({ genericName: '', karigarName: '' });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Unmapped Codes</h1>
-        <p className="text-muted-foreground mt-1">
-          Assign Generic Name and Karigar to orders without matching design mappings
+    <div className="container mx-auto py-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Unmapped Design Codes</h1>
+        <p className="text-muted-foreground">
+          Design codes that are missing generic name or karigar assignment
         </p>
       </div>
 
-      <Card className="border shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">
-            Unmapped Orders ({orders.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-muted-foreground">Loading unmapped orders...</div>
-            </div>
-          ) : orders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <p className="text-muted-foreground">No unmapped orders found</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                All orders have been successfully mapped!
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order No</TableHead>
-                    <TableHead>Design Code</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Generic Name</TableHead>
-                    <TableHead>Karigar Name</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.orderId}>
-                      <TableCell className="font-medium">{order.orderNo}</TableCell>
-                      <TableCell>{order.design}</TableCell>
-                      <TableCell>{order.product}</TableCell>
-                      <TableCell>
-                        <Input
-                          placeholder="Enter generic name"
-                          value={editingData[order.orderId]?.genericName || ''}
-                          onChange={(e) =>
-                            handleInputChange(order.orderId, 'genericName', e.target.value)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          placeholder="Enter karigar name"
-                          value={editingData[order.orderId]?.karigarName || ''}
-                          onChange={(e) =>
-                            handleInputChange(order.orderId, 'karigarName', e.target.value)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Design Code</TableHead>
+              <TableHead>Generic Name</TableHead>
+              <TableHead>Karigar Name</TableHead>
+              <TableHead>Order Count</TableHead>
+              <TableHead className="w-24">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Object.values(groupedOrders).length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  All design codes are mapped!
+                </TableCell>
+              </TableRow>
+            ) : (
+              Object.values(groupedOrders).map((group) => (
+                <TableRow key={group.designCode}>
+                  <TableCell className="font-medium">{group.designCode}</TableCell>
+                  <TableCell>
+                    {editingRow === group.designCode ? (
+                      <Input
+                        value={editValues.genericName}
+                        onChange={(e) =>
+                          setEditValues({ ...editValues, genericName: e.target.value })
+                        }
+                        placeholder="Enter generic name"
+                      />
+                    ) : (
+                      group.genericName || <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingRow === group.designCode ? (
+                      <Input
+                        value={editValues.karigarName}
+                        onChange={(e) =>
+                          setEditValues({ ...editValues, karigarName: e.target.value })
+                        }
+                        placeholder="Enter karigar name"
+                      />
+                    ) : (
+                      group.karigarName || <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>{group.count}</TableCell>
+                  <TableCell>
+                    {editingRow === group.designCode ? (
+                      <div className="flex gap-2">
                         <Button
-                          onClick={() => handleSave(order.orderId)}
-                          disabled={updateOrder.isPending}
-                          size="sm"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleSave(group.designCode)}
+                          disabled={updateMutation.isPending}
                         >
-                          Save
+                          <Check className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={handleCancel}
+                          disabled={updateMutation.isPending}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          handleEdit(group.designCode, group.genericName, group.karigarName)
+                        }
+                      >
+                        Edit
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

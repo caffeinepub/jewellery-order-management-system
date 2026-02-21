@@ -14,6 +14,11 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
+export interface MappingRecord {
+    karigarName: string;
+    genericName: string;
+    designCode: string;
+}
 export type Time = bigint;
 export interface DesignMapping {
     createdAt: Time;
@@ -38,9 +43,9 @@ export interface Order {
     design: string;
     orderId: string;
     orderNo: string;
-    karigarName: string;
+    karigarName?: string;
     updatedAt: Time;
-    genericName: string;
+    genericName?: string;
     quantity: bigint;
     remarks: string;
     product: string;
@@ -57,14 +62,21 @@ export enum OrderType {
 }
 export interface backendInterface {
     addKarigar(name: string): Promise<void>;
+    assignOrdersToKarigar(mappings: Array<MappingRecord>): Promise<void>;
+    batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     deleteOrder(orderId: string): Promise<void>;
     getDesignImage(designCode: string): Promise<ExternalBlob | null>;
     getDesignMapping(designCode: string): Promise<DesignMapping>;
     getKarigars(): Promise<Array<Karigar>>;
+    getMasterDesignExcel(): Promise<ExternalBlob | null>;
     getOrders(statusFilter: OrderStatus | null, typeFilter: OrderType | null, searchText: string | null): Promise<Array<Order>>;
+    isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
-    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, genericName: string, karigarName: string, status: OrderStatus, orderId: string): Promise<void>;
+    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    updateOrdersStatusToReady(orderIds: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;
+    uploadDesignMapping(mappingData: Array<MappingRecord>): Promise<void>;
+    uploadMasterDesignExcel(blob: ExternalBlob): Promise<void>;
 }

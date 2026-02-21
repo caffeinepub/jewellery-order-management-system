@@ -122,48 +122,22 @@ export async function parseMasterDesignExcel(file: File): Promise<
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        console.log('📊 Parsing Master Design Excel file');
+        console.log('📊 Parsing Master Design Excel file (positional columns A, B, C)');
         console.log('Sheet name:', sheetName);
         console.log('Worksheet range:', worksheet['!ref']);
 
         // Get the range of the worksheet
         const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
         
-        // Read headers from first row
-        const headers: { [key: string]: number } = {};
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-          const cell = worksheet[cellAddress];
-          if (cell && cell.v) {
-            const headerValue = String(cell.v).trim();
-            headers[headerValue] = col;
-            console.log(`Header found: "${headerValue}" in column ${col} (${String.fromCharCode(65 + col)})`);
-          }
-        }
-
-        // Check if we found the expected headers
-        const designCodeCol = headers['Design Code'];
-        const genericNameCol = headers['Generic Name'];
-        const karigarNameCol = headers['Karigar Name'];
-
-        console.log('Header mapping:', {
-          'Design Code': designCodeCol !== undefined ? `Column ${String.fromCharCode(65 + designCodeCol)}` : 'NOT FOUND',
-          'Generic Name': genericNameCol !== undefined ? `Column ${String.fromCharCode(65 + genericNameCol)}` : 'NOT FOUND',
-          'Karigar Name': karigarNameCol !== undefined ? `Column ${String.fromCharCode(65 + karigarNameCol)}` : 'NOT FOUND',
-        });
-
-        if (designCodeCol === undefined || genericNameCol === undefined || karigarNameCol === undefined) {
-          console.error('❌ Required headers not found. Available headers:', Object.keys(headers));
-          reject(new Error('Excel file must have headers: "Design Code", "Generic Name", "Karigar Name"'));
-          return;
-        }
-
         const mappings: any[] = [];
         const errors: ParseError[] = [];
 
-        // Process data rows (starting from row 1, since row 0 is headers)
+        // Parse by column position: A=0 (Design Code), B=1 (Generic Name), C=2 (Karigar Name)
+        // Skip first row (headers) and start from row 1
         const CHUNK_SIZE = 100;
         const totalRows = range.e.r;
+        
+        console.log(`Processing ${totalRows} rows (excluding header row 0)`);
         
         for (let startRow = 1; startRow <= totalRows; startRow += CHUNK_SIZE) {
           const endRow = Math.min(startRow + CHUNK_SIZE - 1, totalRows);
@@ -171,34 +145,35 @@ export async function parseMasterDesignExcel(file: File): Promise<
           for (let row = startRow; row <= endRow; row++) {
             const rowNumber = row + 1; // Excel row number (1-based)
             
-            // Read cell values directly
-            const designCodeCell = worksheet[XLSX.utils.encode_cell({ r: row, c: designCodeCol })];
-            const genericNameCell = worksheet[XLSX.utils.encode_cell({ r: row, c: genericNameCol })];
-            const karigarNameCell = worksheet[XLSX.utils.encode_cell({ r: row, c: karigarNameCol })];
+            // Read cells by position: Column A (0), Column B (1), Column C (2)
+            const cellA = worksheet[XLSX.utils.encode_cell({ r: row, c: 0 })]; // Column A - Design Code
+            const cellB = worksheet[XLSX.utils.encode_cell({ r: row, c: 1 })]; // Column B - Generic Name
+            const cellC = worksheet[XLSX.utils.encode_cell({ r: row, c: 2 })]; // Column C - Karigar Name
             
             // Extract values, handling different cell types
-            const designCode = designCodeCell ? String(designCodeCell.v || '').trim() : '';
-            const genericName = genericNameCell ? String(genericNameCell.v || '').trim() : '';
-            const karigarName = karigarNameCell ? String(karigarNameCell.v || '').trim() : '';
+            const designCode = cellA ? String(cellA.v || '').trim() : '';
+            const genericName = cellB ? String(cellB.v || '').trim() : '';
+            const karigarName = cellC ? String(cellC.v || '').trim() : '';
 
             // Log first few rows for debugging
             if (row <= 3) {
-              console.log(`Row ${rowNumber} values:`, {
-                designCode: `"${designCode}"`,
-                genericName: `"${genericName}"`,
-                karigarName: `"${karigarName}"`,
-              });
+              console.log(`Row ${rowNumber} (A=${designCode}, B=${genericName}, C=${karigarName})`);
+            }
+
+            // Skip completely empty rows
+            if (!designCode && !genericName && !karigarName) {
+              continue;
             }
 
             // Validate required fields
             if (!designCode) {
-              errors.push({ row: rowNumber, field: 'Design Code', message: 'Design Code is required' });
+              errors.push({ row: rowNumber, field: 'Column A (Design Code)', message: 'Design Code is required' });
             }
             if (!genericName) {
-              errors.push({ row: rowNumber, field: 'Generic Name', message: 'Generic Name is required' });
+              errors.push({ row: rowNumber, field: 'Column B (Generic Name)', message: 'Generic Name is required' });
             }
             if (!karigarName) {
-              errors.push({ row: rowNumber, field: 'Karigar Name', message: 'Karigar Name is required' });
+              errors.push({ row: rowNumber, field: 'Column C (Karigar Name)', message: 'Karigar Name is required' });
             }
 
             // Only add to mappings if all required fields are present
@@ -232,4 +207,28 @@ export async function parseMasterDesignExcel(file: File): Promise<
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(file);
   });
+}
+
+// Alias for backward compatibility
+export const parseKarigarMappingExcel = parseMasterDesignExcel;
+
+// Parse orders Excel - returns orders with orderId generated
+export async function parseOrdersExcel(file: File): Promise<Array<{
+  orderNo: string;
+  orderType: OrderType;
+  product: string;
+  design: string;
+  weight: number;
+  size: number;
+  quantity: bigint;
+  remarks: string;
+  orderId: string;
+}>> {
+  const result = await parseExcelFile(file);
+  
+  return result.data.map((order) => ({
+    ...order,
+    quantity: BigInt(order.quantity),
+    orderId: `${order.orderNo}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  }));
 }
