@@ -1,0 +1,56 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Fix Excel parser to correctly read karigar mapping columns",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Fix the Excel parser to correctly read karigar mapping data from columns A, B, and C with exact header matching",
+      "acceptanceCriteria": [
+        "Parser correctly identifies and reads data from columns A (Design Code), B (Generic Name), and C (Karigar Name)",
+        "Parser matches exact header names: 'Design Code', 'Generic Name', 'Karigar Name'",
+        "All 561 validation errors are resolved when uploading the same Excel file",
+        "No 'required' errors appear for rows that contain data in all three columns"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/excelParser.ts",
+          "operation": "modify",
+          "description": "Fix the parseMasterDesignExcel function to correctly identify and read karigar mapping columns. Update header detection logic to match exact column names 'Design Code', 'Generic Name', and 'Karigar Name' (case-sensitive). Ensure column A maps to Design Code, column B to Generic Name, and column C to Karigar Name. Fix cell value extraction to properly read string values from each cell using the SheetJS API. Verify the parser handles both row objects and cell references correctly."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Add enhanced error logging to the karigar mapping Excel parser showing exact cell values during parsing",
+      "acceptanceCriteria": [
+        "Console logs show actual cell values being parsed for each row",
+        "Error messages include the specific row number and column being processed",
+        "Logs indicate whether header matching succeeded or failed"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/excelParser.ts",
+          "operation": "modify",
+          "description": "Add comprehensive console logging to the parseMasterDesignExcel function. Log the detected headers with their exact values and positions. For each row being processed, log the row number and the actual values being read from columns A, B, and C before validation. Log whether header matching succeeded or failed with details about what was expected vs. what was found. Include cell addresses (e.g., A2, B2, C2) in the logs to help debug cell reading issues."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
+      "acceptanceCriteria": [
+        "Parser successfully processes .xls files",
+        "Parser successfully processes .xlsx files",
+        "No format-specific parsing errors occur"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/excelParser.ts",
+          "operation": "modify",
+          "description": "Verify and ensure the parseMasterDesignExcel function uses SheetJS read options that support both .xls (BIFF8) and .xlsx (OOXML) formats. Ensure the binary data type passed to XLSX.read() is appropriate for both formats. Add format detection logging to confirm which format is being processed. Test that the same parsing logic works consistently across both file formats."
+        }
+      ]
+    }
+  ]
+}

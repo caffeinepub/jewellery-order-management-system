@@ -1,0 +1,68 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-fix-the-excel-parser-in-frontend-src-utils-excelparser-ts-to-correctly-read-karigar-mapping-data-from-columns-a-design-code-b-generic-name-and-c-karigar-name-with-exact-header-matching",
+      "featureTitle": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+      "files": [
+        "frontend/src/utils/excelParser.ts"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-enhanced-error-logging-to-the-karigar-mapping-excel-parser-to-show-exactly-what-values-are-being-read-from-each-cell-during-parsing",
+      "featureTitle": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+      "files": [
+        "frontend/src/utils/excelParser.ts"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-ensure-the-excel-parser-handles-both-xls-and-xlsx-file-formats-correctly-for-karigar-mapping-uploads",
+      "featureTitle": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
+      "files": [
+        "frontend/src/utils/excelParser.ts"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

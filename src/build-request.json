@@ -1,0 +1,72 @@
+{
+  "kind": "build_request",
+  "title": "Fix Excel parser to correctly read karigar mapping columns",
+  "priority": "high",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-5",
+          "msg-6"
+        ],
+        "quotes": [
+          "They have exactly same column headers",
+          "Column A - design code, Column B - generic name, Column C - karigar name"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Parser correctly identifies and reads data from columns A, B, and C",
+        "Parser matches exact header names: 'Design Code', 'Generic Name', 'Karigar Name'",
+        "All 561 validation errors are resolved when uploading the same Excel file",
+        "No 'required' errors appear for rows that contain data in all three columns"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-5"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Console logs show actual cell values being parsed for each row",
+        "Error messages include the specific row number and column being processed",
+        "Logs indicate whether header matching succeeded or failed"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-5"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Parser successfully processes .xls files",
+        "Parser successfully processes .xlsx files",
+        "No format-specific parsing errors occur"
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not change the backend schema or main.mo file",
+    "Maintain the existing Excel upload UI in frontend/src/pages/MasterDesigns.tsx",
+    "Use the SheetJS library that is already integrated in the project"
+  ],
+  "nonGoals": [
+    "Adding support for different column orders or flexible header matching",
+    "Changing the data validation logic beyond fixing the parsing",
+    "Modifying the UI layout or styling of the Master Designs page"
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 3,
+  "summary": "Jewelry management system with karigar (artisan) mapping functionality that parses Excel files containing design codes, generic names, and karigar names",
+  "architectural_notes": [
+    "Excel file format: Column A = Design Code, Column B = Generic Name, Column C = Karigar Name",
+    "Column headers are exact matches: 'Design Code', 'Generic Name', 'Karigar Name'",
+    "No header rows, empty rows, or special formatting in Excel files"
+  ],
+  "known_issues": [
+    "Karigar mapping Excel parser showing 561 validation errors (Design Code/Generic Name/Karigar Name required) despite data being present in file",
+    "Excel column mapping not recognizing data in columns A, B, and C correctly"
+  ],
+  "isFixRequest": true,
+  "existing_features": [
+    {
+      "id": "feature-fix-the-excel-parser-in-frontend-src-utils-excelparser-ts-to-correctly-read-karigar-mapping-data-from-columns-a-design-code-b-generic-name-and-c-karigar-name-with-exact-header-matching",
+      "title": "Fix the Excel parser in frontend/src/utils/excelParser.ts to correctly read karigar mapping data from columns A (Design Code), B (Generic Name), and C (Karigar Name) with exact header matching",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-enhanced-error-logging-to-the-karigar-mapping-excel-parser-to-show-exactly-what-values-are-being-read-from-each-cell-during-parsing",
+      "title": "Add enhanced error logging to the karigar mapping Excel parser to show exactly what values are being read from each cell during parsing",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-the-excel-parser-handles-both-xls-and-xlsx-file-formats-correctly-for-karigar-mapping-uploads",
+      "title": "Ensure the Excel parser handles both .xls and .xlsx file formats correctly for karigar mapping uploads",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Fix Excel parsing for karigar mapping to correctly read Design Code (Column A), Generic Name (Column B), and Karigar Name (Column C)",
+      "reqIds": [],
+      "status": "pending"
+    }
+  ],
+  "projectName": "Fix Excel parser to correctly read karigar mapping columns",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}
