@@ -1,18 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix critical UI/UX issues across row selection, sidebar display, order ingestion, design mapping editing, and export functionality to ensure smooth operations on both desktop and mobile browsers.
+**Goal:** Fix Excel parsing to normalize design codes and automatically map Master Design data to existing orders.
 
 **Planned changes:**
-- Fix row selection highlighting across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) to work when clicking anywhere on the row except the design column
-- Fix sidebar visibility at 100% zoom on iPhone browser and prevent sidebar overlap at 50% zoom on all browsers
-- Fix "failed to ingest orders" error after Excel upload on Ingest Orders page
-- Optimize Excel upload and order saving speed on Ingest Orders page
-- Display uploaded design mappings in a table on Master Designs page with inline editing for design code column
-- Add Karigar dropdown in Master Designs that shows karigars extracted from the Master Design Excel file
-- Implement cascading updates so modifying design codes in Master Designs automatically updates all pending orders
-- Ensure all dashboard tabs display correct and up-to-date design mappings after modifications
-- Fix JPEG export functionality to work on iPhone browsers
-- Fix PDF export functionality to work on iPhone browsers
+- Normalize all design codes by trimming whitespace and converting to uppercase in Excel parser
+- Update Master Design Excel parsing to correctly read Column A as DESIGN CODE, Column B as Generic Name, Column C as Karigar Name
+- Automatically update existing orders with matching design codes when Master Design Excel is uploaded
+- Display confirmation message showing count of successfully mapped design codes after upload
 
-**User-visible outcome:** Users can reliably select rows across dashboard tabs, view the sidebar correctly on mobile devices, successfully upload and save Excel orders without errors, edit design mappings inline with karigar selection, see automatic updates cascade to all orders, and export data as JPEG/PDF on both desktop and iPhone browsers.
+**User-visible outcome:** After uploading Master Design Excel, orders with matching design codes are automatically updated with Generic Name and Karigar Name, removing them from the unmapped section on the Dashboard.

@@ -1,132 +1,59 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-22T14:27:50.713Z",
+  "generatedAt": "2026-02-22T08:50:16.705Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 10,
-    "implemented": 10,
+    "total": 4,
+    "implemented": 4,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix row selection highlighting across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars). Clicking anywhere on a row except the design column should select/highlight the row. Clicking on the design column should continue to show the design image popup without selecting the row.",
+        "summary": "Update Excel parsing logic in excelParser.ts to normalize all design codes by trimming whitespace and converting to uppercase before comparison",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx"
+          "frontend/src/utils/excelParser.ts"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx"
-        ]
-      },
-      {
-        "id": "REQ-10",
-        "summary": "Fix PDF export functionality to work correctly on iPhone browsers. Ensure exported PDF files download successfully and contain the expected order data with proper formatting.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts"
+          "frontend/src/utils/excelParser.ts"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Fix sidebar display on iPhone browser at 100% zoom level so the entire sidebar is visible. Prevent sidebar from overlapping page content at 50% zoom level on both iPhone browser and desktop web browsers.",
+        "summary": "Update the Master Design Excel parsing to correctly identify Column A as DESIGN CODE, Column B as Generic Name, and Column C as Karigar Name",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/layout/AppSidebar.tsx",
-          "frontend/src/index.css"
+          "frontend/src/utils/excelParser.ts"
         ],
         "matchedFiles": [
-          "frontend/src/components/layout/AppSidebar.tsx",
-          "frontend/src/index.css"
+          "frontend/src/utils/excelParser.ts"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Fix the 'failed to ingest orders' error that occurs after uploading an Excel file on the Ingest Orders page. Ensure the upload and save operations complete successfully.",
+        "summary": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded, mapping Generic Name and Karigar Name to orders",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/pages/IngestOrders.tsx"
+          "frontend/src/pages/MasterDesigns.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": [
-          "frontend/src/pages/IngestOrders.tsx"
+          "frontend/src/pages/MasterDesigns.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ]
       },
       {
         "id": "REQ-4",
-        "summary": "Optimize the speed of Excel file upload and order saving operations on the Ingest Orders page. Reduce processing time and improve responsiveness.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/pages/IngestOrders.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/pages/IngestOrders.tsx"
-        ]
-      },
-      {
-        "id": "REQ-5",
-        "summary": "On the Master Designs page, display uploaded design mappings in a table underneath the upload area. Enable inline editing of the design code column for each row.",
+        "summary": "Display a confirmation message on the Master Design page after Excel upload showing how many design codes were successfully mapped",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/pages/MasterDesigns.tsx"
         ],
         "matchedFiles": [
           "frontend/src/pages/MasterDesigns.tsx"
-        ]
-      },
-      {
-        "id": "REQ-6",
-        "summary": "Add a Karigar dropdown in the Master Designs editing interface that shows the list of karigars extracted from the Master Design Excel file. Allow selection from this dropdown when editing design mappings.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/pages/MasterDesigns.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/pages/MasterDesigns.tsx"
-        ]
-      },
-      {
-        "id": "REQ-7",
-        "summary": "Implement cascading updates so that when a design code is modified in the Master Designs page, all pending orders with that design code are automatically updated with the new mapping (generic name and karigar assignment).",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/pages/MasterDesigns.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/pages/MasterDesigns.tsx"
-        ]
-      },
-      {
-        "id": "REQ-8",
-        "summary": "Ensure all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) display the correct and up-to-date design mappings after design codes are modified in the Master Designs page.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-          "frontend/src/components/dashboard/KarigarsTab.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-9",
-        "summary": "Fix JPEG export functionality to work correctly on iPhone browsers. Ensure exported JPEG files download successfully and contain the expected order data.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts"
         ]
       }
     ]
@@ -138,22 +65,13 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
     "frontend/src/backend.d.ts",
     "frontend/src/backend.ts",
-    "frontend/src/components/dashboard/HallmarkTab.tsx",
-    "frontend/src/components/dashboard/OrderTable.tsx",
-    "frontend/src/components/dashboard/ReadyTab.tsx",
-    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/components/layout/AppSidebar.tsx",
-    "frontend/src/components/masterdesigns/EditDesignModal.tsx",
     "frontend/src/declarations/backend.did.d.ts",
     "frontend/src/declarations/backend.did.js",
-    "frontend/src/index.css",
-    "frontend/src/pages/IngestOrders.tsx",
-    "frontend/src/pages/KarigarDetail.tsx",
+    "frontend/src/hooks/useQueries.ts",
     "frontend/src/pages/MasterDesigns.tsx",
-    "frontend/src/utils/exportUtils.ts",
+    "frontend/src/utils/excelParser.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

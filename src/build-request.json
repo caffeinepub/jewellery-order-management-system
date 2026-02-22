@@ -1,211 +1,95 @@
 {
   "kind": "build_request",
-  "title": "Fix row selection, sidebar display, ingest errors, design editing, and export functionality",
+  "title": "Fix Excel parsing to normalize design codes for proper matching",
+  "projectName": "Jewellery Order Manager",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix row selection highlighting across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars). Clicking anywhere on a row except the design column should select/highlight the row. Clicking on the design column should continue to show the design image popup without selecting the row.",
+      "text": "Update Excel parsing logic in excelParser.ts to normalize all design codes by trimming whitespace and converting to uppercase before comparison",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-final"
+          "msg-5"
         ],
         "quotes": [
-          "Selection of rows across the tabs is not happening. The selection can be done by clicking anywhere on the row expect design. Clicking on design shows the design image in pop up screen. The row selection across the tabs should be highlighted"
+          "Normalize all design codes - trim whitespace and ensure uppercase comparison"
         ]
       },
       "acceptanceCriteria": [
-        "Row selection works consistently across Total Orders, Ready, Hallmark, Customer Orders, and Karigars tabs",
-        "Clicking anywhere on a row (except design column) highlights the row with visual feedback",
-        "Clicking on the design column shows the design image modal without selecting the row",
-        "Selected rows maintain their highlighted state until deselected"
+        "Design codes from uploaded Excel files are trimmed of leading/trailing whitespace",
+        "Design codes are converted to uppercase for matching (e.g., 'chtmn40952' becomes 'CHTMN40952')",
+        "Normalization applies to both Master Design Excel parsing and order Excel parsing"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix sidebar display on iPhone browser at 100% zoom level so the entire sidebar is visible. Prevent sidebar from overlapping page content at 50% zoom level on both iPhone browser and desktop web browsers.",
+      "text": "Update the Master Design Excel parsing to correctly identify Column A as DESIGN CODE, Column B as Generic Name, and Column C as Karigar Name",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-final"
+          "msg-4"
         ],
         "quotes": [
-          "Overall app sidebar is not shown in 100% zoom in iPhone browser. Supporting screenshot is shared. And in 50% zoom in iPhone browser the side bar overlaps contents of the page ( same happens in web page , used in desktop )"
+          "Is Column A labeled 'DESIGN CODE' and contains codes like 'CHTMN40952'?"
         ]
       },
       "acceptanceCriteria": [
-        "Sidebar is fully visible at 100% zoom on iPhone browser",
-        "Sidebar does not overlap page content at 50% zoom on iPhone browser",
-        "Sidebar does not overlap page content at 50% zoom on desktop browsers",
-        "Sidebar responsive behavior works correctly across all zoom levels"
+        "Column A values are read as design codes",
+        "Column B values are read as generic names",
+        "Column C values are read as karigar names",
+        "Parser validates that these columns exist in the uploaded Excel file"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Fix the 'failed to ingest orders' error that occurs after uploading an Excel file on the Ingest Orders page. Ensure the upload and save operations complete successfully.",
+      "text": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded, mapping Generic Name and Karigar Name to orders",
       "target": "both",
       "source": {
         "messageIds": [
-          "msg-user-final"
+          "msg-5"
         ],
         "quotes": [
-          "In ingest page after excel is uploaded it shows failed to ingest orders. Kindly fix it"
+          "Automatically map matching codes when you upload the Excel on the Master Design page",
+          "Update existing orders immediately so the Dashboard no longer shows them as unmapped"
         ]
       },
       "acceptanceCriteria": [
-        "Excel file uploads successfully without errors on the Ingest Orders page",
-        "Orders are saved to the backend without failure",
-        "Success confirmation is displayed to the user after successful ingestion",
-        "Error messages are clear and actionable if validation fails"
+        "After Master Design Excel upload, all orders with matching design codes are updated with Generic Name and Karigar Name",
+        "Orders that were previously unmapped are removed from the unmapped section if they now have matches",
+        "Update happens immediately without requiring manual action"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Optimize the speed of Excel file upload and order saving operations on the Ingest Orders page. Reduce processing time and improve responsiveness.",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-user-final"
-        ],
-        "quotes": [
-          "make sure uploading the excel and saving happens fast and not slow"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Excel parsing completes in under 3 seconds for files with up to 1000 rows",
-        "Order saving operations show progress feedback",
-        "UI remains responsive during upload and save operations",
-        "Batch processing is optimized for large datasets"
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "text": "On the Master Designs page, display uploaded design mappings in a table underneath the upload area. Enable inline editing of the design code column for each row.",
+      "text": "Display a confirmation message on the Master Design page after Excel upload showing how many design codes were successfully mapped",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-user-final"
+          "msg-5"
         ],
         "quotes": [
-          "In master excel page the rows uploaded is to be shown underneath, and it should be able to edit and modify the design code"
+          "Show confirmation of successful mappings"
         ]
       },
       "acceptanceCriteria": [
-        "Uploaded master design rows appear in a table below the upload section",
-        "Design code column is editable inline",
-        "Changes to design code are validated before saving",
-        "Table displays all fields: design code, generic name, and karigar name"
-      ]
-    },
-    {
-      "id": "REQ-6",
-      "text": "Add a Karigar dropdown in the Master Designs editing interface that shows the list of karigars extracted from the Master Design Excel file. Allow selection from this dropdown when editing design mappings.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-user-final"
-        ],
-        "quotes": [
-          "Karigar dropdown shows the extracted list from Master Design"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Karigar dropdown displays all unique karigar names from the uploaded Master Design file",
-        "Dropdown is populated after successful Master Design file upload",
-        "Selected karigar updates the design mapping correctly",
-        "Dropdown supports searching/filtering karigar names"
-      ]
-    },
-    {
-      "id": "REQ-7",
-      "text": "Implement cascading updates so that when a design code is modified in the Master Designs page, all pending orders with that design code are automatically updated with the new mapping (generic name and karigar assignment).",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-user-final"
-        ],
-        "quotes": [
-          "Updates cascade to all pending orders with that Design Code"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Modifying a design code in Master Designs updates all pending orders with that code",
-        "Backend efficiently handles bulk updates for affected orders",
-        "User receives confirmation of how many orders were updated",
-        "Updates are atomic and do not leave data in inconsistent state"
-      ]
-    },
-    {
-      "id": "REQ-8",
-      "text": "Ensure all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) display the correct and up-to-date design mappings after design codes are modified in the Master Designs page.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-user-final"
-        ],
-        "quotes": [
-          "All dashboard tabs display the correct mappings"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Dashboard tabs automatically refresh after design mappings are updated",
-        "All tabs show consistent and current mapping data",
-        "No stale data is displayed in any dashboard tab",
-        "React Query cache is properly invalidated after mapping updates"
-      ]
-    },
-    {
-      "id": "REQ-9",
-      "text": "Fix JPEG export functionality to work correctly on iPhone browsers. Ensure exported JPEG files download successfully and contain the expected order data.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-user-final"
-        ],
-        "quotes": [
-          "Exporting JPEG's and PDFs is not happening. Atleast not in iPhone browser. Kindly fix it."
-        ]
-      },
-      "acceptanceCriteria": [
-        "JPEG export works on iPhone Safari browser",
-        "JPEG files download successfully without errors",
-        "Exported JPEG contains all visible order data from the current view",
-        "File naming follows consistent convention with timestamp"
-      ]
-    },
-    {
-      "id": "REQ-10",
-      "text": "Fix PDF export functionality to work correctly on iPhone browsers. Ensure exported PDF files download successfully and contain the expected order data with proper formatting.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-user-final"
-        ],
-        "quotes": [
-          "Exporting JPEG's and PDFs is not happening. Atleast not in iPhone browser. Kindly fix it."
-        ]
-      },
-      "acceptanceCriteria": [
-        "PDF export works on iPhone Safari browser",
-        "PDF files download successfully without errors",
-        "Exported PDF maintains table formatting and readability",
-        "All order columns are included in the exported PDF",
-        "File naming follows consistent convention with timestamp"
+        "After upload, display a success message with count of mapped design codes",
+        "Show count of orders that were updated with new mappings",
+        "If any design codes failed to map, display warning with details"
       ]
     }
   ],
   "constraints": [
-    "Do not modify the backend schema or order data structure",
-    "Maintain existing design image modal functionality when clicking design column",
-    "Preserve all existing dashboard tab filtering and search capabilities",
-    "Ensure export functionality works across desktop and mobile browsers"
+    "Design codes in the Master Design Excel are in uppercase (Column A)",
+    "Column A is DESIGN CODE, Column B is Generic Name, Column C is Karigar Name",
+    "Existing Master Design page functionality must be preserved",
+    "Single-actor Motoko backend architecture must be maintained"
   ],
   "nonGoals": [
-    "Adding new dashboard tabs or order statuses",
-    "Changing the Master Design Excel file format or required columns",
-    "Implementing new authentication or authorization features",
-    "Modifying the barcode scanning or tag printing workflows"
+    "Changing the Excel file format or column structure",
+    "Adding new columns beyond the three specified",
+    "Supporting case-sensitive design code matching",
+    "Creating a new Master Design page (it already exists)"
   ],
   "imageRequirements": {
     "required": [],

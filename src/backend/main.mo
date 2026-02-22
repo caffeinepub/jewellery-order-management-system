@@ -5,10 +5,8 @@ import Array "mo:core/Array";
 import Principal "mo:core/Principal";
 import List "mo:core/List";
 import Iter "mo:core/Iter";
-
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-
 import Migration "migration";
 
 (with migration = Migration.run)
@@ -36,7 +34,6 @@ actor {
     size : Float;
     quantity : Nat;
     remarks : Text;
-    suppliedQty : Nat;
     genericName : ?Text;
     karigarName : ?Text;
     status : OrderStatus;
@@ -54,7 +51,6 @@ actor {
     size : Float;
     quantity : Nat;
     remarks : Text;
-    suppliedQty : Nat;
     status : OrderStatus;
     orderId : Text;
     createdAt : Time.Time;
@@ -115,7 +111,6 @@ actor {
       quantity;
       remarks;
       status = #Pending;
-      suppliedQty = 0;
       orderId;
       createdAt = timestamp;
       updatedAt = timestamp;
@@ -264,7 +259,6 @@ actor {
         let mapping = designMappings.get(o.design);
         {
           o with
-          remarks = o.remarks;
           genericName = mapping.map(func(m) { m.genericName });
           karigarName = mapping.map(func(m) { m.karigarName });
         };
@@ -364,30 +358,6 @@ actor {
     };
   };
 
-  public shared ({ caller }) func updateOrderStatusToReadyWithQty(orderId : Text, suppliedQty : Nat) : async () {
-    switch (orders.get(orderId)) {
-      case (null) { Runtime.trap("Order with id " # orderId # " not found") };
-      case (?order) {
-        if (suppliedQty > order.quantity) {
-          Runtime.trap("Supplied quantity cannot be greater than order quantity");
-        };
-
-        switch (order.status) {
-          case (#Pending) {
-            let updatedOrder = {
-              order with
-              status = #Ready;
-              suppliedQty;
-              updatedAt = Time.now();
-            };
-            orders.add(orderId, updatedOrder);
-          };
-          case (_) {};
-        };
-      };
-    };
-  };
-
   public query ({ caller }) func getAllMasterDesignMappings() : async [(Text, DesignMapping)] {
     masterDesignMappings.toArray();
   };
@@ -411,14 +381,5 @@ actor {
         };
       }
     );
-  };
-
-  //----------------------------------------------------------------------------------------------------------------------
-  // New functions added by refactoring
-  //----------------------------------------------------------------------------------------------------------------------
-
-  // Update this with proper filtering.
-  public query ({ caller }) func getPendingOrders() : async [PersistentOrder] {
-    orders.values().toArray().filter(func((o)) { o.status == #Pending });
   };
 };

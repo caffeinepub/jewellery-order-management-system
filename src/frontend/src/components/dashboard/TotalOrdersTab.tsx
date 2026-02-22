@@ -1,50 +1,53 @@
-import { useMemo, useState } from 'react';
-import { useGetOrders } from '../../hooks/useQueries';
-import { OrderTable } from './OrderTable';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { OrderStatus } from '../../backend';
+import { useState, useMemo } from "react";
+import OrderTable from "./OrderTable";
+import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
+import { OrderStatus, OrderType } from "@/backend";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export function TotalOrdersTab() {
+export default function TotalOrdersTab() {
+  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
+  const [searchText, setSearchText] = useState("");
+  const [karigarFilter, setKarigarFilter] = useState<string>("All");
+
   const { data: orders = [], isLoading } = useGetOrders();
-  const [orderTypeFilter, setOrderTypeFilter] = useState<'All' | 'CO' | 'RB'>('All');
-  const [karigarFilter, setKarigarFilter] = useState<string>('All');
-  const [searchText, setSearchText] = useState('');
-
-  const totalOrders = useMemo(() => {
-    return orders.filter(
-      (order) => order.status === OrderStatus.Pending || order.status === OrderStatus.ReturnFromHallmark
-    );
-  }, [orders]);
-
-  const uniqueKarigars = useMemo(() => {
-    const karigars = new Set<string>();
-    totalOrders.forEach((order) => {
-      if (order.karigarName) {
-        karigars.add(order.karigarName);
-      }
-    });
-    return Array.from(karigars).sort();
-  }, [totalOrders]);
+  const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
 
   const filteredOrders = useMemo(() => {
-    return totalOrders.filter((order) => {
-      if (orderTypeFilter !== 'All' && order.orderType !== orderTypeFilter) {
-        return false;
-      }
+    let result = orders.filter(
+      (order) =>
+        order.status === OrderStatus.Pending ||
+        order.status === OrderStatus.ReturnFromHallmark
+    );
 
-      if (karigarFilter !== 'All' && order.karigarName !== karigarFilter) {
-        return false;
-      }
+    // Filter by order type
+    if (orderTypeFilter !== "All") {
+      result = result.filter((order) => order.orderType === orderTypeFilter);
+    }
 
-      if (searchText && !order.orderNo.toLowerCase().includes(searchText.toLowerCase())) {
-        return false;
-      }
+    // Filter by karigar name
+    if (karigarFilter !== "All") {
+      result = result.filter((order) => order.karigarName === karigarFilter);
+    }
 
-      return true;
-    });
-  }, [totalOrders, orderTypeFilter, karigarFilter, searchText]);
+    // Filter by order number (search)
+    if (searchText.trim()) {
+      const search = searchText.toLowerCase();
+      result = result.filter((order) =>
+        order.orderNo.toLowerCase().includes(search)
+      );
+    }
+
+    return result;
+  }, [orders, orderTypeFilter, karigarFilter, searchText]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
@@ -52,33 +55,32 @@ export function TotalOrdersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex gap-2">
           <Button
-            variant={orderTypeFilter === 'All' ? 'default' : 'outline'}
-            onClick={() => setOrderTypeFilter('All')}
+            variant={orderTypeFilter === "All" ? "default" : "outline"}
+            onClick={() => setOrderTypeFilter("All")}
             size="sm"
           >
             All
           </Button>
           <Button
-            variant={orderTypeFilter === 'CO' ? 'default' : 'outline'}
-            onClick={() => setOrderTypeFilter('CO')}
+            variant={orderTypeFilter === OrderType.CO ? "default" : "outline"}
+            onClick={() => setOrderTypeFilter(OrderType.CO)}
             size="sm"
           >
             CO
           </Button>
           <Button
-            variant={orderTypeFilter === 'RB' ? 'default' : 'outline'}
-            onClick={() => setOrderTypeFilter('RB')}
+            variant={orderTypeFilter === OrderType.RB ? "default" : "outline"}
+            onClick={() => setOrderTypeFilter(OrderType.RB)}
             size="sm"
           >
             RB
           </Button>
         </div>
-
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Filter by Karigar" />
           </SelectTrigger>
           <SelectContent>
@@ -90,23 +92,17 @@ export function TotalOrdersTab() {
             ))}
           </SelectContent>
         </Select>
-
-        <Input
-          placeholder="Search by Order No..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className="max-w-xs"
-        />
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by Order Number..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="pl-9"
+          />
+        </div>
       </div>
-
-      <OrderTable
-        orders={filteredOrders}
-        showStatusActions={true}
-        showExport={true}
-        exportFilename="total-orders"
-      />
+      <OrderTable orders={filteredOrders} enableBulkActions={true} />
     </div>
   );
 }
-
-export default TotalOrdersTab;

@@ -49,7 +49,6 @@ export const OrderStatus = IDL.Variant({
 export const OrderType = IDL.Variant({ 'CO' : IDL.Null, 'RB' : IDL.Null });
 export const Order = IDL.Record({
   'weight' : IDL.Float64,
-  'suppliedQty' : IDL.Nat,
   'status' : OrderStatus,
   'createdAt' : Time,
   'size' : IDL.Float64,
@@ -60,21 +59,6 @@ export const Order = IDL.Record({
   'karigarName' : IDL.Opt(IDL.Text),
   'updatedAt' : Time,
   'genericName' : IDL.Opt(IDL.Text),
-  'quantity' : IDL.Nat,
-  'remarks' : IDL.Text,
-  'product' : IDL.Text,
-});
-export const PersistentOrder = IDL.Record({
-  'weight' : IDL.Float64,
-  'suppliedQty' : IDL.Nat,
-  'status' : OrderStatus,
-  'createdAt' : Time,
-  'size' : IDL.Float64,
-  'orderType' : OrderType,
-  'design' : IDL.Text,
-  'orderId' : IDL.Text,
-  'orderNo' : IDL.Text,
-  'updatedAt' : Time,
   'quantity' : IDL.Nat,
   'remarks' : IDL.Text,
   'product' : IDL.Text,
@@ -136,7 +120,6 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'getPendingOrders' : IDL.Func([], [IDL.Vec(PersistentOrder)], ['query']),
   'getUniqueKarigarsFromDesignMappings' : IDL.Func(
       [],
       [IDL.Vec(IDL.Text)],
@@ -165,7 +148,6 @@ export const idlService = IDL.Service({
       [],
     ),
   'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-  'updateOrderStatusToReadyWithQty' : IDL.Func([IDL.Text, IDL.Nat], [], []),
   'updateOrdersStatusToReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
   'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
   'uploadDesignMapping' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
@@ -216,7 +198,6 @@ export const idlFactory = ({ IDL }) => {
   const OrderType = IDL.Variant({ 'CO' : IDL.Null, 'RB' : IDL.Null });
   const Order = IDL.Record({
     'weight' : IDL.Float64,
-    'suppliedQty' : IDL.Nat,
     'status' : OrderStatus,
     'createdAt' : Time,
     'size' : IDL.Float64,
@@ -227,21 +208,6 @@ export const idlFactory = ({ IDL }) => {
     'karigarName' : IDL.Opt(IDL.Text),
     'updatedAt' : Time,
     'genericName' : IDL.Opt(IDL.Text),
-    'quantity' : IDL.Nat,
-    'remarks' : IDL.Text,
-    'product' : IDL.Text,
-  });
-  const PersistentOrder = IDL.Record({
-    'weight' : IDL.Float64,
-    'suppliedQty' : IDL.Nat,
-    'status' : OrderStatus,
-    'createdAt' : Time,
-    'size' : IDL.Float64,
-    'orderType' : OrderType,
-    'design' : IDL.Text,
-    'orderId' : IDL.Text,
-    'orderNo' : IDL.Text,
-    'updatedAt' : Time,
     'quantity' : IDL.Nat,
     'remarks' : IDL.Text,
     'product' : IDL.Text,
@@ -303,7 +269,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'getPendingOrders' : IDL.Func([], [IDL.Vec(PersistentOrder)], ['query']),
     'getUniqueKarigarsFromDesignMappings' : IDL.Func(
         [],
         [IDL.Vec(IDL.Text)],
@@ -332,7 +297,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-    'updateOrderStatusToReadyWithQty' : IDL.Func([IDL.Text, IDL.Nat], [], []),
     'updateOrdersStatusToReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
     'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
     'uploadDesignMapping' : IDL.Func([IDL.Vec(MappingRecord)], [], []),

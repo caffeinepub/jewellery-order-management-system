@@ -1,12 +1,16 @@
 import Map "mo:core/Map";
-import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
+import List "mo:core/List";
+import Storage "blob-storage/Storage";
 
 module {
-  // Updated types to match persistent actor state - all fields must be present
-  type OrderType = { #CO; #RB };
+  type OrderType = {
+    #CO;
+    #RB;
+  };
+
   type OrderStatus = {
     #Pending;
     #Ready;
@@ -23,7 +27,6 @@ module {
     size : Float;
     quantity : Nat;
     remarks : Text;
-    suppliedQty : Nat;
     status : OrderStatus;
     orderId : Text;
     createdAt : Time.Time;
@@ -34,23 +37,36 @@ module {
     designCode : Text;
     genericName : Text;
     karigarName : Text;
-    createdBy : Principal.Principal;
-    updatedBy : ?Principal.Principal;
+    createdBy : Principal;
+    updatedBy : ?Principal;
     createdAt : Time.Time;
     updatedAt : Time.Time;
   };
 
-  type OldActor = {
-    orders : Map.Map<Text, PersistentOrder>;
-    designMappings : Map.Map<Text, DesignMapping>;
+  type Karigar = {
+    name : Text;
+    createdBy : Principal;
+    createdAt : Time.Time;
   };
 
-  type NewActor = {
-    orders : Map.Map<Text, PersistentOrder>;
-    designMappings : Map.Map<Text, DesignMapping>;
+  type MappingRecord = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
   };
 
-  public func run(old : OldActor) : NewActor {
-    { orders = old.orders; designMappings = old.designMappings };
+  type State = {
+    orders : Map.Map<Text, PersistentOrder>;
+    designMappings : Map.Map<Text, DesignMapping>;
+    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    masterDesignMappings : Map.Map<Text, DesignMapping>;
+    karigars : Map.Map<Text, Karigar>;
+    masterDesignKarigars : Map.Map<Text, Nat>;
+    masterDesignExcel : ?Storage.ExternalBlob;
+    activeKarigar : ?Text;
+  };
+
+  public func run(state : State) : State {
+    state;
   };
 };

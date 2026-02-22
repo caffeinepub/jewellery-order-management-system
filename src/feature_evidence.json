@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-row-selection-highlighting-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars-clicking-anywhere-on-a-row-except-the-design-column-should-select-highlight-the-row-clicking-on-the-design-column-should-continue-to-show-the-design-image-popup-without-selecting-the-row",
-      "featureTitle": "Fix row selection highlighting across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars). Clicking anywhere on a row except the design column should select/highlight the row. Clicking on the design column should continue to show the design image popup without selecting the row.",
+      "featureId": "feature-update-excel-parsing-logic-in-excelparser-ts-to-normalize-all-design-codes-by-trimming-whitespace-and-converting-to-uppercase-before-comparison",
+      "featureTitle": "Update Excel parsing logic in excelParser.ts to normalize all design codes by trimming whitespace and converting to uppercase before comparison",
       "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx"
+        "frontend/src/utils/excelParser.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -23,11 +23,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-sidebar-display-on-iphone-browser-at-100-zoom-level-so-the-entire-sidebar-is-visible-prevent-sidebar-from-overlapping-page-content-at-50-zoom-level-on-both-iphone-browser-and-desktop-web-browsers",
-      "featureTitle": "Fix sidebar display on iPhone browser at 100% zoom level so the entire sidebar is visible. Prevent sidebar from overlapping page content at 50% zoom level on both iPhone browser and desktop web browsers.",
+      "featureId": "feature-update-the-master-design-excel-parsing-to-correctly-identify-column-a-as-design-code-column-b-as-generic-name-and-column-c-as-karigar-name",
+      "featureTitle": "Update the Master Design Excel parsing to correctly identify Column A as DESIGN CODE, Column B as Generic Name, and Column C as Karigar Name",
       "files": [
-        "frontend/src/components/layout/AppSidebar.tsx",
-        "frontend/src/index.css"
+        "frontend/src/utils/excelParser.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -45,10 +44,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-failed-to-ingest-orders-error-that-occurs-after-uploading-an-excel-file-on-the-ingest-orders-page-ensure-the-upload-and-save-operations-complete-successfully",
-      "featureTitle": "Fix the 'failed to ingest orders' error that occurs after uploading an Excel file on the Ingest Orders page. Ensure the upload and save operations complete successfully.",
+      "featureId": "feature-automatically-update-existing-orders-with-matching-design-codes-when-master-design-excel-is-uploaded-mapping-generic-name-and-karigar-name-to-orders",
+      "featureTitle": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded, mapping Generic Name and Karigar Name to orders",
       "files": [
-        "frontend/src/pages/IngestOrders.tsx"
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/MasterDesigns.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -66,10 +66,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-optimize-the-speed-of-excel-file-upload-and-order-saving-operations-on-the-ingest-orders-page-reduce-processing-time-and-improve-responsiveness",
-      "featureTitle": "Optimize the speed of Excel file upload and order saving operations on the Ingest Orders page. Reduce processing time and improve responsiveness.",
+      "featureId": "feature-display-a-confirmation-message-on-the-master-design-page-after-excel-upload-showing-how-many-design-codes-were-successfully-mapped",
+      "featureTitle": "Display a confirmation message on the Master Design page after Excel upload showing how many design codes were successfully mapped",
       "files": [
-        "frontend/src/pages/IngestOrders.tsx"
+        "frontend/src/pages/MasterDesigns.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -83,134 +83,6 @@
       ],
       "testIds": [
         "REQ-4"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-on-the-master-designs-page-display-uploaded-design-mappings-in-a-table-underneath-the-upload-area-enable-inline-editing-of-the-design-code-column-for-each-row",
-      "featureTitle": "On the Master Designs page, display uploaded design mappings in a table underneath the upload area. Enable inline editing of the design code column for each row.",
-      "files": [
-        "frontend/src/pages/MasterDesigns.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-5"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-add-a-karigar-dropdown-in-the-master-designs-editing-interface-that-shows-the-list-of-karigars-extracted-from-the-master-design-excel-file-allow-selection-from-this-dropdown-when-editing-design-mappings",
-      "featureTitle": "Add a Karigar dropdown in the Master Designs editing interface that shows the list of karigars extracted from the Master Design Excel file. Allow selection from this dropdown when editing design mappings.",
-      "files": [
-        "frontend/src/pages/MasterDesigns.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-6"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-implement-cascading-updates-so-that-when-a-design-code-is-modified-in-the-master-designs-page-all-pending-orders-with-that-design-code-are-automatically-updated-with-the-new-mapping-generic-name-and-karigar-assignment",
-      "featureTitle": "Implement cascading updates so that when a design code is modified in the Master Designs page, all pending orders with that design code are automatically updated with the new mapping (generic name and karigar assignment).",
-      "files": [
-        "frontend/src/pages/MasterDesigns.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-7"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-ensure-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars-display-the-correct-and-up-to-date-design-mappings-after-design-codes-are-modified-in-the-master-designs-page",
-      "featureTitle": "Ensure all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) display the correct and up-to-date design mappings after design codes are modified in the Master Designs page.",
-      "files": [
-        "frontend/src/components/dashboard/HallmarkTab.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-8"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-jpeg-export-functionality-to-work-correctly-on-iphone-browsers-ensure-exported-jpeg-files-download-successfully-and-contain-the-expected-order-data",
-      "featureTitle": "Fix JPEG export functionality to work correctly on iPhone browsers. Ensure exported JPEG files download successfully and contain the expected order data.",
-      "files": [
-        "frontend/src/utils/exportUtils.ts"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-9"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-pdf-export-functionality-to-work-correctly-on-iphone-browsers-ensure-exported-pdf-files-download-successfully-and-contain-the-expected-order-data-with-proper-formatting",
-      "featureTitle": "Fix PDF export functionality to work correctly on iPhone browsers. Ensure exported PDF files download successfully and contain the expected order data with proper formatting.",
-      "files": [
-        "frontend/src/utils/exportUtils.ts"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-10"
       ],
       "confidence": "high"
     }

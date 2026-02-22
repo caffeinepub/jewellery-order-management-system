@@ -32,7 +32,6 @@ export interface MappingRecord {
 }
 export interface Order {
   'weight' : number,
-  'suppliedQty' : bigint,
   'status' : OrderStatus,
   'createdAt' : Time,
   'size' : number,
@@ -53,21 +52,6 @@ export type OrderStatus = { 'Ready' : null } |
   { 'Pending' : null };
 export type OrderType = { 'CO' : null } |
   { 'RB' : null };
-export interface PersistentOrder {
-  'weight' : number,
-  'suppliedQty' : bigint,
-  'status' : OrderStatus,
-  'createdAt' : Time,
-  'size' : number,
-  'orderType' : OrderType,
-  'design' : string,
-  'orderId' : string,
-  'orderNo' : string,
-  'updatedAt' : Time,
-  'quantity' : bigint,
-  'remarks' : string,
-  'product' : string,
-}
 export type Time = bigint;
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
@@ -121,7 +105,6 @@ export interface _SERVICE {
     Array<Order>
   >,
   'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
-  'getPendingOrders' : ActorMethod<[], Array<PersistentOrder>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'reassignDesign' : ActorMethod<[string, string], undefined>,
@@ -131,7 +114,6 @@ export interface _SERVICE {
     undefined
   >,
   'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
-  'updateOrderStatusToReadyWithQty' : ActorMethod<[string, bigint], undefined>,
   'updateOrdersStatusToReady' : ActorMethod<[Array<string>], undefined>,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,
   'uploadDesignMapping' : ActorMethod<[Array<MappingRecord>], undefined>,
