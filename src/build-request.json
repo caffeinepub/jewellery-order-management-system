@@ -1,60 +1,99 @@
 {
   "kind": "build_request",
-  "title": "Fix PDF export design images and restore colorful formatting",
-  "projectName": "Jewellery Order Management",
+  "title": "Fix row selection behavior, design mapping save error, and mobile PDF export",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
+      "text": "Modify OrderTable row click behavior: clicking anywhere on a row must select the row and highlight it with multi-select support, except when clicking on the Design Code text. When the Design Code text is clicked, it must open the Design Image Preview modal without selecting the row or toggling the checkbox.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-4"
         ],
         "quotes": [
-          "Why is image not available for design code *CHTMN40009* in export pdf when actually image for that design is already available",
-          "Yes design are uploaded in design page as per design code"
+          "Clicking anywhere on row → selects row",
+          "Clicking on Design Code text must: ❌ NOT select the row ❌ NOT toggle checkbox ✅ Open Design Image Preview"
         ]
       },
       "acceptanceCriteria": [
-        "PDF export displays actual design images for all design codes that have images uploaded",
-        "Design code CHTMN40009 shows the gold chain image in the PDF export",
-        "If a design image is truly missing, show 'Image Not Available' text instead of placeholder brackets"
+        "Clicking on any part of a row except the Design Code text selects the row",
+        "Selected rows are visually highlighted",
+        "Multi-select works by clicking multiple rows",
+        "Clicking the Design Code text opens the Design Image Preview modal",
+        "Clicking the Design Code text does not select the row or toggle its checkbox"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
+      "text": "Remove the eye icon button from the right corner of each row in OrderTable. Image preview must only be triggered by clicking on the Design Code text.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-4"
         ],
         "quotes": [
-          "About colourful structure, the data in export pdf was sorted from lower design code to higher and then then it had green headers etc, why did such updated get changed in new deployment?"
+          "Remove eye icon from right corner",
+          "Image preview must ONLY open via clicking Design Code"
         ]
       },
       "acceptanceCriteria": [
-        "Each design group in the PDF has a green header row with the design code",
-        "Orders are sorted by design code numerically (lower to higher)",
-        "Visual formatting matches the previous colorful structure with clear separation between design groups",
-        "Table headers maintain green background color (#4CAF50 or similar)"
+        "Eye icon button is completely removed from each row",
+        "Design Image Preview can only be opened by clicking the Design Code text"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Fix the 'Failed to update design mapping' error in EditDesignModal. When Save is clicked: Step 1 - Validate that Karigar selected is not empty. Step 2 - Update the Master Mapping Table with the new karigar assignment. Step 3 - Update only Pending orders with this design code to reflect the new karigar. Do NOT update orders with status 'Ready' or 'Hallmark'.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "Failed to update design mapping",
+          "Karigar selected must not be empty",
+          "Update Master Mapping Table",
+          "Update Pending Orders Only",
+          "Do NOT update: Ready, Hallmark"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Validation error is shown if no karigar is selected when saving",
+        "Master design mapping is successfully updated in the backend",
+        "All orders with 'Pending' status and matching design code are updated with the new karigar",
+        "Orders with 'Ready' or 'Hallmark' status are not modified",
+        "Success message confirms the update without errors"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Fix PDF export in KarigarDetail page so that exported PDFs open correctly on iPhone mobile browsers instead of failing to download or open.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "pdf exported in Karigar page doesn't open or gets downloaded in mobile app especially iPhone"
+        ]
+      },
+      "acceptanceCriteria": [
+        "PDF export from KarigarDetail page successfully opens on iPhone Safari",
+        "PDF is properly rendered and viewable on mobile devices",
+        "No download failures or blank screens occur on iPhone"
       ]
     }
   ],
   "constraints": [
-    "Do not change any other features in the app - only modify PDF export functionality",
-    "Maintain all existing order management, dashboard, and design mapping features",
-    "Preserve the current Excel import/export functionality",
-    "Keep all existing UI components and layouts unchanged except for PDF export styling"
+    "Do not modify backend authentication or Internet Identity integration",
+    "Preserve existing OrderTable bulk selection and export functionality",
+    "Maintain current PDF structure with design images and green headers"
   ],
   "nonGoals": [
-    "Modifying the web interface display of design images",
-    "Changing the Design Image Page upload functionality",
-    "Altering order table row selection or bulk actions",
-    "Modifying any dashboard tabs or summary cards",
-    "Changing barcode scanning or tag printing features"
+    "Changing PDF visual styling or layout beyond mobile compatibility",
+    "Modifying order status transitions or workflow logic",
+    "Adding new design mapping features beyond the fix"
   ],
   "imageRequirements": {
     "required": [],

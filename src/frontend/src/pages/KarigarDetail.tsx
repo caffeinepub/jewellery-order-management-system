@@ -7,12 +7,14 @@ import OrderTable from "@/components/dashboard/OrderTable";
 import { exportKarigarToPDF } from "@/utils/exportUtils";
 import { toast } from "sonner";
 import { OrderStatus } from "@/backend";
+import { useState } from "react";
 
 export default function KarigarDetail() {
   const { name } = useParams({ from: "/karigar/$name" });
   const navigate = useNavigate();
   const { data: orders = [], isLoading } = useGetOrdersByKarigar(name);
   const { actor } = useActor();
+  const [isExporting, setIsExporting] = useState(false);
 
   const pendingOrders = orders.filter((o) => o.status === OrderStatus.Pending);
   const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weight, 0);
@@ -22,12 +24,15 @@ export default function KarigarDetail() {
   );
 
   const handleExportPDF = async () => {
+    setIsExporting(true);
     try {
       await exportKarigarToPDF(pendingOrders, name, actor);
-      toast.success("PDF exported successfully");
+      toast.success("PDF opened successfully");
     } catch (error) {
       toast.error("Failed to export PDF");
       console.error(error);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -55,9 +60,9 @@ export default function KarigarDetail() {
             <p className="text-muted-foreground">Karigar Details</p>
           </div>
         </div>
-        <Button onClick={handleExportPDF} variant="outline">
+        <Button onClick={handleExportPDF} variant="outline" disabled={isExporting}>
           <Download className="mr-2 h-4 w-4" />
-          Export PDF
+          {isExporting ? "Exporting..." : "Export PDF"}
         </Button>
       </div>
 
@@ -82,7 +87,10 @@ export default function KarigarDetail() {
         </div>
       </div>
 
-      <OrderTable orders={pendingOrders} enableBulkActions={true} />
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Orders</h2>
+        <OrderTable orders={pendingOrders} enableBulkActions={true} />
+      </div>
     </div>
   );
 }

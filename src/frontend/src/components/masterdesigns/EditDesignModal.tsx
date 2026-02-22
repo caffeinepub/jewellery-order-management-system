@@ -27,7 +27,7 @@ interface EditDesignModalProps {
   genericName: string;
   currentKarigar: string;
   availableKarigars: string[];
-  onSave: (designCode: string, newKarigar: string) => Promise<void>;
+  onSave: (designCode: string, genericName: string, newKarigar: string) => Promise<void>;
   onAddKarigar: (name: string) => Promise<void>;
 }
 
@@ -53,14 +53,16 @@ export function EditDesignModal({
   }, [currentKarigar, open]);
 
   const handleSave = async () => {
-    if (!selectedKarigar) {
+    // Step 1: Validate
+    if (!selectedKarigar || selectedKarigar.trim() === "") {
       toast.error("Please select a karigar");
       return;
     }
 
     setIsSaving(true);
     try {
-      await onSave(designCode, selectedKarigar);
+      // Step 2 & 3: Update master mapping and pending orders
+      await onSave(designCode, genericName, selectedKarigar);
       toast.success("Design mapping updated successfully");
       onOpenChange(false);
     } catch (error) {
@@ -98,7 +100,7 @@ export function EditDesignModal({
         <DialogHeader>
           <DialogTitle>Edit Design Mapping</DialogTitle>
           <DialogDescription>
-            Update the karigar assignment for this design code.
+            Update the karigar assignment for this design code. Only Pending orders will be updated.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

@@ -61,7 +61,7 @@ async function fetchDesignImageAsBase64(designCode: string, actor: any): Promise
   }
 }
 
-export async function exportToPDF(orders: Order[], actor?: any) {
+export async function exportToPDF(orders: Order[], actor?: any): Promise<string> {
   // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
@@ -161,15 +161,21 @@ export async function exportToPDF(orders: Order[], actor?: any) {
 
   html += `</body></html>`;
 
-  const printWindow = window.open("", "_blank");
+  // Create blob and return URL for mobile compatibility
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  
+  // Open in new window for mobile (especially iPhone)
+  const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    });
   }
+  
+  return blobUrl;
 }
 
 export async function exportToJPEG(orders: Order[]) {
@@ -244,7 +250,7 @@ export async function exportToJPEG(orders: Order[]) {
   }
 }
 
-export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any) {
+export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any): Promise<string> {
   // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
@@ -346,13 +352,19 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
 
   html += `</body></html>`;
 
-  const printWindow = window.open("", "_blank");
+  // Create blob and return URL for mobile compatibility
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  
+  // Open in new window for mobile (especially iPhone)
+  const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    });
   }
+  
+  return blobUrl;
 }

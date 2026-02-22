@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { Download, AlertCircle } from "lucide-react";
 import { Order } from "@/backend";
 import DesignImageModal from "./DesignImageModal";
 import { exportToExcel, exportToPDF, exportToJPEG } from "@/utils/exportUtils";
@@ -56,8 +56,8 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
   }, {} as Record<string, Order[]>);
 
   const handleRowClick = (orderId: string, e: React.MouseEvent) => {
-    // Don't toggle if clicking on checkbox or image button
-    if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) {
+    // Don't toggle if clicking on checkbox
+    if ((e.target as HTMLElement).closest('input[type="checkbox"]')) {
       return;
     }
     
@@ -70,6 +70,11 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
       }
       return newSet;
     });
+  };
+
+  const handleDesignCodeClick = (designCode: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedDesign(designCode);
   };
 
   const handleCheckboxChange = (orderId: string) => {
@@ -181,7 +186,6 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
               <TableHead>Order No</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Product</TableHead>
-              <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -208,7 +212,12 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                           />
                         </TableCell>
                       )}
-                      <TableCell className="font-medium">{order.design}</TableCell>
+                      <TableCell 
+                        className="font-medium text-gold hover:text-gold-hover cursor-pointer underline decoration-dotted"
+                        onClick={(e) => handleDesignCodeClick(order.design, e)}
+                      >
+                        {order.design}
+                      </TableCell>
                       <TableCell>{order.genericName || "-"}</TableCell>
                       <TableCell>{order.karigarName || "-"}</TableCell>
                       <TableCell>{order.weight.toFixed(3)}</TableCell>
@@ -222,15 +231,6 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                         </span>
                       </TableCell>
                       <TableCell>{order.product}</TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedDesign(order.design)}
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -238,7 +238,7 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
             ))}
             {orders.length === 0 && (
               <TableRow>
-                <TableCell colSpan={enableBulkActions ? 12 : 11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={enableBulkActions ? 11 : 10} className="text-center py-8 text-muted-foreground">
                   <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   No orders found
                 </TableCell>

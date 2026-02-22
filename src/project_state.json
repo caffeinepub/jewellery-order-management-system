@@ -1,32 +1,44 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Jewelry order management system with design image uploads and PDF export functionality",
-  "architectural_notes": [
-    "Design images are uploaded via a Design Image Page and stored by design code",
-    "PDF export functionality exists but currently not embedding images correctly",
-    "Previous PDF format had green headers and visual formatting that needs restoration"
-  ],
+  "summary": "New project",
+  "architectural_notes": [],
   "known_issues": [
-    "PDF export shows placeholder text like [Design Image: CHTMN40009] instead of actual images",
-    "PDF export lost colorful structure and green headers from previous version",
-    "Design images exist in system but PDF generation not fetching them properly"
+    "Row selection includes design code clicks when it should not",
+    "Design mapping save fails; missing validation and update logic",
+    "PDF export broken on iPhone in Karigar page"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-pdf-export-to-embed-actual-design-images-from-the-design-image-page-instead-of-showing-placeholder-text-like-design-image-chtmn40009-the-system-must-fetch-uploaded-design-images-by-design-code-and-convert-them-to-a-format-suitable-for-pdf-embedding-base64-or-similar",
-      "title": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
+      "id": "feature-modify-ordertable-row-click-behavior-clicking-anywhere-on-a-row-must-select-the-row-and-highlight-it-with-multi-select-support-except-when-clicking-on-the-design-code-text-when-the-design-code-text-is-clicked-it-must-open-the-design-image-preview-modal-without-selecting-the-row-or-toggling-the-checkbox",
+      "title": "Modify OrderTable row click behavior: clicking anywhere on a row must select the row and highlight it with multi-select support, except when clicking on the Design Code text. When the Design Code text is clicked, it must open the Design Image Preview modal without selecting the row or toggling the checkbox.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-restore-the-colorful-pdf-export-structure-from-the-previous-version-including-green-header-rows-for-each-design-group-visual-distinction-between-design-sections-and-sorting-orders-by-design-code-from-lower-to-higher-within-each-group",
-      "title": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
+      "id": "feature-remove-the-eye-icon-button-from-the-right-corner-of-each-row-in-ordertable-image-preview-must-only-be-triggered-by-clicking-on-the-design-code-text",
+      "title": "Remove the eye icon button from the right corner of each row in OrderTable. Image preview must only be triggered by clicking on the Design Code text.",
       "reqIds": [
         "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-failed-to-update-design-mapping-error-in-editdesignmodal-when-save-is-clicked-step-1-validate-that-karigar-selected-is-not-empty-step-2-update-the-master-mapping-table-with-the-new-karigar-assignment-step-3-update-only-pending-orders-with-this-design-code-to-reflect-the-new-karigar-do-not-update-orders-with-status-ready-or-hallmark",
+      "title": "Fix the 'Failed to update design mapping' error in EditDesignModal. When Save is clicked: Step 1 - Validate that Karigar selected is not empty. Step 2 - Update the Master Mapping Table with the new karigar assignment. Step 3 - Update only Pending orders with this design code to reflect the new karigar. Do NOT update orders with status 'Ready' or 'Hallmark'.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-pdf-export-in-karigardetail-page-so-that-exported-pdfs-open-correctly-on-iphone-mobile-browsers-instead-of-failing-to-download-or-open",
+      "title": "Fix PDF export in KarigarDetail page so that exported PDFs open correctly on iPhone mobile browsers instead of failing to download or open.",
+      "reqIds": [
+        "REQ-4"
       ],
       "version": 1
     }
@@ -34,18 +46,24 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix PDF export to embed actual design images instead of placeholder text",
+      "summary": "Fix row click selection to allow multi-select but exclude design code clicks; remove eye icon",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Restore colorful PDF structure with green headers and design code sorting (lower to higher)",
+      "summary": "Fix 'Failed to update design mapping' error with proper validation and update logic (Pending orders only)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Fix PDF export not opening/downloading correctly on iPhone in Karigar page",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Jewellery Order Management",
+  "projectName": "Fix row selection behavior, design mapping save error, and mobile PDF export",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

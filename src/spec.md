@@ -1,12 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix PDF export to display actual design images and restore colorful formatting with green headers and proper sorting.
+**Goal:** Fix row selection behavior in OrderTable, resolve design mapping save error, and enable PDF export on iPhone mobile browsers.
 
 **Planned changes:**
-- Embed actual design images from the Design Image Page into PDF exports by fetching uploaded images by design code
-- Restore green header rows for each design group in the PDF
-- Sort orders by design code numerically from lower to higher within each group
-- Apply visual formatting with clear separation between design sections
+- Modify OrderTable row click behavior: clicking anywhere on a row (except Design Code text) selects the row with multi-select support; clicking Design Code text opens Design Image Preview modal without selecting the row
+- Remove eye icon button from each row; image preview only opens via Design Code text click
+- Fix EditDesignModal save error by validating karigar selection, updating Master Mapping Table, and updating only Pending orders (not Ready or Hallmark)
+- Fix PDF export in KarigarDetail page to open correctly on iPhone mobile browsers
 
-**User-visible outcome:** PDF exports will show actual design images (like the gold chain for CHTMN40009) instead of placeholder text, with a colorful structure featuring green headers and properly sorted design groups.
+**User-visible outcome:** Users can select rows by clicking anywhere except the Design Code text, open design previews by clicking Design Code, successfully save design-to-karigar mappings without errors, and export PDFs that open properly on iPhone.

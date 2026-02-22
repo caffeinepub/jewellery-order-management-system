@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-pdf-export-to-embed-actual-design-images-from-the-design-image-page-instead-of-showing-placeholder-text-like-design-image-chtmn40009-the-system-must-fetch-uploaded-design-images-by-design-code-and-convert-them-to-a-format-suitable-for-pdf-embedding-base64-or-similar",
-      "featureTitle": "Fix PDF export to embed actual design images from the Design Image Page instead of showing placeholder text like '[Design Image: CHTMN40009]'. The system must fetch uploaded design images by design code and convert them to a format suitable for PDF embedding (base64 or similar).",
+      "featureId": "feature-modify-ordertable-row-click-behavior-clicking-anywhere-on-a-row-must-select-the-row-and-highlight-it-with-multi-select-support-except-when-clicking-on-the-design-code-text-when-the-design-code-text-is-clicked-it-must-open-the-design-image-preview-modal-without-selecting-the-row-or-toggling-the-checkbox",
+      "featureTitle": "Modify OrderTable row click behavior: clicking anywhere on a row must select the row and highlight it with multi-select support, except when clicking on the Design Code text. When the Design Code text is clicked, it must open the Design Image Preview modal without selecting the row or toggling the checkbox.",
       "files": [
-        "frontend/src/utils/exportUtils.ts"
+        "frontend/src/components/dashboard/OrderTable.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -23,10 +23,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-restore-the-colorful-pdf-export-structure-from-the-previous-version-including-green-header-rows-for-each-design-group-visual-distinction-between-design-sections-and-sorting-orders-by-design-code-from-lower-to-higher-within-each-group",
-      "featureTitle": "Restore the colorful PDF export structure from the previous version, including green header rows for each design group, visual distinction between design sections, and sorting orders by design code from lower to higher within each group.",
+      "featureId": "feature-remove-the-eye-icon-button-from-the-right-corner-of-each-row-in-ordertable-image-preview-must-only-be-triggered-by-clicking-on-the-design-code-text",
+      "featureTitle": "Remove the eye icon button from the right corner of each row in OrderTable. Image preview must only be triggered by clicking on the Design Code text.",
       "files": [
-        "frontend/src/utils/exportUtils.ts"
+        "frontend/src/components/dashboard/OrderTable.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -40,6 +40,49 @@
       ],
       "testIds": [
         "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-failed-to-update-design-mapping-error-in-editdesignmodal-when-save-is-clicked-step-1-validate-that-karigar-selected-is-not-empty-step-2-update-the-master-mapping-table-with-the-new-karigar-assignment-step-3-update-only-pending-orders-with-this-design-code-to-reflect-the-new-karigar-do-not-update-orders-with-status-ready-or-hallmark",
+      "featureTitle": "Fix the 'Failed to update design mapping' error in EditDesignModal. When Save is clicked: Step 1 - Validate that Karigar selected is not empty. Step 2 - Update the Master Mapping Table with the new karigar assignment. Step 3 - Update only Pending orders with this design code to reflect the new karigar. Do NOT update orders with status 'Ready' or 'Hallmark'.",
+      "files": [
+        "frontend/src/components/masterdesigns/EditDesignModal.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-pdf-export-in-karigardetail-page-so-that-exported-pdfs-open-correctly-on-iphone-mobile-browsers-instead-of-failing-to-download-or-open",
+      "featureTitle": "Fix PDF export in KarigarDetail page so that exported PDFs open correctly on iPhone mobile browsers instead of failing to download or open.",
+      "files": [
+        "frontend/src/pages/KarigarDetail.tsx",
+        "frontend/src/utils/exportUtils.ts"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
       ],
       "confidence": "high"
     }

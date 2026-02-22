@@ -1,38 +1,77 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix PDF export design images and restore colorful formatting",
+  "title": "Fix row selection behavior, design mapping save error, and mobile PDF export",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Embed actual design images in PDF export by fetching uploaded images via design code and converting them to base64 format for PDF embedding",
+      "summary": "Modify OrderTable row click behavior to select rows on click (except Design Code text) and open Design Image Preview modal only when Design Code text is clicked",
       "acceptanceCriteria": [
-        "PDF export displays actual design images for all design codes that have images uploaded",
-        "Design code CHTMN40009 shows the gold chain image in the PDF export",
-        "If a design image is truly missing, show 'Image Not Available' text instead of placeholder brackets"
+        "Clicking on any part of a row except the Design Code text selects the row",
+        "Selected rows are visually highlighted",
+        "Multi-select works by clicking multiple rows",
+        "Clicking the Design Code text opens the Design Image Preview modal",
+        "Clicking the Design Code text does not select the row or toggle its checkbox"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/exportUtils.ts",
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Modify the exportToPDF function to fetch design images using the getDesignImage backend method. For each unique design code in the order list, call getDesignImage and convert the returned ExternalBlob to base64 using getBytes(). Embed the base64 image data in the PDF HTML structure where design images are currently shown as placeholder text '[Design Image: ...]'. If getDesignImage returns null, display 'Image Not Available' text. Ensure images are sized appropriately for PDF layout (e.g., max-width for embedding)."
+          "description": "Modify row click handler to select rows when clicking anywhere except the Design Code text. Add event handler to Design Code text that stops event propagation and opens the Design Image Preview modal without toggling selection. Ensure multi-select functionality is preserved and selected rows are visually highlighted."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Restore colorful PDF export structure with green header rows for each design group and numeric sorting of design codes from lower to higher",
+      "summary": "Remove the eye icon button from OrderTable rows so Design Image Preview is only triggered by clicking Design Code text",
       "acceptanceCriteria": [
-        "Each design group in the PDF has a green header row with the design code",
-        "Orders are sorted by design code numerically (lower to higher)",
-        "Visual formatting matches the previous colorful structure with clear separation between design groups",
-        "Table headers maintain green background color (#4CAF50 or similar)"
+        "Eye icon button is completely removed from each row",
+        "Design Image Preview can only be opened by clicking the Design Code text"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Remove the eye icon button from the right corner of each row in the table. Ensure the Design Image Preview modal can only be opened by clicking the Design Code text as implemented in REQ-1."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Fix 'Failed to update design mapping' error in EditDesignModal by adding karigar validation and ensuring only Pending orders are updated when design mapping is saved",
+      "acceptanceCriteria": [
+        "Validation error is shown if no karigar is selected when saving",
+        "Master design mapping is successfully updated in the backend",
+        "All orders with 'Pending' status and matching design code are updated with the new karigar",
+        "Orders with 'Ready' or 'Hallmark' status are not modified",
+        "Success message confirms the update without errors"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/masterdesigns/EditDesignModal.tsx",
+          "operation": "modify",
+          "description": "Add validation to ensure karigar is selected before saving. When Save is clicked: Step 1 - Validate that selectedKarigar or newKarigarName is not empty and show an error if validation fails. Step 2 - Call backend method saveDesignMapping to update the Master Mapping Table with the design code, generic name, and new karigar assignment. Step 3 - Call backend method reassignDesign to update only Pending orders with this design code to reflect the new karigar (backend will filter for Pending status only). Display success toast on completion and handle errors appropriately."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Fix PDF export in KarigarDetail page to open correctly on iPhone mobile browsers by using window.open instead of anchor tag download",
+      "acceptanceCriteria": [
+        "PDF export from KarigarDetail page successfully opens on iPhone Safari",
+        "PDF is properly rendered and viewable on mobile devices",
+        "No download failures or blank screens occur on iPhone"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Modify the PDF export functionality to use window.open() with the blob URL instead of creating an anchor element with download attribute. This ensures PDFs open correctly in iPhone mobile browsers (Safari) rather than failing to download. After generating the PDF blob, call window.open(blobUrl, '_blank') to open the PDF in a new tab where it can be viewed and optionally saved by the user."
+        },
+        {
           "path": "frontend/src/utils/exportUtils.ts",
           "operation": "modify",
-          "description": "Modify the exportToPDF function to restore the colorful formatting structure. Sort orders by design code numerically (parse numeric portion or use natural sort) before grouping. For each design group, add a green header row (background-color: #4CAF50 or similar) displaying the design code prominently. Apply green background (#4CAF50) to table column headers. Add visual separation between design groups using borders or spacing. Ensure the PDF structure matches the previous version's colorful layout with distinct design sections."
+          "description": "Update the exportToPDF function to return the blob URL instead of automatically triggering download via anchor element. Remove the anchor.download logic and let the calling component (KarigarDetail) handle opening the PDF with window.open(). Ensure the PDF generation logic (HTML conversion, design image embedding, green headers) remains unchanged."
         }
       ]
     }
