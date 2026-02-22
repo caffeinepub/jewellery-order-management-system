@@ -61,6 +61,39 @@ async function fetchDesignImageAsBase64(designCode: string, actor: any): Promise
   }
 }
 
+// Mobile-friendly download helper
+function downloadBlobOnMobile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  
+  // Detect iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
+  if (isIOS) {
+    // For iOS, open in new window as Safari has restrictions
+    const newWindow = window.open(url, '_blank');
+    if (!newWindow) {
+      // Fallback: try to use Share API if available
+      if (navigator.share) {
+        navigator.share({
+          files: [new File([blob], filename, { type: blob.type })],
+          title: filename,
+        }).catch((err) => console.error('Share failed:', err));
+      }
+    }
+  } else {
+    // For Android and desktop, use standard download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up after a delay
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+}
+
 export async function exportToPDF(orders: Order[], actor?: any): Promise<string> {
   // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
@@ -89,6 +122,8 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
     <!DOCTYPE html>
     <html>
     <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
         @page { size: A4; margin: 20mm; }
         body { font-family: Arial, sans-serif; font-size: 12px; }
@@ -110,6 +145,9 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
         .image-container { text-align: center; margin: 15px 0; }
         .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
         .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
       </style>
     </head>
     <body>
@@ -161,18 +199,21 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
 
   html += `</body></html>`;
 
-  // Create blob and return URL for mobile compatibility
+  // Create blob
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
   
-  // Open in new window for mobile (especially iPhone)
+  // Mobile-friendly approach: Open in new window for printing
   const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {
     printWindow.addEventListener('load', () => {
       setTimeout(() => {
         printWindow.print();
-      }, 250);
+      }, 500);
     });
+  } else {
+    // Fallback: If popup blocked, try direct download
+    downloadBlobOnMobile(blob, `orders_${new Date().toISOString().split("T")[0]}.html`);
   }
   
   return blobUrl;
@@ -191,6 +232,8 @@ export async function exportToJPEG(orders: Order[]) {
     <!DOCTYPE html>
     <html>
     <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
         body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; background: white; }
         h1 { text-align: center; margin-bottom: 5px; }
@@ -199,6 +242,9 @@ export async function exportToJPEG(orders: Order[]) {
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; font-weight: bold; }
         .design-header { font-weight: bold; font-size: 14px; margin: 20px 0 10px 0; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
       </style>
     </head>
     <body>
@@ -239,14 +285,21 @@ export async function exportToJPEG(orders: Order[]) {
 
   html += `</body></html>`;
 
-  const printWindow = window.open("", "_blank");
+  // Create blob
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+
+  // Mobile-friendly approach
+  const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
+    });
+  } else {
+    // Fallback for blocked popups
+    downloadBlobOnMobile(blob, `orders_${new Date().toISOString().split("T")[0]}.html`);
   }
 }
 
@@ -278,6 +331,8 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
     <!DOCTYPE html>
     <html>
     <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
         @page { size: A4; margin: 20mm; }
         body { font-family: Arial, sans-serif; font-size: 12px; }
@@ -299,6 +354,9 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
         .image-container { text-align: center; margin: 15px 0; }
         .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
         .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
       </style>
     </head>
     <body>
@@ -352,18 +410,21 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
 
   html += `</body></html>`;
 
-  // Create blob and return URL for mobile compatibility
+  // Create blob
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
   
-  // Open in new window for mobile (especially iPhone)
+  // Mobile-friendly approach
   const printWindow = window.open(blobUrl, '_blank');
   if (printWindow) {
     printWindow.addEventListener('load', () => {
       setTimeout(() => {
         printWindow.print();
-      }, 250);
+      }, 500);
     });
+  } else {
+    // Fallback for blocked popups
+    downloadBlobOnMobile(blob, `karigar_${karigarName}_${new Date().toISOString().split("T")[0]}.html`);
   }
   
   return blobUrl;

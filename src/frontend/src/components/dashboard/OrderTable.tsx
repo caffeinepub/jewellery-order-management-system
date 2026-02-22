@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download } from "lucide-react";
-import { Order } from "@/backend";
+import { Download, AlertCircle } from "lucide-react";
+import { Order, OrderStatus } from "@/backend";
 import DesignImageModal from "./DesignImageModal";
 import { exportToExcel, exportToPDF, exportToJPEG } from "@/utils/exportUtils";
 import {
@@ -122,6 +122,22 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
   const allSelected = orders.length > 0 && selectedRows.size === orders.length;
   const someSelected = selectedRows.size > 0 && selectedRows.size < orders.length;
 
+  // Helper function to format status display
+  const formatStatus = (status: OrderStatus): string => {
+    switch (status) {
+      case OrderStatus.Pending:
+        return "Pending";
+      case OrderStatus.Ready:
+        return "Ready";
+      case OrderStatus.Hallmark:
+        return "Hallmark";
+      case OrderStatus.ReturnFromHallmark:
+        return "Return From Hallmark";
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -153,7 +169,7 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
         </DropdownMenu>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -166,23 +182,24 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                   />
                 </TableHead>
               )}
+              <TableHead>Order No</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Product</TableHead>
+              <TableHead>Design Code</TableHead>
               <TableHead>Generic Name</TableHead>
               <TableHead>Karigar Name</TableHead>
               <TableHead>Weight</TableHead>
               <TableHead>Size</TableHead>
               <TableHead>Qty</TableHead>
-              <TableHead>Design Code</TableHead>
               <TableHead>Remarks</TableHead>
-              <TableHead>Order No</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Product</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={enableBulkActions ? 11 : 10}
+                  colSpan={enableBulkActions ? 12 : 11}
                   className="text-center py-8 text-muted-foreground"
                 >
                   No orders found
@@ -193,7 +210,7 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                 <>
                   {groupIndex > 0 && (
                     <TableRow key={`separator-${designCode}`} className="bg-muted/30">
-                      <TableCell colSpan={enableBulkActions ? 11 : 10} className="h-2 p-0" />
+                      <TableCell colSpan={enableBulkActions ? 12 : 11} className="h-2 p-0" />
                     </TableRow>
                   )}
                   {designOrders.map((order) => {
@@ -221,6 +238,17 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                             />
                           </TableCell>
                         )}
+                        <TableCell>{order.orderNo}</TableCell>
+                        <TableCell>{order.orderType}</TableCell>
+                        <TableCell>{order.product}</TableCell>
+                        <TableCell>
+                          <button
+                            onClick={(e) => handleDesignClick(order.design, e)}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {order.design}
+                          </button>
+                        </TableCell>
                         <TableCell>
                           {order.genericName || (
                             <span className="text-muted-foreground italic text-sm"></span>
@@ -234,18 +262,12 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                         <TableCell>{order.weight}</TableCell>
                         <TableCell>{order.size}</TableCell>
                         <TableCell>{Number(order.quantity)}</TableCell>
-                        <TableCell>
-                          <button
-                            onClick={(e) => handleDesignClick(order.design, e)}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            {order.design}
-                          </button>
-                        </TableCell>
                         <TableCell>{order.remarks}</TableCell>
-                        <TableCell>{order.orderNo}</TableCell>
-                        <TableCell>{order.orderType}</TableCell>
-                        <TableCell>{order.product}</TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">
+                            {formatStatus(order.status)}
+                          </span>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -267,9 +289,10 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
+            <AlertDialogTitle>Confirm Status Update</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark {selectedRows.size} order(s) as Ready? This action will move them from the pending list to the ready list.
+              Are you sure you want to mark {selectedRows.size} order(s) as Ready?
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

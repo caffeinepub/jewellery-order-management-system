@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType, Order } from "@/backend";
+import { OrderStatus, OrderType } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -13,11 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface TotalOrdersTabProps {
-  onFilteredOrdersChange?: (orders: Order[]) => void;
-}
-
-export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTabProps) {
+export default function TotalOrdersTab() {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -26,9 +22,10 @@ export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTa
   const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
 
   const filteredOrders = useMemo(() => {
-    // Only show Pending status orders (exclude ReturnFromHallmark)
     let result = orders.filter(
-      (order) => order.status === OrderStatus.Pending
+      (order) =>
+        order.status === OrderStatus.Pending ||
+        order.status === OrderStatus.ReturnFromHallmark
     );
 
     // Filter by order type
@@ -51,13 +48,6 @@ export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTa
 
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText]);
-
-  // Notify parent of filtered orders change
-  useMemo(() => {
-    if (onFilteredOrdersChange) {
-      onFilteredOrdersChange(filteredOrders);
-    }
-  }, [filteredOrders, onFilteredOrdersChange]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
@@ -91,7 +81,7 @@ export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTa
         </div>
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filter by Karigar" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Karigars</SelectItem>

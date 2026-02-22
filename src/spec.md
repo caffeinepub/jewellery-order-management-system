@@ -1,13 +1,14 @@
 # Specification
 
 ## Summary
-**Goal:** Fix order filtering by status in tabs, make summary metrics tab-specific, and reorder table columns across all dashboard views.
+**Goal:** Fix critical dashboard display and filtering issues including missing Status columns, incorrect Ready tab filtering, broken design code mapping, karigar filter UI glitch, and non-functional mobile exports.
 
 **Planned changes:**
-- Filter Total Orders tab to show only pending orders; remove orders from view when marked as ready
-- Filter Karigar detail view to show only pending orders; remove orders when marked as ready
-- Update summary cards (Total Orders, Weight, Quantity, Customer Orders) to reflect only the current tab's filtered data
-- Filter Customer Orders tab to display only orders with type 'CO'
-- Reorder all table columns to: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product
+- Add Status column to Total Orders, Ready, and Hallmark tabs showing current order status
+- Fix Ready tab to display only orders with status 'Ready' instead of all orders
+- Fix design code matching logic to correctly map Generic Name and Karigar Name from master designs data, handling product prefixes (CH, BR, H, etc.) that need to be stripped before matching
+- Fix UI glitch in Karigar filter dropdown button text when changing from 'All Karigars' to specific karigar names
+- Fix Export to JPEG functionality to work on mobile devices across all dashboard tabs
+- Fix Export to PDF functionality to work on mobile devices across all dashboard tabs
 
-**User-visible outcome:** Users will see accurate status-filtered orders in each tab, real-time metrics that update per tab, Customer Orders showing only CO type orders, and consistently ordered columns across all dashboard views.
+**User-visible outcome:** Users can see the Status column in all tabs, the Ready tab correctly filters to show only ready orders, Generic Name and Karigar Name populate correctly for all orders (including CHTMN40038, BRNOB41367, BRDZL45035, CHDZL6001GN), the karigar filter displays selected text cleanly without visual artifacts, and JPEG/PDF exports work properly on mobile devices.

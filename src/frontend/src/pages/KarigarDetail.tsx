@@ -7,7 +7,7 @@ import OrderTable from "@/components/dashboard/OrderTable";
 import { exportKarigarToPDF } from "@/utils/exportUtils";
 import { toast } from "sonner";
 import { OrderStatus } from "@/backend";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 
 export default function KarigarDetail() {
   const { name } = useParams({ from: "/karigar/$name" });
@@ -16,11 +16,7 @@ export default function KarigarDetail() {
   const { actor } = useActor();
   const [isExporting, setIsExporting] = useState(false);
 
-  // Filter to show only Pending status orders
-  const pendingOrders = useMemo(() => {
-    return orders.filter((o) => o.status === OrderStatus.Pending);
-  }, [orders]);
-
+  const pendingOrders = orders.filter((o) => o.status === OrderStatus.Pending);
   const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weight, 0);
   const totalQuantity = pendingOrders.reduce(
     (sum, o) => sum + Number(o.quantity),

@@ -1,53 +1,84 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management dashboard for jewelry manufacturing with tabs for Total Orders, Ready Orders, Karigar Orders, and Customer Orders. Includes order filtering, status updates, and real-time metrics.",
+  "summary": "Order management dashboard with tabs for Total Orders, Ready Orders, Hallmark Orders, Customer Orders, and Karigars. Features karigar filtering, order status tracking, master Excel data mapping for design codes/karigar names/generic names, and export functionality (JPEG/PDF).",
   "architectural_notes": [
-    "Dashboard has multiple tabs: Total Orders, Ready Orders, Karigar Orders, Customer Orders",
-    "Orders have status field (pending/ready) that determines tab placement",
-    "Tab-specific metrics displayed in dashboard header icons",
-    "Order type filtering implemented for Customer Orders tab (CO only)"
+    "Dashboard includes tabs: Total Orders, Ready Orders, Hallmark Orders, Customer Orders, and Karigars",
+    "Master Excel file contains karigar names, generic names, and design codes for mapping",
+    "Karigar filtering functionality with dropdown (All Karigars or specific karigar)",
+    "Export functionality supporting JPEG and PDF formats",
+    "Order status tracking (e.g., 'Ready' status)"
   ],
-  "known_issues": [],
-  "isFixRequest": false,
+  "known_issues": [
+    "Status column missing from Total Orders, Ready, and Hallmark tabs",
+    "Ready tab showing all orders instead of filtering by 'Ready' status",
+    "Master Excel data not mapping correctly to orders (design codes, karigar names, generic names)",
+    "Karigar filter button displays UI glitch when changing selection",
+    "Export to JPEG/PDF not working on mobile devices"
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-modify-total-orders-tab-to-display-only-orders-with-status-pending-when-rows-are-selected-and-marked-as-ready-remove-them-from-the-total-orders-view-immediately",
-      "title": "Modify Total Orders tab to display only orders with status 'Pending'. When rows are selected and marked as ready, remove them from the Total Orders view immediately.",
+      "id": "feature-add-a-status-column-to-the-total-orders-tab-displaying-the-current-order-status-pending-ready-returnfromhallmark-etc-for-each-order-row",
+      "title": "Add a Status column to the Total Orders tab displaying the current order status (Pending, Ready, ReturnFromHallmark, etc.) for each order row",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-in-karigars-tab-when-viewing-a-specific-karigar-s-pending-orders-and-marking-them-as-ready-remove-those-orders-from-the-karigar-s-pending-order-list-immediately",
-      "title": "In Karigars tab, when viewing a specific karigar's pending orders and marking them as ready, remove those orders from the karigar's pending order list immediately.",
+      "id": "feature-add-a-status-column-to-the-ready-tab-displaying-the-current-order-status-for-each-order-row",
+      "title": "Add a Status column to the Ready tab displaying the current order status for each order row",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-summarycards-component-to-calculate-and-display-metrics-total-orders-count-total-weight-total-quantity-customer-orders-count-based-on-the-currently-active-tab-s-filtered-data-not-all-orders",
-      "title": "Update SummaryCards component to calculate and display metrics (Total Orders count, Total Weight, Total Quantity, Customer Orders count) based on the currently active tab's filtered data, not all orders.",
+      "id": "feature-add-a-status-column-to-the-hallmark-tab-displaying-the-current-order-status-for-each-order-row",
+      "title": "Add a Status column to the Hallmark tab displaying the current order status for each order row",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-modify-customer-orders-tab-to-filter-and-display-only-orders-where-order-type-is-co-excluding-all-other-order-types",
-      "title": "Modify Customer Orders tab to filter and display only orders where order type is 'CO', excluding all other order types.",
+      "id": "feature-fix-the-ready-tab-to-display-only-orders-with-status-ready-instead-of-showing-all-orders",
+      "title": "Fix the Ready tab to display only orders with status 'Ready' instead of showing all orders",
       "reqIds": [
         "REQ-4"
       ],
       "version": 1
     },
     {
-      "id": "feature-reorder-all-table-columns-across-all-dashboard-tabs-to-display-data-in-this-exact-sequence-generic-name-karigar-name-wt-size-qty-design-code-remarks-order-number-type-product",
-      "title": "Reorder all table columns across all dashboard tabs to display data in this exact sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product.",
+      "id": "feature-fix-the-design-code-matching-logic-to-correctly-map-generic-name-and-karigar-name-from-the-master-designs-data-when-displaying-orders-in-all-dashboard-tabs-handling-cases-where-design-codes-may-have-product-prefixes-ch-br-h-etc-that-need-to-be-stripped-before-matching-against-the-base-design-codes-in-master-designs",
+      "title": "Fix the design code matching logic to correctly map Generic Name and Karigar Name from the master designs data when displaying orders in all dashboard tabs, handling cases where design codes may have product prefixes (CH, BR, H, etc.) that need to be stripped before matching against the base design codes in master designs",
       "reqIds": [
         "REQ-5"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-ui-glitch-in-the-karigar-filter-dropdown-button-text-that-occurs-when-changing-the-selection-from-all-karigars-to-a-specific-karigar-name-ensuring-the-button-displays-the-selected-text-cleanly-without-visual-artifacts",
+      "title": "Fix the UI glitch in the Karigar filter dropdown button text that occurs when changing the selection from 'All Karigars' to a specific Karigar name, ensuring the button displays the selected text cleanly without visual artifacts",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-export-to-jpeg-functionality-to-work-correctly-on-mobile-devices-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
+      "title": "Fix the Export to JPEG functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
+      "reqIds": [
+        "REQ-7"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-export-to-pdf-functionality-to-work-correctly-on-mobile-devices-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
+      "title": "Fix the Export to PDF functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
+      "reqIds": [
+        "REQ-8"
       ],
       "version": 1
     }
@@ -55,36 +86,36 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Total Orders tab shows pending orders; selecting and marking as ready removes from Total and moves to Ready tab",
+      "summary": "Add Status column to all tabs (Total Orders, Ready, Hallmark)",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Karigar tab: selecting pending orders and marking as ready removes from Karigar pending list and moves to Ready tab",
+      "summary": "Fix Ready tab to show only orders with status 'Ready'",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-3",
-      "summary": "Dashboard icons (Total orders, weight, qty, customer orders) reflect values for currently selected tab and update dynamically on tab change",
+      "summary": "Fix master Excel data mapping for design codes, karigar names, and generic names",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-4",
-      "summary": "Customer Orders tab filters to show only order type 'CO'",
+      "summary": "Fix Karigar filter button UI glitch when switching from 'All Karigar' to specific karigar",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-5",
-      "summary": "Display dashboard data in all tabs with sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product",
+      "summary": "Fix export to JPEG and PDF on mobile devices",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Fix order status filtering, tab-specific metrics, and column ordering",
+  "projectName": "Jewellery Order Manager",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

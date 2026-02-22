@@ -1,109 +1,173 @@
 {
   "kind": "build_request",
-  "title": "Fix order status filtering, tab-specific metrics, and column ordering",
+  "title": "Fix dashboard issues: Status column, Ready tab filtering, data mapping, karigar filter UI, and mobile export",
+  "projectName": "Jewellery Order Manager",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Modify Total Orders tab to display only orders with status 'Pending'. When rows are selected and marked as ready, remove them from the Total Orders view immediately.",
+      "text": "Add a Status column to the Total Orders tab displaying the current order status (Pending, Ready, ReturnFromHallmark, etc.) for each order row",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-final"
         ],
         "quotes": [
-          "Total orders should show orders with status pending and when rows are selected to update it as ready, the row gets removed from total orders and moved to ready"
+          "The Status column is not visible across all tabs — Total Orders, Ready, and Hallmark. It must be consistently displayed in every tab."
         ]
       },
       "acceptanceCriteria": [
-        "Total Orders tab filters orders to show only status 'Pending'",
-        "After marking orders as ready, those orders disappear from Total Orders tab",
-        "Orders appear in Ready tab after status update"
+        "Status column appears in the Total Orders tab table",
+        "Status values are displayed correctly for each order",
+        "Column is visible on both desktop and mobile views"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "In Karigars tab, when viewing a specific karigar's pending orders and marking them as ready, remove those orders from the karigar's pending order list immediately.",
+      "text": "Add a Status column to the Ready tab displaying the current order status for each order row",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-final"
         ],
         "quotes": [
-          "Same way from Karigar tabs, if selected and marked as ready it should remove from Karigar pending order list and move to ready"
+          "The Status column is not visible across all tabs — Total Orders, Ready, and Hallmark. It must be consistently displayed in every tab."
         ]
       },
       "acceptanceCriteria": [
-        "Karigar detail view shows only pending orders for that karigar",
-        "After marking orders as ready, they are removed from karigar's pending list",
-        "Orders appear in Ready tab after status update"
+        "Status column appears in the Ready tab table",
+        "Status values are displayed correctly",
+        "Column is visible on both desktop and mobile views"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Update SummaryCards component to calculate and display metrics (Total Orders count, Total Weight, Total Quantity, Customer Orders count) based on the currently active tab's filtered data, not all orders.",
+      "text": "Add a Status column to the Hallmark tab displaying the current order status for each order row",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-final"
         ],
         "quotes": [
-          "The icons in dashboard ( Total orders. weight , qty, customer orders) should reflect true values as selected in current tab and keeps changing according to the tab"
+          "The Status column is not visible across all tabs — Total Orders, Ready, and Hallmark. It must be consistently displayed in every tab."
         ]
       },
       "acceptanceCriteria": [
-        "In Total Orders tab, summary cards show counts/totals for pending orders only",
-        "In Ready tab, summary cards show counts/totals for ready orders only",
-        "In Hallmark tab, summary cards show counts/totals for hallmark orders only",
-        "In Customer Orders tab, summary cards show counts/totals for CO type orders only",
-        "Metrics update immediately when switching tabs"
+        "Status column appears in the Hallmark tab table",
+        "Status values are displayed correctly",
+        "Column is visible on both desktop and mobile views"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Modify Customer Orders tab to filter and display only orders where order type is 'CO', excluding all other order types.",
+      "text": "Fix the Ready tab to display only orders with status 'Ready' instead of showing all orders",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-final"
         ],
         "quotes": [
-          "Customer order tab should only show order type *CO* and not any other type"
+          "The Ready tab is currently showing all orders. It should display only those orders where the order status has been changed to 'Ready.'"
         ]
       },
       "acceptanceCriteria": [
-        "Customer Orders tab displays only orders with type 'CO'",
-        "Orders with type 'RB' or other types are not visible in this tab"
+        "Ready tab shows only orders with status === 'Ready'",
+        "Orders with other statuses (Pending, ReturnFromHallmark, Hallmark, Supplied) are not displayed in the Ready tab",
+        "The filtering works correctly with other filters (order type, karigar, search)"
       ]
     },
     {
       "id": "REQ-5",
-      "text": "Reorder all table columns across all dashboard tabs to display data in this exact sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product.",
-      "target": "frontend",
+      "text": "Fix the design code matching logic to correctly map Generic Name and Karigar Name from the master designs data when displaying orders in all dashboard tabs, handling cases where design codes may have product prefixes (CH, BR, H, etc.) that need to be stripped before matching against the base design codes in master designs",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-final"
         ],
         "quotes": [
-          "Display the data in the dashboard as in this sequence. ( in all tabs ) - Generic name, Karigar name, wt , size , qty. design code, remarks, order number, type, product"
+          "The master Excel file already contains properly matched: Karigar names, Generic names, Design codes. However, while displaying orders in the dashboard, the system is not correctly mapping and showing these details based on the design code. This matching logic needs to work properly."
         ]
       },
       "acceptanceCriteria": [
-        "OrderTable component displays columns in specified order",
-        "Column order is consistent across Total Orders, Ready, Hallmark, Customer Orders, and Karigar detail tabs",
-        "All existing columns remain functional with new ordering"
+        "Generic Name displays correctly for all orders when 'All Karigars' filter is selected (IMG_6136 shows empty Generic Name column)",
+        "Karigar Name displays correctly for all orders when 'All Karigars' filter is selected (IMG_6136 shows empty Karigar Name column)",
+        "Design codes like HTMN40950, HTMN40038 are matched against master designs data even if they have product prefixes",
+        "Unmapped design codes (CHTMN40038, BRNOB41367, BRDZL45035, CHDZL6001GN from IMG_6139, IMG_6140) are correctly matched after handling prefix variations",
+        "The mapping works consistently across Total Orders, Ready, Hallmark, Customer Orders, and Karigars tabs"
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "Fix the UI glitch in the Karigar filter dropdown button text that occurs when changing the selection from 'All Karigars' to a specific Karigar name, ensuring the button displays the selected text cleanly without visual artifacts",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-final"
+        ],
+        "quotes": [
+          "When using the filter button to change from 'All Karigar' to a specific Karigar name, the button text is displaying with a UI glitch. This needs to be corrected."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Karigar filter button displays selected text without overlapping or truncation",
+        "Text transitions smoothly when changing from 'All Karigars' to a specific karigar name like 'MOMIN' (as seen in IMG_6137)",
+        "Button width adjusts properly to accommodate different text lengths",
+        "No visual glitches occur on mobile devices during filter selection"
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "text": "Fix the Export to JPEG functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-final"
+        ],
+        "quotes": [
+          "Export to JPEG and PDF is not functioning on mobile devices. This must work properly across all mobile screens."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Export to JPEG button triggers export successfully on mobile browsers",
+        "Generated JPEG file downloads correctly on mobile devices",
+        "Export includes all visible order data with correct formatting",
+        "Export functionality works on iOS Safari and Android Chrome browsers"
+      ]
+    },
+    {
+      "id": "REQ-8",
+      "text": "Fix the Export to PDF functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-final"
+        ],
+        "quotes": [
+          "Export to JPEG and PDF is not functioning on mobile devices. This must work properly across all mobile screens."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Export to PDF button triggers export successfully on mobile browsers",
+        "Generated PDF file downloads correctly on mobile devices",
+        "PDF formatting is correct with all order data visible",
+        "Design images are embedded in PDF exports on mobile",
+        "Export functionality works on iOS Safari and Android Chrome browsers"
       ]
     }
   ],
   "constraints": [
-    "Do not modify backend order status logic or data models",
-    "Maintain existing bulk selection and status update functionality",
-    "Keep export functionality (Excel, PDF, JPEG) working with new column order"
+    "Do not modify the backend Order type structure unless absolutely necessary for status column requirements",
+    "Maintain existing karigar filter functionality while fixing the UI glitch",
+    "Preserve existing export functionality for desktop while fixing mobile issues",
+    "Do not change the master designs data structure or upload flow"
   ],
   "nonGoals": [
-    "Changing order status workflow or adding new statuses",
-    "Modifying order ingestion or Excel parsing logic",
-    "Adding new tabs or removing existing tabs"
+    "Redesigning the overall dashboard layout or navigation",
+    "Changing the Excel upload format or parsing logic for orders or master designs",
+    "Adding new filtering options beyond fixing existing karigar filter",
+    "Modifying the Unmapped Codes section or its display logic",
+    "Adding new export formats beyond JPEG and PDF",
+    "Changing the order status workflow or status transition logic"
   ],
   "imageRequirements": {
     "required": [],

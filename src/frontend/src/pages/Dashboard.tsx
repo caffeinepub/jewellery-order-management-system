@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import TotalOrdersTab from "@/components/dashboard/TotalOrdersTab";
@@ -7,12 +6,8 @@ import HallmarkTab from "@/components/dashboard/HallmarkTab";
 import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
 import KarigarsTab from "@/components/dashboard/KarigarsTab";
 import UnmappedSection from "@/components/dashboard/UnmappedSection";
-import { Order } from "@/backend";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("total");
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div>
@@ -24,9 +19,9 @@ export default function Dashboard() {
 
       <UnmappedSection />
 
-      <SummaryCards orders={filteredOrders} />
+      <SummaryCards />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs defaultValue="total" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="total">Total Orders</TabsTrigger>
           <TabsTrigger value="ready">Ready</TabsTrigger>
@@ -36,19 +31,19 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="total" className="space-y-4">
-          <TotalOrdersTab onFilteredOrdersChange={setFilteredOrders} />
+          <TotalOrdersTab />
         </TabsContent>
 
         <TabsContent value="ready" className="space-y-4">
-          <ReadyTab onFilteredOrdersChange={setFilteredOrders} />
+          <ReadyTab />
         </TabsContent>
 
         <TabsContent value="hallmark" className="space-y-4">
-          <HallmarkTab onFilteredOrdersChange={setFilteredOrders} />
+          <HallmarkTab />
         </TabsContent>
 
         <TabsContent value="customer" className="space-y-4">
-          <CustomerOrdersTab onFilteredOrdersChange={setFilteredOrders} />
+          <CustomerOrdersTab />
         </TabsContent>
 
         <TabsContent value="karigars" className="space-y-4">

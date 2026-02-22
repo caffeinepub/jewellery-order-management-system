@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
-import { useGetOrdersByStatus, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType, Order } from "@/backend";
+import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
+import { OrderStatus, OrderType } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,11 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface ReadyTabProps {
-  onFilteredOrdersChange?: (orders: Order[]) => void;
-}
-
-export default function ReadyTab({ onFilteredOrdersChange }: ReadyTabProps) {
+export default function ReadyTab() {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -29,11 +25,12 @@ export default function ReadyTab({ onFilteredOrdersChange }: ReadyTabProps) {
     to: endOfDay(new Date()),
   });
 
-  const { data: orders = [], isLoading } = useGetOrdersByStatus(OrderStatus.Ready);
+  const { data: allOrders = [], isLoading } = useGetOrders();
   const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
 
   const filteredOrders = useMemo(() => {
-    let result = orders;
+    // First filter: Only Ready status orders
+    let result = allOrders.filter((order) => order.status === OrderStatus.Ready);
 
     // Filter by order type
     if (orderTypeFilter !== "All") {
@@ -62,14 +59,7 @@ export default function ReadyTab({ onFilteredOrdersChange }: ReadyTabProps) {
     }
 
     return result;
-  }, [orders, orderTypeFilter, karigarFilter, searchText, dateRange]);
-
-  // Notify parent of filtered orders change
-  useMemo(() => {
-    if (onFilteredOrdersChange) {
-      onFilteredOrdersChange(filteredOrders);
-    }
-  }, [filteredOrders, onFilteredOrdersChange]);
+  }, [allOrders, orderTypeFilter, karigarFilter, searchText, dateRange]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
@@ -103,7 +93,7 @@ export default function ReadyTab({ onFilteredOrdersChange }: ReadyTabProps) {
         </div>
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filter by Karigar" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Karigars</SelectItem>

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetHallmarkOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderType, Order } from "@/backend";
+import { OrderType } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,11 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface HallmarkTabProps {
-  onFilteredOrdersChange?: (orders: Order[]) => void;
-}
-
-export default function HallmarkTab({ onFilteredOrdersChange }: HallmarkTabProps) {
+export default function HallmarkTab() {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -64,13 +60,6 @@ export default function HallmarkTab({ onFilteredOrdersChange }: HallmarkTabProps
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText, dateRange]);
 
-  // Notify parent of filtered orders change
-  useMemo(() => {
-    if (onFilteredOrdersChange) {
-      onFilteredOrdersChange(filteredOrders);
-    }
-  }, [filteredOrders, onFilteredOrdersChange]);
-
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
   }
@@ -103,7 +92,7 @@ export default function HallmarkTab({ onFilteredOrdersChange }: HallmarkTabProps
         </div>
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filter by Karigar" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Karigars</SelectItem>

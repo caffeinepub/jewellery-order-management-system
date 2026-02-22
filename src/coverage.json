@@ -1,89 +1,129 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-22T16:33:09.442Z",
+  "generatedAt": "2026-02-22T18:36:05.137Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 5,
-    "implemented": 5,
+    "total": 8,
+    "implemented": 8,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Modify Total Orders tab to display only orders with status 'Pending'. When rows are selected and marked as ready, remove them from the Total Orders view immediately.",
+        "summary": "Add a Status column to the Total Orders tab displaying the current order status (Pending, Ready, ReturnFromHallmark, etc.) for each order row",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/OrderTable.tsx"
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/OrderTable.tsx"
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "In Karigars tab, when viewing a specific karigar's pending orders and marking them as ready, remove those orders from the karigar's pending order list immediately.",
+        "summary": "Add a Status column to the Ready tab displaying the current order status for each order row",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/pages/KarigarDetail.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/pages/KarigarDetail.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Update SummaryCards component to calculate and display metrics (Total Orders count, Total Weight, Total Quantity, Customer Orders count) based on the currently active tab's filtered data, not all orders.",
+        "summary": "Add a Status column to the Hallmark tab displaying the current order status for each order row",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx",
-          "frontend/src/pages/Dashboard.tsx"
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx",
-          "frontend/src/pages/Dashboard.tsx"
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ]
       },
       {
         "id": "REQ-4",
-        "summary": "Modify Customer Orders tab to filter and display only orders where order type is 'CO', excluding all other order types.",
+        "summary": "Fix the Ready tab to display only orders with status 'Ready' instead of showing all orders",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ]
       },
       {
         "id": "REQ-5",
-        "summary": "Reorder all table columns across all dashboard tabs to display data in this exact sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product.",
+        "summary": "Fix the design code matching logic to correctly map Generic Name and Karigar Name from the master designs data when displaying orders in all dashboard tabs, handling cases where design codes may have product prefixes (CH, BR, H, etc.) that need to be stripped before matching against the base design codes in master designs",
         "status": "implemented",
         "plannedFiles": [
+          "frontend/src/utils/excelParser.ts",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/pages/Dashboard.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ]
+      },
+      {
+        "id": "REQ-6",
+        "summary": "Fix the UI glitch in the Karigar filter dropdown button text that occurs when changing the selection from 'All Karigars' to a specific Karigar name, ensuring the button displays the selected text cleanly without visual artifacts",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-7",
+        "summary": "Fix the Export to JPEG functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/utils/exportUtils.ts",
           "frontend/src/components/dashboard/OrderTable.tsx"
         ],
         "matchedFiles": [
+          "frontend/src/utils/exportUtils.ts",
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ]
+      },
+      {
+        "id": "REQ-8",
+        "summary": "Fix the Export to PDF functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/utils/exportUtils.ts",
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/utils/exportUtils.ts",
           "frontend/src/components/dashboard/OrderTable.tsx"
         ]
       }
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
     "frontend/src/components/dashboard/HallmarkTab.tsx",
     "frontend/src/components/dashboard/OrderTable.tsx",
     "frontend/src/components/dashboard/ReadyTab.tsx",
-    "frontend/src/components/dashboard/SummaryCards.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/pages/Dashboard.tsx",
-    "frontend/src/pages/KarigarDetail.tsx",
+    "frontend/src/utils/exportUtils.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",
