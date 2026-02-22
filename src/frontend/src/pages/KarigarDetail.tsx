@@ -6,8 +6,9 @@ import { useActor } from "@/hooks/useActor";
 import OrderTable from "@/components/dashboard/OrderTable";
 import { exportKarigarToPDF } from "@/utils/exportUtils";
 import { toast } from "sonner";
-import { OrderStatus } from "@/backend";
+import { OrderStatus, OrderType, Order } from "@/backend";
 import { useState } from "react";
+import SuppliedQtyDialog from "@/components/dashboard/SuppliedQtyDialog";
 
 export default function KarigarDetail() {
   const { name } = useParams({ from: "/karigar/$name" });
@@ -15,6 +16,7 @@ export default function KarigarDetail() {
   const { data: orders = [], isLoading } = useGetOrdersByKarigar(name);
   const { actor } = useActor();
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedOrdersForSupply, setSelectedOrdersForSupply] = useState<Order[]>([]);
 
   const pendingOrders = orders.filter((o) => o.status === OrderStatus.Pending);
   const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weight, 0);
@@ -34,6 +36,22 @@ export default function KarigarDetail() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleMarkAsReady = (selectedOrders: Order[]) => {
+    // Check if any selected orders are RB type with Pending status
+    const rbPendingOrders = selectedOrders.filter(
+      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
+    );
+
+    if (rbPendingOrders.length > 0) {
+      // Show dialog for RB orders
+      setSelectedOrdersForSupply(rbPendingOrders);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedOrdersForSupply([]);
   };
 
   if (isLoading) {
@@ -89,8 +107,19 @@ export default function KarigarDetail() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Orders</h2>
-        <OrderTable orders={pendingOrders} enableBulkActions={true} />
+        <OrderTable 
+          orders={pendingOrders} 
+          enableBulkActions={true}
+          onMarkAsReady={handleMarkAsReady}
+        />
       </div>
+
+      {selectedOrdersForSupply.length > 0 && (
+        <SuppliedQtyDialog
+          orders={selectedOrdersForSupply}
+          onClose={handleCloseDialog}
+        />
+      )}
     </div>
   );
 }

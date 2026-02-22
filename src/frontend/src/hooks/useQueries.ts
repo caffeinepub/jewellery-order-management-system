@@ -236,61 +236,6 @@ export function useGetMasterDesignKarigars() {
   });
 }
 
-export function useUpdateMasterDesignKarigars() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (karigars: string[]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.updateMasterDesignKarigars(karigars);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["masterDesignKarigars"] });
-      queryClient.invalidateQueries({ queryKey: ["karigars"] });
-    },
-  });
-}
-
-export function useSaveDesignMapping() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ designCode, genericName, karigarName }: { designCode: string; genericName: string; karigarName: string }) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.saveDesignMapping(designCode, genericName, karigarName);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["masterDesignMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["uniqueKarigarsFromMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-    },
-  });
-}
-
-export function useReassignDesign() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ designCode, newKarigar }: { designCode: string; newKarigar: string }) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.reassignDesign(designCode, newKarigar);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["masterDesignMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["karigars"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["uniqueKarigarsFromMappings"] });
-    },
-  });
-}
-
 export function useGetKarigars() {
   const { actor, isFetching } = useActor();
 
@@ -315,70 +260,107 @@ export function useAddKarigar() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["karigars"] });
-      queryClient.invalidateQueries({ queryKey: ["uniqueKarigarsFromMappings"] });
       queryClient.invalidateQueries({ queryKey: ["masterDesignKarigars"] });
     },
   });
 }
 
-export function useUploadDesignImage() {
+export function useSaveDesignMapping() {
   const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ designCode, blob }: { designCode: string; blob: ExternalBlob }) => {
+    mutationFn: async ({
+      designCode,
+      genericName,
+      karigarName,
+    }: {
+      designCode: string;
+      genericName: string;
+      karigarName: string;
+    }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.uploadDesignImage(designCode, blob);
+      return actor.saveDesignMapping(designCode, genericName, karigarName);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
     },
   });
 }
 
-export function useBatchUploadDesignImages() {
+export function useReassignDesign() {
   const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (images: Array<[string, ExternalBlob]>) => {
+    mutationFn: async ({
+      designCode,
+      newKarigar,
+    }: {
+      designCode: string;
+      newKarigar: string;
+    }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.batchUploadDesignImages(images);
+      return actor.reassignDesign(designCode, newKarigar);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["masterDesignMappings"] });
     },
   });
 }
 
-export function useGetDesignImage(designCode: string) {
-  const { actor, isFetching } = useActor();
+export function useUpdateOrdersStatusToReady() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
 
-  return useQuery<{ imageUrl: string | null; designCode: string; genericName: string | null; karigarName: string | null } | null>({
-    queryKey: ["designImage", designCode],
-    queryFn: async () => {
-      if (!actor) return null;
-      const blob = await actor.getDesignImage(designCode);
-      if (!blob) return null;
-
-      // Get design details
-      const orders = await actor.getOrders(null, null, null);
-      const order = orders.find((o) => o.design === designCode);
-
-      return {
-        imageUrl: blob.getDirectURL(),
-        designCode,
-        genericName: order?.genericName || null,
-        karigarName: order?.karigarName || null,
-      };
+  return useMutation({
+    mutationFn: async (orderIds: string[]) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.updateOrdersStatusToReady(orderIds);
     },
-    enabled: !!actor && !isFetching && !!designCode,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+    },
   });
 }
 
-export function useGetUnmappedOrders() {
-  const { actor, isFetching } = useActor();
+export function useSupplyOrder() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
 
-  return useQuery({
-    queryKey: ["unmappedOrders"],
-    queryFn: async () => {
-      if (!actor) return [];
-      const orders = await actor.getOrders(null, null, null);
-      return orders.filter((order) => !order.genericName || !order.karigarName);
+  return useMutation({
+    mutationFn: async ({ orderId, suppliedQuantity }: { orderId: string; suppliedQuantity: number }) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.supplyOrder(orderId, BigInt(suppliedQuantity));
     },
-    enabled: !!actor && !isFetching,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+    },
+  });
+}
+
+export function useBulkUpdateStatus() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ orderIds, newStatus }: { orderIds: string[]; newStatus: OrderStatus }) => {
+      if (!actor) throw new Error("Actor not initialized");
+      if (newStatus === OrderStatus.Ready) {
+        return actor.updateOrdersStatusToReady(orderIds);
+      }
+      throw new Error("Only Ready status is supported for bulk updates");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+    },
   });
 }
 
@@ -397,56 +379,147 @@ export function useUpdateUnmappedOrder() {
       karigarName: string;
     }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.saveDesignMapping(designCode, genericName, karigarName);
+      await actor.saveDesignMapping(designCode, genericName, karigarName);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["masterDesignMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["uniqueKarigarsFromMappings"] });
     },
   });
 }
 
-export function useUpdateOrdersStatusToReady() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
+export function useGetUnmappedOrders() {
+  const { actor, isFetching } = useActor();
 
-  return useMutation({
-    mutationFn: async (orderIds: string[]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.updateOrdersStatusToReady(orderIds);
+  return useQuery<{ designCode: string; count: number; missingGenericName: boolean; missingKarigarName: boolean }[]>({
+    queryKey: ["unmappedOrders"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const orders = await actor.getOrders(null, null, null);
+      const unmappedOrders = orders.filter(
+        (order) => !order.genericName || !order.karigarName
+      );
+
+      const groupedByDesign = unmappedOrders.reduce((acc, order) => {
+        if (!acc[order.design]) {
+          acc[order.design] = {
+            designCode: order.design,
+            count: 0,
+            missingGenericName: !order.genericName,
+            missingKarigarName: !order.karigarName,
+          };
+        }
+        acc[order.design].count++;
+        return acc;
+      }, {} as Record<string, { designCode: string; count: number; missingGenericName: boolean; missingKarigarName: boolean }>);
+
+      return Object.values(groupedByDesign);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["karigars"] });
-    },
+    enabled: !!actor && !isFetching,
   });
 }
 
-export function useBulkUpdateStatus() {
+export function useUploadDesignImage() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({
-      orderIds,
-      newStatus,
+      designCode,
+      blob,
     }: {
-      orderIds: string[];
-      newStatus: OrderStatus;
+      designCode: string;
+      blob: ExternalBlob;
     }) => {
       if (!actor) throw new Error("Actor not initialized");
-      
-      if (newStatus === OrderStatus.Ready) {
-        return actor.updateOrdersStatusToReady(orderIds);
-      }
-      
-      throw new Error("Only Ready status updates are supported");
+      return actor.uploadDesignImage(designCode, blob);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["designImages"] });
+    },
+  });
+}
+
+export function useBatchUploadDesignImages() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (images: Array<[string, ExternalBlob]>) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.batchUploadDesignImages(images);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["designImages"] });
+    },
+  });
+}
+
+export function useGetDesignImage(designCode: string) {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<{ imageUrl: string; designCode: string; genericName?: string; karigarName?: string } | null>({
+    queryKey: ["designImage", designCode],
+    queryFn: async () => {
+      if (!actor) return null;
+      const blob = await actor.getDesignImage(designCode);
+      if (!blob) return null;
+
+      // Get design mapping for additional details
+      const orders = await actor.getOrders(null, null, null);
+      const order = orders.find((o) => o.design === designCode);
+
+      return {
+        imageUrl: blob.getDirectURL(),
+        designCode,
+        genericName: order?.genericName,
+        karigarName: order?.karigarName,
+      };
+    },
+    enabled: !!actor && !isFetching && !!designCode,
+  });
+}
+
+export function useUploadMasterDesignExcel() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (blob: ExternalBlob) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.uploadMasterDesignExcel(blob);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masterDesignExcel"] });
+    },
+  });
+}
+
+export function useGetMasterDesignExcel() {
+  const { actor, isFetching } = useActor();
+
+  return useQuery<ExternalBlob | null>({
+    queryKey: ["masterDesignExcel"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getMasterDesignExcel();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useUpdateMasterDesignKarigars() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (karigars: string[]) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.updateMasterDesignKarigars(karigars);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masterDesignKarigars"] });
     },
   });
 }

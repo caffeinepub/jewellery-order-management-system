@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGetUnmappedOrders, useUpdateUnmappedOrder } from '@/hooks/useQueries';
+import { useGetOrders, useUpdateUnmappedOrder } from '@/hooks/useQueries';
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import { Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UnmappedCodes() {
-  const { data: unmappedOrders = [], isLoading } = useGetUnmappedOrders();
+  const { data: allOrders = [], isLoading } = useGetOrders();
   const updateMutation = useUpdateUnmappedOrder();
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{
@@ -22,7 +22,11 @@ export default function UnmappedCodes() {
     karigarName: string;
   }>({ genericName: '', karigarName: '' });
 
-  // Group by design code
+  // Filter unmapped orders and group by design code
+  const unmappedOrders = allOrders.filter(
+    (order) => !order.genericName || !order.karigarName
+  );
+
   const groupedOrders = unmappedOrders.reduce((acc, order) => {
     if (!acc[order.design]) {
       acc[order.design] = {

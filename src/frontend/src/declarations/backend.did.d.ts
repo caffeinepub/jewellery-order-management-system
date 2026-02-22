@@ -113,6 +113,7 @@ export interface _SERVICE {
     [string, OrderType, string, string, number, number, bigint, string, string],
     undefined
   >,
+  'supplyOrder' : ActorMethod<[string, bigint], undefined>,
   'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
   'updateOrdersStatusToReady' : ActorMethod<[Array<string>], undefined>,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,

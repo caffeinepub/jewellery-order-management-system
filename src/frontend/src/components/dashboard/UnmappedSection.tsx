@@ -5,32 +5,18 @@ import { useNavigate } from '@tanstack/react-router';
 import { useGetUnmappedOrders } from '@/hooks/useQueries';
 
 export default function UnmappedSection() {
-  const { data: unmappedOrders = [], isLoading } = useGetUnmappedOrders();
+  const { data: unmappedDesignCodes = [], isLoading } = useGetUnmappedOrders();
   const navigate = useNavigate();
 
   if (isLoading) {
     return null;
   }
 
-  // Group unmapped orders by design code
-  const groupedByDesign = unmappedOrders.reduce((acc, order) => {
-    if (!acc[order.design]) {
-      acc[order.design] = {
-        designCode: order.design,
-        count: 0,
-        missingGeneric: !order.genericName || order.genericName === '',
-        missingKarigar: !order.karigarName || order.karigarName === '',
-      };
-    }
-    acc[order.design].count++;
-    return acc;
-  }, {} as Record<string, { designCode: string; count: number; missingGeneric: boolean; missingKarigar: boolean }>);
-
-  const unmappedDesignCodes = Object.values(groupedByDesign);
-
   if (unmappedDesignCodes.length === 0) {
     return null;
   }
+
+  const totalOrders = unmappedDesignCodes.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <Alert variant="destructive" className="mb-6">
@@ -39,7 +25,7 @@ export default function UnmappedSection() {
       <AlertDescription>
         <div className="mt-2 space-y-2">
           <p className="text-sm">
-            {unmappedOrders.length} order(s) with {unmappedDesignCodes.length} design code(s) are missing mapping
+            {totalOrders} order(s) with {unmappedDesignCodes.length} design code(s) are missing mapping
             information.
           </p>
 
@@ -50,9 +36,9 @@ export default function UnmappedSection() {
                   <div className="font-mono text-sm font-medium">{item.designCode}</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     {item.count} order(s) • Missing:{' '}
-                    {item.missingGeneric && item.missingKarigar
+                    {item.missingGenericName && item.missingKarigarName
                       ? 'Generic Name & Karigar Name'
-                      : item.missingGeneric
+                      : item.missingGenericName
                       ? 'Generic Name'
                       : 'Karigar Name'}
                   </div>

@@ -1,129 +1,58 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-22T18:36:05.137Z",
+  "generatedAt": "2026-02-22T20:26:53.336Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 8,
-    "implemented": 8,
+    "total": 3,
+    "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Add a Status column to the Total Orders tab displaying the current order status (Pending, Ready, ReturnFromHallmark, etc.) for each order row",
+        "summary": "Identify and fix the infinite setState loop in the Dashboard component that occurs when the onFilteredOrdersChange callback is triggered, causing a maximum update depth exceeded error",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/pages/Dashboard.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/pages/Dashboard.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Add a Status column to the Ready tab displaying the current order status for each order row",
-        "status": "implemented",
+        "summary": "Ensure the onFilteredOrdersChange callbacks in TotalOrdersTab, ReadyTab, HallmarkTab, and CustomerOrdersTab do not cause parent component re-renders that retrigger the same callbacks",
+        "status": "missing",
         "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
         ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
-        ]
+        "matchedFiles": []
       },
       {
         "id": "REQ-3",
-        "summary": "Add a Status column to the Hallmark tab displaying the current order status for each order row",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/HallmarkTab.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/HallmarkTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-4",
-        "summary": "Fix the Ready tab to display only orders with status 'Ready' instead of showing all orders",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-5",
-        "summary": "Fix the design code matching logic to correctly map Generic Name and Karigar Name from the master designs data when displaying orders in all dashboard tabs, handling cases where design codes may have product prefixes (CH, BR, H, etc.) that need to be stripped before matching against the base design codes in master designs",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/excelParser.ts",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/pages/Dashboard.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx"
-        ]
-      },
-      {
-        "id": "REQ-6",
-        "summary": "Fix the UI glitch in the Karigar filter dropdown button text that occurs when changing the selection from 'All Karigars' to a specific Karigar name, ensuring the button displays the selected text cleanly without visual artifacts",
-        "status": "implemented",
+        "summary": "Add proper dependency arrays and memoization (useMemo/useCallback) to prevent unnecessary effect re-executions in the Dashboard and tab components",
+        "status": "missing",
         "plannedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx"
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
         ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-7",
-        "summary": "Fix the Export to JPEG functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx"
-        ]
-      },
-      {
-        "id": "REQ-8",
-        "summary": "Fix the Export to PDF functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx"
-        ]
+        "matchedFiles": []
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/components/dashboard/HallmarkTab.tsx",
-    "frontend/src/components/dashboard/OrderTable.tsx",
-    "frontend/src/components/dashboard/ReadyTab.tsx",
-    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/utils/exportUtils.ts",
+    "frontend/src/pages/Dashboard.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

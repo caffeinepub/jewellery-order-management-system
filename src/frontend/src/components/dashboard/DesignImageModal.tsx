@@ -110,13 +110,13 @@ export default function DesignImageModal({
             </div>
           )}
 
-          {!isLoading && !error && !designData?.imageUrl && (
+          {!isLoading && !error && !designData && (
             <div className="flex items-center justify-center py-12 bg-muted rounded-lg">
               <div className="text-muted-foreground">No image available for this design</div>
             </div>
           )}
 
-          {designData?.imageUrl && (
+          {designData && designData.imageUrl && (
             <>
               <div className="flex items-center justify-center gap-2 mb-4">
                 <Button variant="outline" size="sm" onClick={handleZoomOut}>

@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import OrderTable from "./OrderTable";
 import { useGetHallmarkOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderType } from "@/backend";
+import { OrderType, Order } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,7 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function HallmarkTab() {
+interface HallmarkTabProps {
+  onFilteredOrdersChange: (orders: Order[], isLoading: boolean) => void;
+}
+
+export default function HallmarkTab({ onFilteredOrdersChange }: HallmarkTabProps) {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -27,6 +31,12 @@ export default function HallmarkTab() {
 
   const { data: orders = [], isLoading } = useGetHallmarkOrders();
   const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
+
+  // Deduplicate karigar names
+  const uniqueKarigarList = useMemo(() => {
+    const karigarSet = new Set(uniqueKarigars);
+    return Array.from(karigarSet).sort();
+  }, [uniqueKarigars]);
 
   const filteredOrders = useMemo(() => {
     let result = orders;
@@ -60,6 +70,11 @@ export default function HallmarkTab() {
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText, dateRange]);
 
+  // Notify parent of filtered orders changes
+  useEffect(() => {
+    onFilteredOrdersChange(filteredOrders, isLoading);
+  }, [filteredOrders, isLoading, onFilteredOrdersChange]);
+
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
   }
@@ -92,11 +107,11 @@ export default function HallmarkTab() {
         </div>
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue />
+            <SelectValue placeholder="Filter by Karigar" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Karigars</SelectItem>
-            {uniqueKarigars.map((karigar) => (
+            {uniqueKarigarList.map((karigar) => (
               <SelectItem key={karigar} value={karigar}>
                 {karigar}
               </SelectItem>

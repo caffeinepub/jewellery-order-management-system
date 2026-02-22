@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGetAllOrders } from '@/hooks/useQueries';
 import { Package, Weight, Hash, Users } from 'lucide-react';
-import { OrderType } from '@/backend';
+import { OrderType, Order } from '@/backend';
 
-export default function SummaryCards() {
-  const { data: orders = [], isLoading } = useGetAllOrders();
+interface SummaryCardsProps {
+  orders: Order[];
+  isLoading?: boolean;
+}
 
+export default function SummaryCards({ orders, isLoading = false }: SummaryCardsProps) {
   const totalOrders = orders.length;
   const totalWeight = orders.reduce((sum, order) => sum + order.weight, 0);
   const totalQuantity = orders.reduce((sum, order) => sum + Number(order.quantity), 0);

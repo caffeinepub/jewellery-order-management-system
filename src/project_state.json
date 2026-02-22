@@ -1,121 +1,41 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management dashboard with tabs for Total Orders, Ready Orders, Hallmark Orders, Customer Orders, and Karigars. Features karigar filtering, order status tracking, master Excel data mapping for design codes/karigar names/generic names, and export functionality (JPEG/PDF).",
-  "architectural_notes": [
-    "Dashboard includes tabs: Total Orders, Ready Orders, Hallmark Orders, Customer Orders, and Karigars",
-    "Master Excel file contains karigar names, generic names, and design codes for mapping",
-    "Karigar filtering functionality with dropdown (All Karigars or specific karigar)",
-    "Export functionality supporting JPEG and PDF formats",
-    "Order status tracking (e.g., 'Ready' status)"
-  ],
+  "summary": "New project",
+  "architectural_notes": [],
   "known_issues": [
-    "Status column missing from Total Orders, Ready, and Hallmark tabs",
-    "Ready tab showing all orders instead of filtering by 'Ready' status",
-    "Master Excel data not mapping correctly to orders (design codes, karigar names, generic names)",
-    "Karigar filter button displays UI glitch when changing selection",
-    "Export to JPEG/PDF not working on mobile devices"
+    "V39: Maximum update depth exceeded error - infinite loop in setState calls"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-add-a-status-column-to-the-total-orders-tab-displaying-the-current-order-status-pending-ready-returnfromhallmark-etc-for-each-order-row",
-      "title": "Add a Status column to the Total Orders tab displaying the current order status (Pending, Ready, ReturnFromHallmark, etc.) for each order row",
+      "id": "feature-identify-and-fix-the-infinite-setstate-loop-in-the-dashboard-component-that-occurs-when-the-onfilteredorderschange-callback-is-triggered-causing-a-maximum-update-depth-exceeded-error",
+      "title": "Identify and fix the infinite setState loop in the Dashboard component that occurs when the onFilteredOrdersChange callback is triggered, causing a maximum update depth exceeded error",
       "reqIds": [
         "REQ-1"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-add-a-status-column-to-the-ready-tab-displaying-the-current-order-status-for-each-order-row",
-      "title": "Add a Status column to the Ready tab displaying the current order status for each order row",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-add-a-status-column-to-the-hallmark-tab-displaying-the-current-order-status-for-each-order-row",
-      "title": "Add a Status column to the Hallmark tab displaying the current order status for each order row",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-ready-tab-to-display-only-orders-with-status-ready-instead-of-showing-all-orders",
-      "title": "Fix the Ready tab to display only orders with status 'Ready' instead of showing all orders",
-      "reqIds": [
-        "REQ-4"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-design-code-matching-logic-to-correctly-map-generic-name-and-karigar-name-from-the-master-designs-data-when-displaying-orders-in-all-dashboard-tabs-handling-cases-where-design-codes-may-have-product-prefixes-ch-br-h-etc-that-need-to-be-stripped-before-matching-against-the-base-design-codes-in-master-designs",
-      "title": "Fix the design code matching logic to correctly map Generic Name and Karigar Name from the master designs data when displaying orders in all dashboard tabs, handling cases where design codes may have product prefixes (CH, BR, H, etc.) that need to be stripped before matching against the base design codes in master designs",
-      "reqIds": [
-        "REQ-5"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-ui-glitch-in-the-karigar-filter-dropdown-button-text-that-occurs-when-changing-the-selection-from-all-karigars-to-a-specific-karigar-name-ensuring-the-button-displays-the-selected-text-cleanly-without-visual-artifacts",
-      "title": "Fix the UI glitch in the Karigar filter dropdown button text that occurs when changing the selection from 'All Karigars' to a specific Karigar name, ensuring the button displays the selected text cleanly without visual artifacts",
-      "reqIds": [
-        "REQ-6"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-export-to-jpeg-functionality-to-work-correctly-on-mobile-devices-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
-      "title": "Fix the Export to JPEG functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
-      "reqIds": [
-        "REQ-7"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-export-to-pdf-functionality-to-work-correctly-on-mobile-devices-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
-      "title": "Fix the Export to PDF functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
-      "reqIds": [
-        "REQ-8"
       ],
       "version": 1
     }
   ],
   "new_feature_requests": [
     {
-      "id": "AR-1",
-      "summary": "Add Status column to all tabs (Total Orders, Ready, Hallmark)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
       "id": "AR-2",
-      "summary": "Fix Ready tab to show only orders with status 'Ready'",
-      "reqIds": [],
+      "summary": "Ensure the onFilteredOrdersChange callbacks in TotalOrdersTab, ReadyTab, HallmarkTab, and CustomerOrdersTab do not cause parent component re-renders that retrigger the same callbacks",
+      "reqIds": [
+        "REQ-2"
+      ],
       "status": "pending"
     },
     {
       "id": "AR-3",
-      "summary": "Fix master Excel data mapping for design codes, karigar names, and generic names",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Fix Karigar filter button UI glitch when switching from 'All Karigar' to specific karigar",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Fix export to JPEG and PDF on mobile devices",
-      "reqIds": [],
+      "summary": "Add proper dependency arrays and memoization (useMemo/useCallback) to prevent unnecessary effect re-executions in the Dashboard and tab components",
+      "reqIds": [
+        "REQ-3"
+      ],
       "status": "pending"
     }
   ],
-  "projectName": "Jewellery Order Manager",
+  "projectName": "Fix infinite loop causing maximum update depth exceeded error",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

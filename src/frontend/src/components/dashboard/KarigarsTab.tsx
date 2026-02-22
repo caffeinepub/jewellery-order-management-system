@@ -1,18 +1,24 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useGetAllOrders } from '@/hooks/useQueries';
-import { OrderStatus } from '@/backend';
+import { OrderStatus, Order } from '@/backend';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, Package } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
-export default function KarigarsTab() {
+interface KarigarsTabProps {
+  onFilteredOrdersChange: (orders: Order[], isLoading: boolean) => void;
+}
+
+export default function KarigarsTab({ onFilteredOrdersChange }: KarigarsTabProps) {
   const { data: orders = [], isLoading } = useGetAllOrders();
   const navigate = useNavigate();
 
+  const pendingOrders = useMemo(() => {
+    return orders.filter((order) => order.status === OrderStatus.Pending);
+  }, [orders]);
+
   const karigarGroups = useMemo(() => {
-    const pendingOrders = orders.filter((order) => order.status === OrderStatus.Pending);
-    
     const groups: Record<string, any[]> = {};
     
     pendingOrders.forEach((order) => {
@@ -31,7 +37,12 @@ export default function KarigarsTab() {
         totalWeight: orders.reduce((sum, o) => sum + o.weight, 0),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [orders]);
+  }, [pendingOrders]);
+
+  // Notify parent of filtered orders changes (all pending orders for this tab)
+  useEffect(() => {
+    onFilteredOrdersChange(pendingOrders, isLoading);
+  }, [pendingOrders, isLoading, onFilteredOrdersChange]);
 
   const handleKarigarClick = (karigarName: string) => {
     navigate({ to: `/karigar/${encodeURIComponent(karigarName)}` });

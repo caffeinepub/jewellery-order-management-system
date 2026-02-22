@@ -171,6 +171,7 @@ export interface backendInterface {
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
     updateOrdersStatusToReady(orderIds: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;
@@ -513,6 +514,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n26(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            return result;
+        }
+    }
+    async supplyOrder(arg0: string, arg1: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.supplyOrder(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.supplyOrder(arg0, arg1);
             return result;
         }
     }

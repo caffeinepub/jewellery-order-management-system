@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-add-a-status-column-to-the-total-orders-tab-displaying-the-current-order-status-pending-ready-returnfromhallmark-etc-for-each-order-row",
-      "featureTitle": "Add a Status column to the Total Orders tab displaying the current order status (Pending, Ready, ReturnFromHallmark, etc.) for each order row",
+      "featureId": "feature-identify-and-fix-the-infinite-setstate-loop-in-the-dashboard-component-that-occurs-when-the-onfilteredorderschange-callback-is-triggered-causing-a-maximum-update-depth-exceeded-error",
+      "featureTitle": "Identify and fix the infinite setState loop in the Dashboard component that occurs when the onFilteredOrdersChange callback is triggered, causing a maximum update depth exceeded error",
       "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        "frontend/src/pages/Dashboard.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -20,157 +19,6 @@
       ],
       "testIds": [
         "REQ-1"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-add-a-status-column-to-the-ready-tab-displaying-the-current-order-status-for-each-order-row",
-      "featureTitle": "Add a Status column to the Ready tab displaying the current order status for each order row",
-      "files": [
-        "frontend/src/components/dashboard/ReadyTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-add-a-status-column-to-the-hallmark-tab-displaying-the-current-order-status-for-each-order-row",
-      "featureTitle": "Add a Status column to the Hallmark tab displaying the current order status for each order row",
-      "files": [
-        "frontend/src/components/dashboard/HallmarkTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-3"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-ready-tab-to-display-only-orders-with-status-ready-instead-of-showing-all-orders",
-      "featureTitle": "Fix the Ready tab to display only orders with status 'Ready' instead of showing all orders",
-      "files": [
-        "frontend/src/components/dashboard/ReadyTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-4"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-design-code-matching-logic-to-correctly-map-generic-name-and-karigar-name-from-the-master-designs-data-when-displaying-orders-in-all-dashboard-tabs-handling-cases-where-design-codes-may-have-product-prefixes-ch-br-h-etc-that-need-to-be-stripped-before-matching-against-the-base-design-codes-in-master-designs",
-      "featureTitle": "Fix the design code matching logic to correctly map Generic Name and Karigar Name from the master designs data when displaying orders in all dashboard tabs, handling cases where design codes may have product prefixes (CH, BR, H, etc.) that need to be stripped before matching against the base design codes in master designs",
-      "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-5"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-ui-glitch-in-the-karigar-filter-dropdown-button-text-that-occurs-when-changing-the-selection-from-all-karigars-to-a-specific-karigar-name-ensuring-the-button-displays-the-selected-text-cleanly-without-visual-artifacts",
-      "featureTitle": "Fix the UI glitch in the Karigar filter dropdown button text that occurs when changing the selection from 'All Karigars' to a specific Karigar name, ensuring the button displays the selected text cleanly without visual artifacts",
-      "files": [
-        "frontend/src/components/dashboard/HallmarkTab.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-6"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-export-to-jpeg-functionality-to-work-correctly-on-mobile-devices-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
-      "featureTitle": "Fix the Export to JPEG functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
-      "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx",
-        "frontend/src/utils/exportUtils.ts"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-7"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-export-to-pdf-functionality-to-work-correctly-on-mobile-devices-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
-      "featureTitle": "Fix the Export to PDF functionality to work correctly on mobile devices across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars)",
-      "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx",
-        "frontend/src/utils/exportUtils.ts"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-8"
       ],
       "confidence": "high"
     }

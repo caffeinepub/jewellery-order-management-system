@@ -1,179 +1,85 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix dashboard issues: Status column, Ready tab filtering, data mapping, karigar filter UI, and mobile export",
+  "title": "Fix infinite loop causing maximum update depth exceeded error",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Add Status column to Total Orders tab",
+      "summary": "Identify and fix the infinite setState loop in the Dashboard component that occurs when the onFilteredOrdersChange callback is triggered",
       "acceptanceCriteria": [
-        "Status column appears in the Total Orders tab table",
-        "Status values are displayed correctly for each order",
-        "Column is visible on both desktop and mobile views"
+        "Dashboard renders without React errors",
+        "Tab switching works without triggering infinite loops",
+        "SummaryCards update correctly when filtered orders change",
+        "No maximum update depth exceeded errors in console"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "path": "frontend/src/pages/Dashboard.tsx",
           "operation": "modify",
-          "description": "Add a Status column to the table header and data rows that displays order.status for each order. Ensure the column is included in both desktop and mobile responsive layouts."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Verify that orders passed to OrderTable include status property and that the Status column is visible when rendering the Total Orders tab data."
+          "description": "Wrap all onFilteredOrdersChange callback functions in useCallback hooks with empty dependency arrays to stabilize their references and prevent them from being recreated on every render. This breaks the infinite loop where state updates cause callback recreation, which triggers tab effects, which call callbacks, which update state again."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Add Status column to Ready tab",
+      "summary": "Ensure the onFilteredOrdersChange callbacks in TotalOrdersTab, ReadyTab, HallmarkTab, and CustomerOrdersTab do not cause parent component re-renders that retrigger the same callbacks",
       "acceptanceCriteria": [
-        "Status column appears in the Ready tab table",
-        "Status values are displayed correctly",
-        "Column is visible on both desktop and mobile views"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Ensure that Status column rendering added to OrderTable component is properly displayed when the Ready tab renders order data."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Add Status column to Hallmark tab",
-      "acceptanceCriteria": [
-        "Status column appears in the Hallmark tab table",
-        "Status values are displayed correctly",
-        "Column is visible on both desktop and mobile views"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Ensure that Status column rendering added to OrderTable component is properly displayed when the Hallmark tab renders order data."
-        }
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "summary": "Fix Ready tab to filter only orders with status 'Ready'",
-      "acceptanceCriteria": [
-        "Ready tab shows only orders with status === 'Ready'",
-        "Orders with other statuses (Pending, ReturnFromHallmark, Hallmark, Supplied) are not displayed in the Ready tab",
-        "The filtering works correctly with other filters (order type, karigar, search)"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Add client-side filtering logic using useMemo to filter orders where order.status === 'Ready' before applying other filters (orderType, karigarName, searchText). Ensure the filtered orders array only includes Ready status orders and works correctly with the existing filter controls."
-        }
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "summary": "Fix design code matching logic to correctly map Generic Name and Karigar Name from master designs data, handling product prefix variations",
-      "acceptanceCriteria": [
-        "Generic Name displays correctly for all orders when 'All Karigars' filter is selected (IMG_6136 shows empty Generic Name column)",
-        "Karigar Name displays correctly for all orders when 'All Karigars' filter is selected (IMG_6136 shows empty Karigar Name column)",
-        "Design codes like HTMN40950, HTMN40038 are matched against master designs data even if they have product prefixes",
-        "Unmapped design codes (CHTMN40038, BRNOB41367, BRDZL45035, CHDZL6001GN from IMG_6139, IMG_6140) are correctly matched after handling prefix variations",
-        "The mapping works consistently across Total Orders, Ready, Hallmark, Customer Orders, and Karigars tabs"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/utils/excelParser.ts",
-          "operation": "modify",
-          "description": "Add a utility function that normalizes design codes by stripping common product prefixes (CH, BR, H, etc.) to create a base design code. This function should be used when matching order design codes against master design mappings to handle cases where design codes have product-specific prefixes."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Update the useGetOrdersWithMappings hook (or related data fetching logic) to use the normalized design code matching logic when enriching orders with genericName and karigarName from design mappings. Ensure the matching tries both the original design code and the normalized version (with prefixes stripped) to find the correct mapping."
-        },
-        {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "Verify that the table correctly displays genericName and karigarName columns using the enriched order data from the updated useGetOrdersWithMappings hook. Ensure these columns show data for all orders when 'All Karigars' filter is selected."
-        },
-        {
-          "path": "frontend/src/pages/Dashboard.tsx",
-          "operation": "modify",
-          "description": "Ensure that the unmapped section correctly reflects reduced unmapped counts after the improved design code matching logic is implemented, using the updated data from backend queries."
-        }
-      ]
-    },
-    {
-      "id": "REQ-6",
-      "summary": "Fix UI glitch in Karigar filter dropdown button text when changing selection",
-      "acceptanceCriteria": [
-        "Karigar filter button displays selected text without overlapping or truncation",
-        "Text transitions smoothly when changing from 'All Karigars' to a specific karigar name like 'MOMIN' (as seen in IMG_6137)",
-        "Button width adjusts properly to accommodate different text lengths",
-        "No visual glitches occur on mobile devices during filter selection"
+        "Callbacks are properly memoized or stabilized",
+        "Filtered orders state updates do not cause cascading re-renders",
+        "Each tab's filtering logic executes exactly once per filter change"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Fix the Karigar filter dropdown button rendering to prevent text repetition or overflow. Ensure the button properly displays the selected karigar name with correct truncation or width adjustment. Add CSS classes for text overflow handling (truncate, overflow-hidden) and ensure the button element updates its text content correctly when the selection changes."
+          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
         },
         {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Apply the same Karigar filter button fix as in TotalOrdersTab to ensure consistent behavior across tabs. Verify proper text display without visual glitches when changing filter selections on mobile devices."
+          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
         },
         {
           "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
           "operation": "modify",
-          "description": "Apply the same Karigar filter button fix as in TotalOrdersTab to ensure consistent behavior across tabs. Verify proper text display without visual glitches when changing filter selections on mobile devices."
+          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
         }
       ]
     },
     {
-      "id": "REQ-7",
-      "summary": "Fix Export to JPEG functionality on mobile devices",
+      "id": "REQ-3",
+      "summary": "Add proper dependency arrays and memoization (useMemo/useCallback) to prevent unnecessary effect re-executions in the Dashboard and tab components",
       "acceptanceCriteria": [
-        "Export to JPEG button triggers export successfully on mobile browsers",
-        "Generated JPEG file downloads correctly on mobile devices",
-        "Export includes all visible order data with correct formatting",
-        "Export functionality works on iOS Safari and Android Chrome browsers"
+        "useEffect hooks have correct dependency arrays",
+        "Callback functions passed as props are wrapped in useCallback",
+        "Filtered data calculations use useMemo where appropriate",
+        "No unnecessary re-renders detected in React DevTools"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/exportUtils.ts",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Update the JPEG export function to handle mobile browser limitations. Implement mobile-specific handling for file downloads using blob URLs and programmatic anchor clicks. Add fallback mechanisms for iOS Safari (which may have restrictions on direct downloads) such as opening the image in a new tab or using the Share API. Ensure proper cleanup of blob URLs after download."
+          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data, selectedType, selectedKarigar, and searchText state variables."
         },
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Verify that the Export to JPEG button correctly invokes the updated mobile-compatible export function from exportUtils. Add user feedback (loading state, success/error messages) during the export process to improve mobile user experience."
-        }
-      ]
-    },
-    {
-      "id": "REQ-8",
-      "summary": "Fix Export to PDF functionality on mobile devices",
-      "acceptanceCriteria": [
-        "Export to PDF button triggers export successfully on mobile browsers",
-        "Generated PDF file downloads correctly on mobile devices",
-        "PDF formatting is correct with all order data visible",
-        "Design images are embedded in PDF exports on mobile",
-        "Export functionality works on iOS Safari and Android Chrome browsers"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/utils/exportUtils.ts",
-          "operation": "modify",
-          "description": "Update the PDF export function to handle mobile browser download limitations. Ensure the PDF library (jsPDF) properly generates PDFs on mobile devices with all order data and embedded design images. Implement mobile-specific download handling using blob URLs with programmatic anchor clicks. Add iOS Safari fallbacks such as opening the PDF in a new tab or using the Share API if direct download fails. Test image embedding and ensure proper cleanup of resources."
+          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data, selectedType, selectedKarigar, searchText, and date range state variables."
         },
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
           "operation": "modify",
-          "description": "Verify that the Export to PDF button correctly invokes the updated mobile-compatible PDF export function. Ensure loading states and error handling provide clear feedback to users during PDF generation and download on mobile devices."
+          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data, selectedType, selectedKarigar, searchText, and date range state variables."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data and searchText state variable."
         }
       ]
     }

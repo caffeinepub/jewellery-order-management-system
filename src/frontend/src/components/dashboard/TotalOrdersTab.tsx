@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType } from "@/backend";
+import { OrderStatus, OrderType, Order } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -12,14 +12,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import SuppliedQtyDialog from "./SuppliedQtyDialog";
 
-export default function TotalOrdersTab() {
+interface TotalOrdersTabProps {
+  onFilteredOrdersChange: (orders: Order[], isLoading: boolean) => void;
+}
+
+export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTabProps) {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
+  const [selectedOrdersForSupply, setSelectedOrdersForSupply] = useState<Order[]>([]);
 
   const { data: orders = [], isLoading } = useGetOrders();
   const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
+
+  // Deduplicate karigar names
+  const uniqueKarigarList = useMemo(() => {
+    const karigarSet = new Set(uniqueKarigars);
+    return Array.from(karigarSet).sort();
+  }, [uniqueKarigars]);
 
   const filteredOrders = useMemo(() => {
     let result = orders.filter(
@@ -48,6 +60,27 @@ export default function TotalOrdersTab() {
 
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText]);
+
+  // Notify parent of filtered orders changes
+  useEffect(() => {
+    onFilteredOrdersChange(filteredOrders, isLoading);
+  }, [filteredOrders, isLoading, onFilteredOrdersChange]);
+
+  const handleMarkAsReady = (selectedOrders: Order[]) => {
+    // Check if any selected orders are RB type with Pending status
+    const rbPendingOrders = selectedOrders.filter(
+      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
+    );
+
+    if (rbPendingOrders.length > 0) {
+      // Show dialog for RB orders
+      setSelectedOrdersForSupply(rbPendingOrders);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedOrdersForSupply([]);
+  };
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
@@ -81,11 +114,11 @@ export default function TotalOrdersTab() {
         </div>
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue />
+            <SelectValue placeholder="Filter by Karigar" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Karigars</SelectItem>
-            {uniqueKarigars.map((karigar) => (
+            {uniqueKarigarList.map((karigar) => (
               <SelectItem key={karigar} value={karigar}>
                 {karigar}
               </SelectItem>
@@ -102,7 +135,18 @@ export default function TotalOrdersTab() {
           />
         </div>
       </div>
-      <OrderTable orders={filteredOrders} enableBulkActions={true} />
+      <OrderTable 
+        orders={filteredOrders} 
+        enableBulkActions 
+        onMarkAsReady={handleMarkAsReady}
+      />
+
+      {selectedOrdersForSupply.length > 0 && (
+        <SuppliedQtyDialog
+          orders={selectedOrdersForSupply}
+          onClose={handleCloseDialog}
+        />
+      )}
     </div>
   );
 }

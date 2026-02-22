@@ -4,8 +4,6 @@ import Map "mo:core/Map";
 import Array "mo:core/Array";
 import Principal "mo:core/Principal";
 import List "mo:core/List";
-import Float "mo:core/Float";
-import Text "mo:core/Text";
 import Iter "mo:core/Iter";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
@@ -79,12 +77,13 @@ actor {
     karigarName : Text;
   };
 
-  let orders = Map.empty<Text, PersistentOrder>();
-  let designMappings = Map.empty<Text, DesignMapping>();
-  let designImages = Map.empty<Text, Storage.ExternalBlob>();
-  let masterDesignMappings = Map.empty<Text, DesignMapping>();
-  let karigars = Map.empty<Text, Karigar>();
-  let masterDesignKarigars = Map.empty<Text, Nat>();
+  var orders = Map.empty<Text, PersistentOrder>();
+  var readyOrders = Map.empty<Text, PersistentOrder>();
+  var designMappings = Map.empty<Text, DesignMapping>();
+  var designImages = Map.empty<Text, Storage.ExternalBlob>();
+  var masterDesignMappings = Map.empty<Text, DesignMapping>();
+  var karigars = Map.empty<Text, Karigar>();
+  var masterDesignKarigars = Map.empty<Text, Nat>();
 
   var masterDesignExcel : ?Storage.ExternalBlob = null;
   var activeKarigar : ?Text = null;
@@ -117,6 +116,37 @@ actor {
     };
 
     orders.add(orderId, persistentOrder);
+  };
+
+  public shared ({ caller }) func supplyOrder(orderId : Text, suppliedQuantity : Nat) : async () {
+    let timestamp = Time.now();
+
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order not found") };
+      case (?originalOrder) {
+        if (suppliedQuantity > originalOrder.quantity) {
+          Runtime.trap("Supplied quantity cannot be greater than the original order quantity");
+        };
+
+        // Update remaining quantity in orders map
+        let remainingQuantity = originalOrder.quantity - suppliedQuantity;
+        let updatedOrder : PersistentOrder = {
+          originalOrder with
+          quantity = remainingQuantity;
+          updatedAt = timestamp;
+        };
+        orders.add(orderId, updatedOrder);
+
+        // Add supplied quantity to readyOrders map
+        let readyOrder : PersistentOrder = {
+          originalOrder with
+          quantity = suppliedQuantity;
+          status = #Ready;
+          updatedAt = timestamp;
+        };
+        readyOrders.add(orderId, readyOrder);
+      };
+    };
   };
 
   public shared ({ caller }) func addKarigar(name : Text) : async () {
@@ -369,107 +399,17 @@ actor {
     };
   };
 
-  func extractBaseDesignCode(designCode : Text) : Text {
-    // Check if first two characters are uppercase letters (product prefix)
-    let codeLength = designCode.size();
-    if (codeLength <= 2) { return designCode };
-
-    let chars = Array.tabulate(
-      codeLength,
-      func(i) {
-        designCode.chars().toArray()[i];
-      },
-    );
-
-    // Check if first two chars are uppercase letters (A-Z)
-    let firstTwoAreLetters = chars[0] >= 'A' and chars[0] <= 'Z' and chars[1] >= 'A' and chars[1] <= 'Z';
-
-    if (firstTwoAreLetters) {
-      // Remove the first two characters (product prefix)
-      Text.fromIter(chars.sliceToArray(2, codeLength).values());
-    } else {
-      // Check if only the first character is a letter and not from 0-9
-      let firstCharIsLetter = chars[0] >= 'A' and chars[0] <= 'Z' and not (chars[1] >= '0' and chars[1] <= '9');
-
-      if (firstCharIsLetter) {
-        // Remove the first character (product prefix)
-        Text.fromIter(chars.sliceToArray(1, codeLength).values());
-      } else {
-        // No prefix, keep the original code
-        designCode;
-      };
-    };
-  };
-
-  func findMappingViaBaseDesign(design : Text) : ?DesignMapping {
-    // 1. First Try: Direct search
-    let direct = masterDesignMappings.get(design);
-    switch (direct) {
-      case (?mapping) { return ?mapping };
-      case (null) {};
-    };
-
-    // 2. First Fallback with baseDesignCode
-    let baseDesignCode = extractBaseDesignCode(design);
-
-    let baseFallback = masterDesignMappings.get(baseDesignCode);
-    switch (baseFallback) {
-      case (?mapping) { return ?mapping };
-      case (null) {};
-    };
-
-    // 3. Fallback via Partial Product Codes (for BR, H, etc.)
-    let len = design.size();
-    let chars = Array.tabulate(
-      len,
-      func(i) {
-        design.chars().toArray()[i];
-      },
-    );
-
-    if (len > 2 and chars[0] >= 'A' and chars[0] <= 'Z' and chars[1] >= '0' and chars[1] <= '9') {
-      let substring = Text.fromIter(chars.sliceToArray(1, len).values());
-      let fallback = masterDesignMappings.get(substring);
-      switch (fallback) {
-        case (?mapping) { return ?mapping };
-        case (null) {};
-      };
-    };
-
-    // 4. Remove leading zeros and check again
-    let trimmedWithZeros = baseDesignCode.trimStart(#char ('0'));
-    let lastFallback = masterDesignMappings.get(trimmedWithZeros);
-    switch (lastFallback) {
-      case (?mapping) { return ?mapping };
-      case (null) {};
-    };
-
-    // Mapping not found
-    null;
-  };
-
-  func mapOrderToOrderWithMappings(order : PersistentOrder) : Order {
-    let mapping = findMappingViaBaseDesign(order.design);
-    let genericName = switch (mapping) {
-      case (null) { null };
-      case (?mapping) { ?mapping.genericName };
-    };
-
-    let karigarName = switch (mapping) {
-      case (null) { null };
-      case (?mapping) { ?mapping.karigarName };
-    };
-
-    {
-      order with
-      remarks = order.remarks;
-      genericName;
-      karigarName;
-    };
-  };
-
   public query ({ caller }) func getOrdersWithMappings() : async [Order] {
     let persistentOrders = orders.values().toArray();
-    persistentOrders.map(mapOrderToOrderWithMappings);
+    persistentOrders.map(
+      func(persistentOrder) {
+        {
+          persistentOrder with
+          remarks = persistentOrder.remarks;
+          genericName = designMappings.get(persistentOrder.design).map(func(mapping) { mapping.genericName });
+          karigarName = designMappings.get(persistentOrder.design).map(func(mapping) { mapping.karigarName });
+        };
+      }
+    );
   };
 };

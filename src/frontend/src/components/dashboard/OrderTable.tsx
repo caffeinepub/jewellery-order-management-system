@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, AlertCircle } from "lucide-react";
-import { Order, OrderStatus } from "@/backend";
+import { Download } from "lucide-react";
+import { Order, OrderType, OrderStatus } from "@/backend";
 import DesignImageModal from "./DesignImageModal";
 import { exportToExcel, exportToPDF, exportToJPEG } from "@/utils/exportUtils";
 import {
@@ -37,9 +37,15 @@ interface OrderTableProps {
   orders: Order[];
   showDateFilter?: boolean;
   enableBulkActions?: boolean;
+  onMarkAsReady?: (selectedOrders: Order[]) => void;
 }
 
-export default function OrderTable({ orders, showDateFilter = false, enableBulkActions = false }: OrderTableProps) {
+export default function OrderTable({ 
+  orders, 
+  showDateFilter = false, 
+  enableBulkActions = false,
+  onMarkAsReady 
+}: OrderTableProps) {
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -74,7 +80,22 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
   };
 
   const handleMarkAsReady = () => {
-    setShowConfirmDialog(true);
+    const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
+    
+    // Check if any selected orders are RB type with Pending status
+    const rbPendingOrders = selectedOrders.filter(
+      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
+    );
+
+    if (rbPendingOrders.length > 0 && onMarkAsReady) {
+      // Pass RB orders to parent for supply dialog
+      onMarkAsReady(rbPendingOrders);
+      // Clear selection after handling
+      setSelectedRows(new Set());
+    } else {
+      // For non-RB orders, show confirmation dialog
+      setShowConfirmDialog(true);
+    }
   };
 
   const confirmMarkAsReady = async () => {
@@ -98,12 +119,14 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
     try {
       if (format === "excel") {
         exportToExcel(orders);
+        toast.success(`Exported to ${format.toUpperCase()}`);
       } else if (format === "pdf") {
         await exportToPDF(orders, actor);
+        toast.success(`Exported to ${format.toUpperCase()}`);
       } else if (format === "jpeg") {
         await exportToJPEG(orders);
+        toast.success(`Exported to ${format.toUpperCase()}`);
       }
-      toast.success(`Exported to ${format.toUpperCase()}`);
     } catch (error) {
       toast.error(`Failed to export to ${format.toUpperCase()}`);
       console.error(error);
@@ -121,22 +144,6 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
 
   const allSelected = orders.length > 0 && selectedRows.size === orders.length;
   const someSelected = selectedRows.size > 0 && selectedRows.size < orders.length;
-
-  // Helper function to format status display
-  const formatStatus = (status: OrderStatus): string => {
-    switch (status) {
-      case OrderStatus.Pending:
-        return "Pending";
-      case OrderStatus.Ready:
-        return "Ready";
-      case OrderStatus.Hallmark:
-        return "Hallmark";
-      case OrderStatus.ReturnFromHallmark:
-        return "Return From Hallmark";
-      default:
-        return status;
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -169,7 +176,7 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
         </DropdownMenu>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -182,17 +189,17 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                   />
                 </TableHead>
               )}
-              <TableHead>Order No</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Design Code</TableHead>
               <TableHead>Generic Name</TableHead>
               <TableHead>Karigar Name</TableHead>
+              <TableHead>Design Code</TableHead>
               <TableHead>Weight</TableHead>
               <TableHead>Size</TableHead>
               <TableHead>Qty</TableHead>
               <TableHead>Remarks</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Order Number</TableHead>
+              <TableHead>Product</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -238,17 +245,6 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                             />
                           </TableCell>
                         )}
-                        <TableCell>{order.orderNo}</TableCell>
-                        <TableCell>{order.orderType}</TableCell>
-                        <TableCell>{order.product}</TableCell>
-                        <TableCell>
-                          <button
-                            onClick={(e) => handleDesignClick(order.design, e)}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            {order.design}
-                          </button>
-                        </TableCell>
                         <TableCell>
                           {order.genericName || (
                             <span className="text-muted-foreground italic text-sm"></span>
@@ -259,15 +255,22 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                             <span className="text-muted-foreground italic text-sm"></span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <button
+                            onClick={(e) => handleDesignClick(order.design, e)}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {order.design}
+                          </button>
+                        </TableCell>
                         <TableCell>{order.weight}</TableCell>
                         <TableCell>{order.size}</TableCell>
                         <TableCell>{Number(order.quantity)}</TableCell>
                         <TableCell>{order.remarks}</TableCell>
-                        <TableCell>
-                          <span className="text-sm font-medium">
-                            {formatStatus(order.status)}
-                          </span>
-                        </TableCell>
+                        <TableCell>{order.status}</TableCell>
+                        <TableCell>{order.orderType}</TableCell>
+                        <TableCell>{order.orderNo}</TableCell>
+                        <TableCell>{order.product}</TableCell>
                       </TableRow>
                     );
                   })}
