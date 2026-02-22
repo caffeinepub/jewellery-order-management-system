@@ -4,11 +4,17 @@ import { ArrowLeft, Download } from "lucide-react";
 import { useGetOrdersByKarigar } from "@/hooks/useQueries";
 import { useActor } from "@/hooks/useActor";
 import OrderTable from "@/components/dashboard/OrderTable";
-import { exportKarigarToPDF } from "@/utils/exportUtils";
+import { exportKarigarToPDF, exportToJPEG } from "@/utils/exportUtils";
 import { toast } from "sonner";
 import { OrderStatus, OrderType, Order } from "@/backend";
 import { useState } from "react";
 import SuppliedQtyDialog from "@/components/dashboard/SuppliedQtyDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function KarigarDetail() {
   const { name } = useParams({ from: "/karigar/$name" });
@@ -25,13 +31,23 @@ export default function KarigarDetail() {
     0
   );
 
-  const handleExportPDF = async () => {
+  const handleExport = async (format: "pdf" | "jpeg") => {
+    if (!actor) {
+      toast.error("Actor not initialized");
+      return;
+    }
+
     setIsExporting(true);
     try {
-      await exportKarigarToPDF(pendingOrders, name, actor);
-      toast.success("PDF opened successfully");
+      if (format === "pdf") {
+        await exportKarigarToPDF(pendingOrders, name, actor);
+        toast.success("PDF opened successfully");
+      } else if (format === "jpeg") {
+        await exportToJPEG(pendingOrders, actor);
+        toast.success("JPEG opened successfully");
+      }
     } catch (error) {
-      toast.error("Failed to export PDF");
+      toast.error(`Failed to export ${format.toUpperCase()}`);
       console.error(error);
     } finally {
       setIsExporting(false);
@@ -78,10 +94,22 @@ export default function KarigarDetail() {
             <p className="text-muted-foreground">Karigar Details</p>
           </div>
         </div>
-        <Button onClick={handleExportPDF} variant="outline" disabled={isExporting}>
-          <Download className="mr-2 h-4 w-4" />
-          {isExporting ? "Exporting..." : "Export PDF"}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" disabled={isExporting}>
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? "Exporting..." : "Export"}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => handleExport("pdf")}>
+              Export to PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("jpeg")}>
+              Export to JPEG
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

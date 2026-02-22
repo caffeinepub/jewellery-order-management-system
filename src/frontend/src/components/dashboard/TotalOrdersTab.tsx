@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
 import { OrderStatus, OrderType, Order } from "@/backend";
@@ -14,11 +14,7 @@ import {
 } from "@/components/ui/select";
 import SuppliedQtyDialog from "./SuppliedQtyDialog";
 
-interface TotalOrdersTabProps {
-  onFilteredOrdersChange: (orders: Order[], isLoading: boolean) => void;
-}
-
-export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTabProps) {
+export default function TotalOrdersTab() {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -60,11 +56,6 @@ export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTa
 
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText]);
-
-  // Notify parent of filtered orders changes
-  useEffect(() => {
-    onFilteredOrdersChange(filteredOrders, isLoading);
-  }, [filteredOrders, isLoading, onFilteredOrdersChange]);
 
   const handleMarkAsReady = (selectedOrders: Order[]) => {
     // Check if any selected orders are RB type with Pending status

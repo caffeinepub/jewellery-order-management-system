@@ -1,85 +1,117 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix infinite loop causing maximum update depth exceeded error",
+  "title": "Fix Ready Tab Display, Add RB Order Splitting, and Enhance PDF/JPEG Exports",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Identify and fix the infinite setState loop in the Dashboard component that occurs when the onFilteredOrdersChange callback is triggered",
+      "summary": "Fix the Ready tab to only display orders with exact status 'Ready', excluding 'StatusChangedToReady' orders",
       "acceptanceCriteria": [
-        "Dashboard renders without React errors",
-        "Tab switching works without triggering infinite loops",
-        "SummaryCards update correctly when filtered orders change",
-        "No maximum update depth exceeded errors in console"
+        "Ready tab displays only orders with exact status 'Ready'",
+        "Orders with status 'StatusChangedToReady' do not appear in Ready tab",
+        "All existing filters (order type, karigar, search, date range) continue to work correctly"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/Dashboard.tsx",
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Wrap all onFilteredOrdersChange callback functions in useCallback hooks with empty dependency arrays to stabilize their references and prevent them from being recreated on every render. This breaks the infinite loop where state updates cause callback recreation, which triggers tab effects, which call callbacks, which update state again."
+          "description": "Update the order filtering logic to strictly match status 'Ready' only. Review the current filtering implementation in useGetOrders hook call or local filtering logic, and ensure orders with status 'StatusChangedToReady' are explicitly excluded. Verify all existing filters (order type CO/RB, karigar name, search by order number, date range) continue to function correctly with the updated status filter."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Ensure the onFilteredOrdersChange callbacks in TotalOrdersTab, ReadyTab, HallmarkTab, and CustomerOrdersTab do not cause parent component re-renders that retrigger the same callbacks",
+      "summary": "For RB orders being marked as ready, prompt for supplied quantity and split the order into pending and ready lines",
       "acceptanceCriteria": [
-        "Callbacks are properly memoized or stabilized",
-        "Filtered orders state updates do not cause cascading re-renders",
-        "Each tab's filtering logic executes exactly once per filter change"
+        "When marking an RB order as ready, a dialog prompts for supplied quantity",
+        "Supplied quantity must be validated (cannot exceed original order quantity, must be greater than 0)",
+        "After submission, the original order line is split into two entries with unique identifiers",
+        "Pending quantity line (original qty - supplied qty) appears in Total Orders tab with status 'Pending'",
+        "Supplied quantity line appears in Ready Orders tab with status 'Ready'",
+        "Both split lines retain all other order properties (design code, karigar, order number, etc.)",
+        "If supplied quantity equals original quantity, only the Ready line is created"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "operation": "modify",
+          "description": "Update the supplied quantity dialog to handle RB order splitting logic. Add validation to ensure supplied quantity is greater than 0 and does not exceed the original order quantity. Update the dialog's submit handler to call the backend supplyOrder method which handles the order splitting. Ensure the dialog displays clear error messages for invalid quantities and provides user feedback during the submission process."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Update the mark-as-ready functionality to open the SuppliedQtyDialog for RB orders before marking them as ready. Ensure the dialog is properly triggered when RB orders are selected for status update. After the dialog submission completes, refresh the order lists to reflect the split orders. Verify that the splitting logic works correctly for both single and bulk RB order selections."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and update the mutation hooks related to order status updates. Ensure the supplyOrder backend method is properly called with orderId and suppliedQuantity parameters. Add proper cache invalidation after the supply operation completes to refresh both Total Orders and Ready Orders tabs. Verify that the mutation properly handles success and error states with appropriate user feedback."
+        },
+        {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
+          "description": "Verify that the Total Orders tab correctly displays pending quantity lines after RB order splitting. Ensure the tab's filtering logic includes orders with 'Pending' status that result from the split operation. Test that all existing filters (order type, karigar, search) work correctly with split orders."
         },
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
-        },
-        {
-          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Add onFilteredOrdersChange to the dependency array of the useEffect hook that calculates filtered orders. This ensures the effect only re-runs when filters or the callback reference changes, not on every render."
+          "description": "Update the karigar detail page to handle RB order splitting when marking orders as ready from this view. Ensure the SuppliedQtyDialog is triggered for RB orders and that the page refreshes to show updated order lists after splitting. Verify that statistics (total weight, quantity) are recalculated correctly after order splits."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Add proper dependency arrays and memoization (useMemo/useCallback) to prevent unnecessary effect re-executions in the Dashboard and tab components",
+      "summary": "Fix PDF export functionality to work correctly on iPhone devices and iOS browsers",
       "acceptanceCriteria": [
-        "useEffect hooks have correct dependency arrays",
-        "Callback functions passed as props are wrapped in useCallback",
-        "Filtered data calculations use useMemo where appropriate",
-        "No unnecessary re-renders detected in React DevTools"
+        "PDF export successfully generates and downloads on iPhone Safari",
+        "PDF export works on iPhone Chrome and other iOS browsers",
+        "Exported PDFs maintain proper formatting and data integrity on mobile devices",
+        "Error handling provides clear feedback if PDF generation fails on any platform"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/utils/exportUtils.ts",
           "operation": "modify",
-          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data, selectedType, selectedKarigar, and searchText state variables."
+          "description": "Investigate and fix PDF generation issues specific to iOS Safari and mobile browsers. Review the current PDF rendering implementation (likely using html2canvas and jsPDF or similar libraries). Implement iOS-specific workarounds such as: handling canvas size limitations on iOS, adjusting viewport meta tags for rendering, using proper MIME types and blob URLs for iOS compatibility, implementing fallback download mechanisms for iOS (e.g., opening PDF in new window if direct download fails). Add comprehensive error handling with user-friendly messages for PDF generation failures. Test and verify PDF formatting remains consistent across desktop and mobile platforms."
         },
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data, selectedType, selectedKarigar, searchText, and date range state variables."
+          "description": "Update the PDF export button handler to include better error handling and user feedback for iOS devices. Add loading indicators during PDF generation. Implement fallback mechanisms if direct download fails on iOS (e.g., display PDF in modal or new tab). Provide clear error messages if PDF generation fails on any platform."
         },
         {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data, selectedType, selectedKarigar, searchText, and date range state variables."
+          "description": "Update the PDF export functionality in the karigar detail page to use the fixed exportUtils implementation. Ensure iOS compatibility for PDF exports from this page. Add proper loading states and error handling for mobile devices."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Include design images in PDF and JPEG exports from Karigar detail page",
+      "acceptanceCriteria": [
+        "PDF exports from Karigar detail page include design images for each order",
+        "JPEG exports from Karigar detail page include design images for each order",
+        "Design images are properly fetched and embedded based on order design codes",
+        "Exports gracefully handle missing design images (display placeholder or skip)",
+        "Image quality is maintained in exported files",
+        "Export file size remains reasonable with embedded images"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/exportUtils.ts",
+          "operation": "modify",
+          "description": "Update the PDF and JPEG export functions to accept an optional includeImages parameter. Modify the export logic to fetch design images using the getDesignImage backend method for each unique design code in the orders. Convert fetched ExternalBlob images to base64 format for embedding in PDF/JPEG. Implement image fetching with proper error handling for missing images (use placeholder or skip). Optimize image dimensions and quality to balance visual clarity with file size. Update the HTML template generation to include image elements positioned appropriately with each order's design information. Ensure images are properly cached during the export process to avoid redundant fetches for duplicate design codes."
         },
         {
-          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Wrap the filtered orders calculation logic in useMemo to prevent recalculating filtered orders unnecessarily. The memoization should depend on orders data and searchText state variable."
+          "description": "Update the PDF and JPEG export button handlers to call the enhanced exportUtils functions with includeImages parameter set to true. Add loading indicators during image fetching and export generation. Provide user feedback about the export progress, especially when fetching multiple design images. Implement proper error handling if image fetching or export generation fails, with clear user messaging."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and verify that the useGetDesignImage hook properly supports bulk fetching of design images for export purposes. Ensure the hook can handle multiple concurrent image fetch requests efficiently. Add proper error handling and retry logic for failed image fetches during export operations."
         }
       ]
     }

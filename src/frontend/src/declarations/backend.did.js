@@ -35,11 +35,6 @@ export const DesignMapping = IDL.Record({
   'designCode' : IDL.Text,
 });
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
-export const Karigar = IDL.Record({
-  'name' : IDL.Text,
-  'createdAt' : Time,
-  'createdBy' : IDL.Principal,
-});
 export const OrderStatus = IDL.Variant({
   'Ready' : IDL.Null,
   'Hallmark' : IDL.Null,
@@ -62,6 +57,11 @@ export const Order = IDL.Record({
   'quantity' : IDL.Nat,
   'remarks' : IDL.Text,
   'product' : IDL.Text,
+});
+export const Karigar = IDL.Record({
+  'name' : IDL.Text,
+  'createdAt' : Time,
+  'createdBy' : IDL.Principal,
 });
 
 export const idlService = IDL.Service({
@@ -109,6 +109,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
       ['query'],
     ),
+  'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
   'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
   'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
@@ -120,6 +121,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getUniqueKarigarsFromDesignMappings' : IDL.Func(
       [],
       [IDL.Vec(IDL.Text)],
@@ -185,11 +187,6 @@ export const idlFactory = ({ IDL }) => {
     'designCode' : IDL.Text,
   });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
-  const Karigar = IDL.Record({
-    'name' : IDL.Text,
-    'createdAt' : Time,
-    'createdBy' : IDL.Principal,
-  });
   const OrderStatus = IDL.Variant({
     'Ready' : IDL.Null,
     'Hallmark' : IDL.Null,
@@ -212,6 +209,11 @@ export const idlFactory = ({ IDL }) => {
     'quantity' : IDL.Nat,
     'remarks' : IDL.Text,
     'product' : IDL.Text,
+  });
+  const Karigar = IDL.Record({
+    'name' : IDL.Text,
+    'createdAt' : Time,
+    'createdBy' : IDL.Principal,
   });
   
   return IDL.Service({
@@ -259,6 +261,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
         ['query'],
       ),
+    'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
     'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
     'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
@@ -270,6 +273,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getUniqueKarigarsFromDesignMappings' : IDL.Func(
         [],
         [IDL.Vec(IDL.Text)],

@@ -1,72 +1,93 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
-import Time "mo:core/Time";
-import Principal "mo:core/Principal";
-import List "mo:core/List";
-import Storage "blob-storage/Storage";
+import Text "mo:core/Text";
 
 module {
-  type OrderType = {
-    #CO;
-    #RB;
-  };
-
-  type OrderStatus = {
-    #Pending;
-    #Ready;
-    #Hallmark;
-    #ReturnFromHallmark;
-  };
-
+  // Old types
   type PersistentOrder = {
     orderNo : Text;
-    orderType : OrderType;
+    orderType : {
+      #CO;
+      #RB;
+    };
     product : Text;
     design : Text;
     weight : Float;
     size : Float;
     quantity : Nat;
     remarks : Text;
-    status : OrderStatus;
+    status : {
+      #Pending;
+      #Ready;
+      #Hallmark;
+      #ReturnFromHallmark;
+    };
     orderId : Text;
-    createdAt : Time.Time;
-    updatedAt : Time.Time;
+    createdAt : Int;
+    updatedAt : Int;
   };
 
-  type DesignMapping = {
-    designCode : Text;
-    genericName : Text;
-    karigarName : Text;
-    createdBy : Principal;
-    updatedBy : ?Principal;
-    createdAt : Time.Time;
-    updatedAt : Time.Time;
-  };
-
-  type Karigar = {
-    name : Text;
-    createdBy : Principal;
-    createdAt : Time.Time;
-  };
-
-  type MappingRecord = {
-    designCode : Text;
-    genericName : Text;
-    karigarName : Text;
-  };
-
-  type State = {
+  type OldActor = {
     orders : Map.Map<Text, PersistentOrder>;
-    designMappings : Map.Map<Text, DesignMapping>;
-    designImages : Map.Map<Text, Storage.ExternalBlob>;
-    masterDesignMappings : Map.Map<Text, DesignMapping>;
-    karigars : Map.Map<Text, Karigar>;
-    masterDesignKarigars : Map.Map<Text, Nat>;
-    masterDesignExcel : ?Storage.ExternalBlob;
-    activeKarigar : ?Text;
+    readyOrders : Map.Map<Text, PersistentOrder>;
   };
 
-  public func run(state : State) : State {
-    state;
+  // New types
+  type Order = {
+    orderNo : Text;
+    orderType : {
+      #CO;
+      #RB;
+    };
+    product : Text;
+    design : Text;
+    weight : Float;
+    size : Float;
+    quantity : Nat;
+    remarks : Text;
+    genericName : ?Text;
+    karigarName : ?Text;
+    status : {
+      #Pending;
+      #Ready;
+      #Hallmark;
+      #ReturnFromHallmark;
+    };
+    orderId : Text;
+    createdAt : Int;
+    updatedAt : Int;
+  };
+
+  type NewActor = {
+    orders : Map.Map<Text, Order>;
+    readyOrders : Map.Map<Text, Order>;
+  };
+
+  public func run(old : OldActor) : NewActor {
+    let newOrders = old.orders.map<Text, PersistentOrder, Order>(
+      func(_id, oldOrder) {
+        {
+          oldOrder with
+          genericName = null;
+          karigarName = null;
+        };
+      }
+    );
+
+    let newReadyOrders = old.readyOrders.map<Text, PersistentOrder, Order>(
+      func(_id, oldOrder) {
+        {
+          oldOrder with
+          genericName = null;
+          karigarName = null;
+        };
+      }
+    );
+
+    {
+      old with
+      orders = newOrders;
+      readyOrders = newReadyOrders;
+    };
   };
 };

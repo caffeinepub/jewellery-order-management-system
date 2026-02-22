@@ -1,68 +1,100 @@
 {
   "kind": "build_request",
-  "title": "Fix infinite loop causing maximum update depth exceeded error",
-  "priority": "high",
+  "title": "Fix Ready Tab Display, Add RB Order Splitting, and Enhance PDF/JPEG Exports",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Identify and fix the infinite setState loop in the Dashboard component that occurs when the onFilteredOrdersChange callback is triggered, causing a maximum update depth exceeded error",
+      "text": "Fix the Ready tab to only display orders with status 'Ready'. Orders with status 'StatusChangedToReady' should not appear in the Ready tab.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-8"
         ],
         "quotes": [
-          "Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops"
+          "Status changed to ready has been showing under ready tab."
         ]
       },
       "acceptanceCriteria": [
-        "Dashboard renders without React errors",
-        "Tab switching works without triggering infinite loops",
-        "SummaryCards update correctly when filtered orders change",
-        "No maximum update depth exceeded errors in console"
+        "Ready tab displays only orders with exact status 'Ready'",
+        "Orders with status 'StatusChangedToReady' do not appear in Ready tab",
+        "All existing filters (order type, karigar, search, date range) continue to work correctly"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Ensure the onFilteredOrdersChange callbacks in TotalOrdersTab, ReadyTab, HallmarkTab, and CustomerOrdersTab do not cause parent component re-renders that retrigger the same callbacks",
-      "target": "frontend",
+      "text": "For RB orders being marked as ready, prompt the user to enter a supplied quantity. Split the original order line into two separate entries: one with the pending quantity (original qty minus supplied qty) displayed in Total Orders tab, and one with the supplied quantity displayed in Ready Orders tab.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-8"
+        ],
+        "quotes": [
+          "For RB orders, ask for supplied qty: and split it as two lines, the order line with pending qty will be shown in total orders and supplied qty and the order line in ready orders."
         ]
       },
       "acceptanceCriteria": [
-        "Callbacks are properly memoized or stabilized",
-        "Filtered orders state updates do not cause cascading re-renders",
-        "Each tab's filtering logic executes exactly once per filter change"
+        "When marking an RB order as ready, a dialog prompts for supplied quantity",
+        "Supplied quantity must be validated (cannot exceed original order quantity, must be greater than 0)",
+        "After submission, the original order line is split into two entries with unique identifiers",
+        "Pending quantity line (original qty - supplied qty) appears in Total Orders tab with status 'Pending'",
+        "Supplied quantity line appears in Ready Orders tab with status 'Ready'",
+        "Both split lines retain all other order properties (design code, karigar, order number, etc.)",
+        "If supplied quantity equals original quantity, only the Ready line is created"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Add proper dependency arrays and memoization (useMemo/useCallback) to prevent unnecessary effect re-executions in the Dashboard and tab components",
+      "text": "Fix PDF export functionality to work correctly on iPhone devices. Investigate and resolve current PDF generation failures specific to iOS Safari/mobile browsers.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-8"
+        ],
+        "quotes": [
+          "PDF export fails and doesn't really work in iPhone."
         ]
       },
       "acceptanceCriteria": [
-        "useEffect hooks have correct dependency arrays",
-        "Callback functions passed as props are wrapped in useCallback",
-        "Filtered data calculations use useMemo where appropriate",
-        "No unnecessary re-renders detected in React DevTools"
+        "PDF export successfully generates and downloads on iPhone Safari",
+        "PDF export works on iPhone Chrome and other iOS browsers",
+        "Exported PDFs maintain proper formatting and data integrity on mobile devices",
+        "Error handling provides clear feedback if PDF generation fails on any platform"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "In the Karigar detail page, when exporting orders to PDF or JPEG, automatically include the associated design images in the exported files. Each order's design code should have its corresponding design image embedded in the export.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-8"
+        ],
+        "quotes": [
+          "From Karigar tab page whenever export is done through jpeg and pdf attach the design image in the PDF and jpeg when exported."
+        ]
+      },
+      "acceptanceCriteria": [
+        "PDF exports from Karigar detail page include design images for each order",
+        "JPEG exports from Karigar detail page include design images for each order",
+        "Design images are properly fetched and embedded based on order design codes",
+        "Exports gracefully handle missing design images (display placeholder or skip)",
+        "Image quality is maintained in exported files",
+        "Export file size remains reasonable with embedded images"
       ]
     }
   ],
   "constraints": [
-    "Do not change the data flow architecture where tabs filter orders and pass results to parent",
-    "Preserve the existing functionality where SummaryCards display tab-specific metrics",
-    "Do not modify the backend or data fetching logic"
+    "Maintain the single-actor backend architecture",
+    "Do not modify the Internet Identity authentication hooks",
+    "Preserve existing order filtering and tab functionality",
+    "Ensure backward compatibility with existing order data"
   ],
   "nonGoals": [
-    "Refactoring the overall component architecture",
-    "Changing how orders are fetched from the backend",
-    "Modifying the OrderTable component functionality"
+    "Changing the overall UI design or layout",
+    "Modifying authentication or user management",
+    "Adding new order types beyond CO and RB",
+    "Implementing real-time synchronization or notifications"
   ],
   "imageRequirements": {
     "required": [],

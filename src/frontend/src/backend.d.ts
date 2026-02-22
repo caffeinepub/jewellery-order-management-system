@@ -67,13 +67,15 @@ export interface backendInterface {
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     deleteOrder(orderId: string): Promise<void>;
     getAllMasterDesignMappings(): Promise<Array<[string, DesignMapping]>>;
+    getAllOrders(): Promise<Array<Order>>;
     getDesignImage(designCode: string): Promise<ExternalBlob | null>;
     getDesignMapping(designCode: string): Promise<DesignMapping>;
     getKarigars(): Promise<Array<Karigar>>;
     getMasterDesignExcel(): Promise<ExternalBlob | null>;
     getMasterDesignKarigars(): Promise<Array<string>>;
-    getOrders(statusFilter: OrderStatus | null, typeFilter: OrderType | null, searchText: string | null): Promise<Array<Order>>;
+    getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
+    getReadyOrders(): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;

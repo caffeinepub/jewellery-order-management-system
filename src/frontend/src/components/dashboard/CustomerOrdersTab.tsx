@@ -1,15 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrders } from "@/hooks/useQueries";
-import { OrderType, OrderStatus, Order } from "@/backend";
+import { OrderType, OrderStatus } from "@/backend";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
-interface CustomerOrdersTabProps {
-  onFilteredOrdersChange: (orders: Order[], isLoading: boolean) => void;
-}
-
-export default function CustomerOrdersTab({ onFilteredOrdersChange }: CustomerOrdersTabProps) {
+export default function CustomerOrdersTab() {
   const [searchText, setSearchText] = useState("");
   const { data: orders = [], isLoading } = useGetOrders();
 
@@ -29,11 +25,6 @@ export default function CustomerOrdersTab({ onFilteredOrdersChange }: CustomerOr
 
     return result;
   }, [orders, searchText]);
-
-  // Notify parent of filtered orders changes
-  useEffect(() => {
-    onFilteredOrdersChange(filteredOrders, isLoading);
-  }, [filteredOrders, isLoading, onFilteredOrdersChange]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;

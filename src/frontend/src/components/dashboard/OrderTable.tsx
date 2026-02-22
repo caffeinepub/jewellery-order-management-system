@@ -49,6 +49,7 @@ export default function OrderTable({
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const updateStatusMutation = useUpdateOrdersStatusToReady();
   const { actor } = useActor();
 
@@ -116,6 +117,7 @@ export default function OrderTable({
       return;
     }
 
+    setIsExporting(true);
     try {
       if (format === "excel") {
         exportToExcel(orders);
@@ -124,12 +126,14 @@ export default function OrderTable({
         await exportToPDF(orders, actor);
         toast.success(`Exported to ${format.toUpperCase()}`);
       } else if (format === "jpeg") {
-        await exportToJPEG(orders);
+        await exportToJPEG(orders, actor);
         toast.success(`Exported to ${format.toUpperCase()}`);
       }
     } catch (error) {
       toast.error(`Failed to export to ${format.toUpperCase()}`);
       console.error(error);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -157,9 +161,9 @@ export default function OrderTable({
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled={isExporting}>
               <Download className="mr-2 h-4 w-4" />
-              Export
+              {isExporting ? "Exporting..." : "Export"}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -222,17 +226,11 @@ export default function OrderTable({
                   )}
                   {designOrders.map((order) => {
                     const isSelected = selectedRows.has(order.orderId);
-                    const isUnmapped = !order.genericName || !order.karigarName;
-                    
                     return (
                       <TableRow
                         key={order.orderId}
-                        className={`${
-                          isSelected ? "bg-blue-50 dark:bg-blue-950/20" : ""
-                        } ${
-                          isUnmapped ? "bg-amber-50/50 dark:bg-amber-950/10" : ""
-                        } ${
-                          enableBulkActions ? "cursor-pointer" : ""
+                        className={`cursor-pointer hover:bg-muted/50 ${
+                          isSelected ? "bg-muted" : ""
                         }`}
                         onClick={() => handleRowClick(order.orderId)}
                       >
@@ -241,34 +239,50 @@ export default function OrderTable({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => handleRowClick(order.orderId)}
-                              aria-label={`Select order ${order.orderNo}`}
+                              aria-label={`Select order ${order.orderId}`}
                             />
                           </TableCell>
                         )}
-                        <TableCell>
-                          {order.genericName || (
-                            <span className="text-muted-foreground italic text-sm"></span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {order.karigarName || (
-                            <span className="text-muted-foreground italic text-sm"></span>
-                          )}
-                        </TableCell>
+                        <TableCell>{order.genericName || "-"}</TableCell>
+                        <TableCell>{order.karigarName || "-"}</TableCell>
                         <TableCell>
                           <button
                             onClick={(e) => handleDesignClick(order.design, e)}
-                            className="text-primary hover:underline font-medium"
+                            className="text-primary hover:underline"
                           >
                             {order.design}
                           </button>
                         </TableCell>
-                        <TableCell>{order.weight}</TableCell>
-                        <TableCell>{order.size}</TableCell>
+                        <TableCell>{order.weight.toFixed(3)}</TableCell>
+                        <TableCell>{order.size.toFixed(2)}</TableCell>
                         <TableCell>{Number(order.quantity)}</TableCell>
-                        <TableCell>{order.remarks}</TableCell>
-                        <TableCell>{order.status}</TableCell>
-                        <TableCell>{order.orderType}</TableCell>
+                        <TableCell>{order.remarks || "-"}</TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                              order.status === OrderStatus.Ready
+                                ? "bg-green-100 text-green-700"
+                                : order.status === OrderStatus.Pending
+                                ? "bg-yellow-100 text-yellow-700"
+                                : order.status === OrderStatus.Hallmark
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-purple-100 text-purple-700"
+                            }`}
+                          >
+                            {order.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                              order.orderType === OrderType.CO
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-orange-100 text-orange-700"
+                            }`}
+                          >
+                            {order.orderType}
+                          </span>
+                        </TableCell>
                         <TableCell>{order.orderNo}</TableCell>
                         <TableCell>{order.product}</TableCell>
                       </TableRow>
@@ -295,7 +309,6 @@ export default function OrderTable({
             <AlertDialogTitle>Confirm Status Update</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to mark {selectedRows.size} order(s) as Ready?
-              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

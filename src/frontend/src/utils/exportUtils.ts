@@ -197,7 +197,8 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
   return blobUrl;
 }
 
-export async function exportToJPEG(orders: Order[]) {
+export async function exportToJPEG(orders: Order[], actor?: any) {
+  // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
       acc[order.design] = [];
@@ -205,6 +206,20 @@ export async function exportToJPEG(orders: Order[]) {
     acc[order.design].push(order);
     return acc;
   }, {} as Record<string, Order[]>);
+
+  // Sort design codes numerically (lower to higher)
+  const sortedDesignCodes = Object.keys(groupedOrders).sort((a, b) => {
+    return extractNumericPortion(a) - extractNumericPortion(b);
+  });
+
+  // Fetch all design images in parallel
+  const imagePromises = sortedDesignCodes.map(async (designCode) => {
+    const base64Image = actor ? await fetchDesignImageAsBase64(designCode, actor) : null;
+    return { designCode, base64Image };
+  });
+
+  const imageResults = await Promise.all(imagePromises);
+  const imageMap = new Map(imageResults.map(r => [r.designCode, r.base64Image]));
 
   let html = `
     <!DOCTYPE html>
@@ -216,8 +231,19 @@ export async function exportToJPEG(orders: Order[]) {
         h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .design-header { font-weight: bold; font-size: 14px; margin: 20px 0 10px 0; }
+        th { background-color: #4CAF50; color: white; font-weight: bold; }
+        .design-header { 
+          background-color: #4CAF50; 
+          color: white; 
+          font-weight: bold; 
+          font-size: 16px; 
+          padding: 12px; 
+          margin: 20px 0 10px 0; 
+          border-radius: 4px;
+        }
+        .image-container { text-align: center; margin: 15px 0; }
+        .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
+        .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
       </style>
     </head>
     <body>
@@ -225,8 +251,20 @@ export async function exportToJPEG(orders: Order[]) {
       <h2>Orders - ${new Date().toLocaleDateString()}</h2>
   `;
 
-  for (const [design, designOrders] of Object.entries(groupedOrders)) {
-    html += `<div class="design-header">Design: ${design}</div>`;
+  for (const designCode of sortedDesignCodes) {
+    const designOrders = groupedOrders[designCode];
+    const base64Image = imageMap.get(designCode);
+
+    html += `<div class="design-header">Design: ${designCode}</div>`;
+    
+    html += `<div class="image-container">`;
+    if (base64Image) {
+      html += `<img src="${base64Image}" alt="Design ${designCode}" />`;
+    } else {
+      html += `<div class="image-placeholder">Image Not Available</div>`;
+    }
+    html += `</div>`;
+
     html += `<table>
       <thead>
         <tr>

@@ -14,7 +14,11 @@ export function useGetOrders(
     queryKey: ["orders", statusFilter, typeFilter, searchText],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getOrders(statusFilter || null, typeFilter || null, searchText || null);
+      const pendingOrders = await actor.getOrders(statusFilter || null, typeFilter || null, searchText || null);
+      const readyOrders = await actor.getReadyOrders();
+      
+      // Combine both order sources
+      return [...pendingOrders, ...readyOrders];
     },
     enabled: !!actor && !isFetching,
   });
@@ -39,7 +43,9 @@ export function useGetHallmarkOrders() {
     queryKey: ["orders", "hallmark-related"],
     queryFn: async () => {
       if (!actor) return [];
-      const allOrders = await actor.getOrders(null, null, null);
+      const pendingOrders = await actor.getOrders(null, null, null);
+      const readyOrders = await actor.getReadyOrders();
+      const allOrders = [...pendingOrders, ...readyOrders];
       return allOrders.filter(
         (order) =>
           order.status === OrderStatus.Hallmark ||
@@ -57,7 +63,9 @@ export function useGetOrdersByKarigar(karigarName: string) {
     queryKey: ["orders", "karigar", karigarName],
     queryFn: async () => {
       if (!actor) return [];
-      const allOrders = await actor.getOrders(null, null, null);
+      const pendingOrders = await actor.getOrders(null, null, null);
+      const readyOrders = await actor.getReadyOrders();
+      const allOrders = [...pendingOrders, ...readyOrders];
       return allOrders.filter((order) => order.karigarName === karigarName);
     },
     enabled: !!actor && !isFetching,
@@ -173,7 +181,9 @@ export function useGetDesignMappings() {
     queryKey: ["designMappings"],
     queryFn: async () => {
       if (!actor) return [];
-      const orders = await actor.getOrders(null, null, null);
+      const pendingOrders = await actor.getOrders(null, null, null);
+      const readyOrders = await actor.getReadyOrders();
+      const orders = [...pendingOrders, ...readyOrders];
       const mappings = new Map<string, { designCode: string; genericName: string; karigarName: string }>();
       
       orders.forEach((order) => {
@@ -396,7 +406,9 @@ export function useGetUnmappedOrders() {
     queryKey: ["unmappedOrders"],
     queryFn: async () => {
       if (!actor) return [];
-      const orders = await actor.getOrders(null, null, null);
+      const pendingOrders = await actor.getOrders(null, null, null);
+      const readyOrders = await actor.getReadyOrders();
+      const orders = [...pendingOrders, ...readyOrders];
       const unmappedOrders = orders.filter(
         (order) => !order.genericName || !order.karigarName
       );
@@ -467,7 +479,9 @@ export function useGetDesignImage(designCode: string) {
       if (!blob) return null;
 
       // Get design mapping for additional details
-      const orders = await actor.getOrders(null, null, null);
+      const pendingOrders = await actor.getOrders(null, null, null);
+      const readyOrders = await actor.getReadyOrders();
+      const orders = [...pendingOrders, ...readyOrders];
       const order = orders.find((o) => o.design === designCode);
 
       return {

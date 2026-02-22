@@ -95,6 +95,7 @@ export interface _SERVICE {
     [],
     Array<[string, DesignMapping]>
   >,
+  'getAllOrders' : ActorMethod<[], Array<Order>>,
   'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
   'getDesignMapping' : ActorMethod<[string], DesignMapping>,
   'getKarigars' : ActorMethod<[], Array<Karigar>>,
@@ -105,6 +106,7 @@ export interface _SERVICE {
     Array<Order>
   >,
   'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
+  'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'reassignDesign' : ActorMethod<[string, string], undefined>,
