@@ -1,17 +1,17 @@
-import { RouterProvider, createRouter, createRoute, createRootRoute, Outlet } from '@tanstack/react-router';
+import { RouterProvider, createRouter, createRoute, createRootRoute } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import AppSidebar from '@/components/layout/AppSidebar';
-import Dashboard from '@/pages/Dashboard';
 import IngestOrders from '@/pages/IngestOrders';
-import UnmappedCodes from '@/pages/UnmappedCodes';
+import Dashboard from '@/pages/Dashboard';
 import MasterDesigns from '@/pages/MasterDesigns';
 import DesignImages from '@/pages/DesignImages';
 import TagPrinting from '@/pages/TagPrinting';
 import BarcodeScanning from '@/pages/BarcodeScanning';
+import UnmappedCodes from '@/pages/UnmappedCodes';
 import KarigarDetail from '@/pages/KarigarDetail';
+import { AppSidebar } from '@/components/layout/AppSidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,18 +22,13 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootLayout() {
+function Layout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full overflow-x-hidden">
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 lg:hidden">
-            <SidebarTrigger />
-          </header>
-          <main className="flex-1">
-            <Outlet />
-          </main>
+        <SidebarInset className="flex-1 overflow-auto">
+          <div id="router-outlet" />
         </SidebarInset>
       </div>
     </SidebarProvider>
@@ -41,10 +36,10 @@ function RootLayout() {
 }
 
 const rootRoute = createRootRoute({
-  component: RootLayout,
+  component: Layout,
 });
 
-const dashboardRoute = createRoute({
+const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: Dashboard,
@@ -93,7 +88,7 @@ const karigarDetailRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([
-  dashboardRoute,
+  indexRoute,
   ingestOrdersRoute,
   unmappedCodesRoute,
   masterDesignsRoute,
@@ -113,7 +108,7 @@ declare module '@tanstack/react-router' {
 
 export default function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         <Toaster />

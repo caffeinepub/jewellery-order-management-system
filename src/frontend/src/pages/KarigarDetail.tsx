@@ -1,96 +1,97 @@
-import { useParams, useNavigate } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download } from "lucide-react";
-import { useGetOrdersByKarigar } from "@/hooks/useQueries";
-import { useActor } from "@/hooks/useActor";
-import OrderTable from "@/components/dashboard/OrderTable";
-import { exportKarigarToPDF } from "@/utils/exportUtils";
-import { toast } from "sonner";
-import { OrderStatus } from "@/backend";
-import { useState } from "react";
+import { useParams, useNavigate } from '@tanstack/react-router';
+import { useGetOrders } from '@/hooks/useQueries';
+import { OrderTable } from '@/components/dashboard/OrderTable';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Download } from 'lucide-react';
+import { OrderStatus } from '@/backend';
+import { exportKarigarToPDF } from '@/utils/exportUtils';
+import { useActor } from '@/hooks/useActor';
+import { toast } from 'sonner';
 
 export default function KarigarDetail() {
-  const { name } = useParams({ from: "/karigar/$name" });
+  const { name } = useParams({ from: '/karigar/$name' });
   const navigate = useNavigate();
-  const { data: orders = [], isLoading } = useGetOrdersByKarigar(name);
+  const { data: orders = [] } = useGetOrders();
   const { actor } = useActor();
-  const [isExporting, setIsExporting] = useState(false);
 
-  const pendingOrders = orders.filter((o) => o.status === OrderStatus.Pending);
-  const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weight, 0);
-  const totalQuantity = pendingOrders.reduce(
-    (sum, o) => sum + Number(o.quantity),
-    0
+  const karigarOrders = orders.filter(
+    (order) =>
+      order.karigarName === name &&
+      (order.status === OrderStatus.Pending || order.status === OrderStatus.ReturnFromHallmark)
   );
 
   const handleExportPDF = async () => {
-    setIsExporting(true);
+    if (!actor) return;
+    
     try {
-      await exportKarigarToPDF(pendingOrders, name, actor);
-      toast.success("PDF opened successfully");
+      const getDesignImage = async (designCode: string): Promise<string | null> => {
+        try {
+          const blob = await actor.getDesignImage(designCode);
+          if (blob) {
+            return blob.getDirectURL();
+          }
+        } catch (error) {
+          console.error(`Failed to get image for ${designCode}:`, error);
+        }
+        return null;
+      };
+
+      await exportKarigarToPDF(name, karigarOrders, getDesignImage);
+      toast.success('PDF exported successfully');
     } catch (error) {
-      toast.error("Failed to export PDF");
-      console.error(error);
-    } finally {
-      setIsExporting(false);
+      console.error('Export failed:', error);
+      toast.error('Failed to export PDF');
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
-  }
+  const totalQuantity = karigarOrders.reduce((sum, order) => sum + Number(order.quantity), 0);
+  const uniqueDesigns = new Set(karigarOrders.map((o) => o.design)).size;
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-6">
+      <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: "/" })}
-          >
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="sm" onClick={() => navigate({ to: '/' })}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{name}</h1>
-            <p className="text-muted-foreground">Karigar Details</p>
-          </div>
+          <h1 className="text-3xl font-bold">{name}</h1>
         </div>
-        <Button onClick={handleExportPDF} variant="outline" disabled={isExporting}>
-          <Download className="mr-2 h-4 w-4" />
-          {isExporting ? "Exporting..." : "Export PDF"}
+        <Button onClick={handleExportPDF} disabled={karigarOrders.length === 0}>
+          <Download className="h-4 w-4 mr-2" />
+          Export PDF
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Pending Orders
-          </div>
-          <div className="text-2xl font-bold">{pendingOrders.length}</div>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Total Weight
-          </div>
-          <div className="text-2xl font-bold">{totalWeight.toFixed(3)} g</div>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Total Quantity
-          </div>
-          <div className="text-2xl font-bold">{totalQuantity}</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{karigarOrders.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{totalQuantity}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Unique Designs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{uniqueDesigns}</p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Orders</h2>
-        <OrderTable orders={pendingOrders} enableBulkActions={true} />
-      </div>
+      <OrderTable orders={karigarOrders} showStatusActions={true} showExport={false} />
     </div>
   );
 }

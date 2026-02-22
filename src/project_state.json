@@ -1,44 +1,99 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
+  "summary": "Production management app with order ingestion, master design management, and dashboard with multiple tabs",
+  "architectural_notes": [
+    "App has multiple tabs in dashboard for viewing orders",
+    "Master Design page contains Karigar list for dropdown selection",
+    "Design column in rows triggers image popup instead of row selection",
+    "Excel upload functionality for order ingestion and master data"
+  ],
   "known_issues": [
-    "Row selection includes design code clicks when it should not",
-    "Design mapping save fails; missing validation and update logic",
-    "PDF export broken on iPhone in Karigar page"
+    "Row selection not working across tabs (design column excluded)",
+    "Sidebar not visible at 100% zoom on iPhone and overlaps content at 50% zoom",
+    "Ingest orders failing after excel upload",
+    "Upload and save operations are slow",
+    "JPEG/PDF export not working on iPhone browser"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-modify-ordertable-row-click-behavior-clicking-anywhere-on-a-row-must-select-the-row-and-highlight-it-with-multi-select-support-except-when-clicking-on-the-design-code-text-when-the-design-code-text-is-clicked-it-must-open-the-design-image-preview-modal-without-selecting-the-row-or-toggling-the-checkbox",
-      "title": "Modify OrderTable row click behavior: clicking anywhere on a row must select the row and highlight it with multi-select support, except when clicking on the Design Code text. When the Design Code text is clicked, it must open the Design Image Preview modal without selecting the row or toggling the checkbox.",
+      "id": "feature-fix-row-selection-highlighting-across-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars-clicking-anywhere-on-a-row-except-the-design-column-should-select-highlight-the-row-clicking-on-the-design-column-should-continue-to-show-the-design-image-popup-without-selecting-the-row",
+      "title": "Fix row selection highlighting across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars). Clicking anywhere on a row except the design column should select/highlight the row. Clicking on the design column should continue to show the design image popup without selecting the row.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-remove-the-eye-icon-button-from-the-right-corner-of-each-row-in-ordertable-image-preview-must-only-be-triggered-by-clicking-on-the-design-code-text",
-      "title": "Remove the eye icon button from the right corner of each row in OrderTable. Image preview must only be triggered by clicking on the Design Code text.",
+      "id": "feature-fix-sidebar-display-on-iphone-browser-at-100-zoom-level-so-the-entire-sidebar-is-visible-prevent-sidebar-from-overlapping-page-content-at-50-zoom-level-on-both-iphone-browser-and-desktop-web-browsers",
+      "title": "Fix sidebar display on iPhone browser at 100% zoom level so the entire sidebar is visible. Prevent sidebar from overlapping page content at 50% zoom level on both iPhone browser and desktop web browsers.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-failed-to-update-design-mapping-error-in-editdesignmodal-when-save-is-clicked-step-1-validate-that-karigar-selected-is-not-empty-step-2-update-the-master-mapping-table-with-the-new-karigar-assignment-step-3-update-only-pending-orders-with-this-design-code-to-reflect-the-new-karigar-do-not-update-orders-with-status-ready-or-hallmark",
-      "title": "Fix the 'Failed to update design mapping' error in EditDesignModal. When Save is clicked: Step 1 - Validate that Karigar selected is not empty. Step 2 - Update the Master Mapping Table with the new karigar assignment. Step 3 - Update only Pending orders with this design code to reflect the new karigar. Do NOT update orders with status 'Ready' or 'Hallmark'.",
+      "id": "feature-fix-the-failed-to-ingest-orders-error-that-occurs-after-uploading-an-excel-file-on-the-ingest-orders-page-ensure-the-upload-and-save-operations-complete-successfully",
+      "title": "Fix the 'failed to ingest orders' error that occurs after uploading an Excel file on the Ingest Orders page. Ensure the upload and save operations complete successfully.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-pdf-export-in-karigardetail-page-so-that-exported-pdfs-open-correctly-on-iphone-mobile-browsers-instead-of-failing-to-download-or-open",
-      "title": "Fix PDF export in KarigarDetail page so that exported PDFs open correctly on iPhone mobile browsers instead of failing to download or open.",
+      "id": "feature-optimize-the-speed-of-excel-file-upload-and-order-saving-operations-on-the-ingest-orders-page-reduce-processing-time-and-improve-responsiveness",
+      "title": "Optimize the speed of Excel file upload and order saving operations on the Ingest Orders page. Reduce processing time and improve responsiveness.",
       "reqIds": [
         "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-on-the-master-designs-page-display-uploaded-design-mappings-in-a-table-underneath-the-upload-area-enable-inline-editing-of-the-design-code-column-for-each-row",
+      "title": "On the Master Designs page, display uploaded design mappings in a table underneath the upload area. Enable inline editing of the design code column for each row.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-karigar-dropdown-in-the-master-designs-editing-interface-that-shows-the-list-of-karigars-extracted-from-the-master-design-excel-file-allow-selection-from-this-dropdown-when-editing-design-mappings",
+      "title": "Add a Karigar dropdown in the Master Designs editing interface that shows the list of karigars extracted from the Master Design Excel file. Allow selection from this dropdown when editing design mappings.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-cascading-updates-so-that-when-a-design-code-is-modified-in-the-master-designs-page-all-pending-orders-with-that-design-code-are-automatically-updated-with-the-new-mapping-generic-name-and-karigar-assignment",
+      "title": "Implement cascading updates so that when a design code is modified in the Master Designs page, all pending orders with that design code are automatically updated with the new mapping (generic name and karigar assignment).",
+      "reqIds": [
+        "REQ-7"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-all-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars-display-the-correct-and-up-to-date-design-mappings-after-design-codes-are-modified-in-the-master-designs-page",
+      "title": "Ensure all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) display the correct and up-to-date design mappings after design codes are modified in the Master Designs page.",
+      "reqIds": [
+        "REQ-8"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-jpeg-export-functionality-to-work-correctly-on-iphone-browsers-ensure-exported-jpeg-files-download-successfully-and-contain-the-expected-order-data",
+      "title": "Fix JPEG export functionality to work correctly on iPhone browsers. Ensure exported JPEG files download successfully and contain the expected order data.",
+      "reqIds": [
+        "REQ-9"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-pdf-export-functionality-to-work-correctly-on-iphone-browsers-ensure-exported-pdf-files-download-successfully-and-contain-the-expected-order-data-with-proper-formatting",
+      "title": "Fix PDF export functionality to work correctly on iPhone browsers. Ensure exported PDF files download successfully and contain the expected order data with proper formatting.",
+      "reqIds": [
+        "REQ-10"
       ],
       "version": 1
     }
@@ -46,24 +101,52 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix row click selection to allow multi-select but exclude design code clicks; remove eye icon",
+      "summary": "Fix row selection highlighting across all tabs (excluding design column which shows popup)",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Fix 'Failed to update design mapping' error with proper validation and update logic (Pending orders only)",
+      "summary": "Fix sidebar display on iPhone at 100% zoom and prevent overlap at 50% zoom",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-3",
-      "summary": "Fix PDF export not opening/downloading correctly on iPhone in Karigar page",
+      "summary": "Fix ingest orders failure and optimize upload/save speed",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Enable editing/modifying design code in master excel page with Karigar dropdown from Master Design list",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Implement cascading updates to all pending orders when design code is modified",
+      "reqIds": [
+        "AR-4"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Ensure all dashboard tabs display correct mappings after design code updates",
+      "reqIds": [
+        "AR-5"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Fix JPEG and PDF export functionality on iPhone browser",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Fix row selection behavior, design mapping save error, and mobile PDF export",
+  "projectName": "Fix row selection, sidebar display, ingest errors, design editing, and export functionality",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

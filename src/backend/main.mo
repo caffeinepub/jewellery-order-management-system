@@ -1,25 +1,25 @@
-import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
-import Array "mo:core/Array";
 import Time "mo:core/Time";
+import Map "mo:core/Map";
+import Array "mo:core/Array";
 import Principal "mo:core/Principal";
+import List "mo:core/List";
+import Iter "mo:core/Iter";
+
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Iter "mo:core/Iter";
-import List "mo:core/List";
 
+import Migration "migration";
 
-
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
-  // Order Type
   type OrderType = {
-    #CO; // Customer Order
-    #RB; // Ready Batch
+    #CO;
+    #RB;
   };
 
-  // Order Status
   type OrderStatus = {
     #Pending;
     #Ready;
@@ -36,6 +36,7 @@ actor {
     size : Float;
     quantity : Nat;
     remarks : Text;
+    suppliedQty : Nat;
     genericName : ?Text;
     karigarName : ?Text;
     status : OrderStatus;
@@ -53,6 +54,7 @@ actor {
     size : Float;
     quantity : Nat;
     remarks : Text;
+    suppliedQty : Nat;
     status : OrderStatus;
     orderId : Text;
     createdAt : Time.Time;
@@ -84,8 +86,9 @@ actor {
   let orders = Map.empty<Text, PersistentOrder>();
   let designMappings = Map.empty<Text, DesignMapping>();
   let designImages = Map.empty<Text, Storage.ExternalBlob>();
+  let masterDesignMappings = Map.empty<Text, DesignMapping>();
   let karigars = Map.empty<Text, Karigar>();
-  let masterDesignMapping = Map.empty<Text, (Text, Text)>();
+  let masterDesignKarigars = Map.empty<Text, Nat>();
 
   var masterDesignExcel : ?Storage.ExternalBlob = null;
   var activeKarigar : ?Text = null;
@@ -112,6 +115,7 @@ actor {
       quantity;
       remarks;
       status = #Pending;
+      suppliedQty = 0;
       orderId;
       createdAt = timestamp;
       updatedAt = timestamp;
@@ -134,6 +138,16 @@ actor {
 
   public query ({ caller }) func getKarigars() : async [Karigar] {
     karigars.values().toArray();
+  };
+
+  public query ({ caller }) func getUniqueKarigarsFromDesignMappings() : async [Text] {
+    designMappings.values().toArray().map(
+      func(mapping) { mapping.karigarName }
+    );
+  };
+
+  public query ({ caller }) func getMasterDesignKarigars() : async [Text] {
+    masterDesignKarigars.keys().toArray();
   };
 
   public shared ({ caller }) func saveDesignMapping(
@@ -210,6 +224,32 @@ actor {
           updatedAt = Time.now();
         };
         designMappings.add(designCode, updatedMapping);
+
+        let design = designCode;
+
+        let pendingOrderIds = orders.toArray().filter(
+          func((_, order)) {
+            order.design == design and order.status == #Pending;
+          }
+        ).map(func((orderId, _)) { orderId });
+
+        for (orderId in pendingOrderIds.values()) {
+          switch (orders.get(orderId)) {
+            case (null) { Runtime.trap("Order with id " # orderId # " already removed") };
+            case (?order) {
+              if (order.status == #Pending) {
+                let updatedOrder : PersistentOrder = {
+                  order with
+                  status = #Pending;
+                  updatedAt = Time.now();
+                };
+                orders.add(orderId, updatedOrder);
+              } else {
+                Runtime.trap("Unexpected status for pending order with id: " # orderId);
+              };
+            };
+          };
+        };
       };
     };
   };
@@ -224,6 +264,7 @@ actor {
         let mapping = designMappings.get(o.design);
         {
           o with
+          remarks = o.remarks;
           genericName = mapping.map(func(m) { m.genericName });
           karigarName = mapping.map(func(m) { m.karigarName });
         };
@@ -286,9 +327,19 @@ actor {
   };
 
   public shared ({ caller }) func uploadDesignMapping(mappingData : [MappingRecord]) : async () {
-    masterDesignMapping.clear();
+    masterDesignMappings.clear();
     for (record in mappingData.values()) {
-      masterDesignMapping.add(record.designCode, (record.genericName, record.karigarName));
+      let timestamp = Time.now();
+      let newMapping : DesignMapping = {
+        designCode = record.designCode;
+        genericName = record.genericName;
+        karigarName = record.karigarName;
+        createdBy = caller;
+        updatedBy = null;
+        createdAt = timestamp;
+        updatedAt = timestamp;
+      };
+      masterDesignMappings.add(record.designCode, newMapping);
     };
   };
 
@@ -312,5 +363,62 @@ actor {
       };
     };
   };
-};
 
+  public shared ({ caller }) func updateOrderStatusToReadyWithQty(orderId : Text, suppliedQty : Nat) : async () {
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order with id " # orderId # " not found") };
+      case (?order) {
+        if (suppliedQty > order.quantity) {
+          Runtime.trap("Supplied quantity cannot be greater than order quantity");
+        };
+
+        switch (order.status) {
+          case (#Pending) {
+            let updatedOrder = {
+              order with
+              status = #Ready;
+              suppliedQty;
+              updatedAt = Time.now();
+            };
+            orders.add(orderId, updatedOrder);
+          };
+          case (_) {};
+        };
+      };
+    };
+  };
+
+  public query ({ caller }) func getAllMasterDesignMappings() : async [(Text, DesignMapping)] {
+    masterDesignMappings.toArray();
+  };
+
+  public shared ({ caller }) func updateMasterDesignKarigars(karigars : [Text]) : async () {
+    masterDesignKarigars.clear();
+    for (karigar in karigars.values()) {
+      masterDesignKarigars.add(karigar, 1);
+    };
+  };
+
+  public query ({ caller }) func getOrdersWithMappings() : async [Order] {
+    let persistentOrders = orders.values().toArray();
+    persistentOrders.map(
+      func(persistentOrder) {
+        {
+          persistentOrder with
+          remarks = persistentOrder.remarks;
+          genericName = designMappings.get(persistentOrder.design).map(func(mapping) { mapping.genericName });
+          karigarName = designMappings.get(persistentOrder.design).map(func(mapping) { mapping.karigarName });
+        };
+      }
+    );
+  };
+
+  //----------------------------------------------------------------------------------------------------------------------
+  // New functions added by refactoring
+  //----------------------------------------------------------------------------------------------------------------------
+
+  // Update this with proper filtering.
+  public query ({ caller }) func getPendingOrders() : async [PersistentOrder] {
+    orders.values().toArray().filter(func((o)) { o.status == #Pending });
+  };
+};

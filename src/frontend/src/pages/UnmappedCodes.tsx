@@ -30,11 +30,19 @@ export default function UnmappedCodes() {
         genericName: order.genericName || '',
         karigarName: order.karigarName || '',
         count: 0,
+        missingFields: [] as string[],
       };
     }
     acc[order.design].count++;
+    
+    // Track which fields are missing
+    const missing: string[] = [];
+    if (!order.genericName) missing.push('Generic Name');
+    if (!order.karigarName) missing.push('Karigar Name');
+    acc[order.design].missingFields = missing;
+    
     return acc;
-  }, {} as Record<string, { designCode: string; genericName: string; karigarName: string; count: number }>);
+  }, {} as Record<string, { designCode: string; genericName: string; karigarName: string; count: number; missingFields: string[] }>);
 
   const handleEdit = (designCode: string, genericName: string, karigarName: string) => {
     setEditingRow(designCode);
@@ -42,11 +50,16 @@ export default function UnmappedCodes() {
   };
 
   const handleSave = async (designCode: string) => {
+    if (!editValues.genericName.trim() || !editValues.karigarName.trim()) {
+      toast.error('Both Generic Name and Karigar Name are required');
+      return;
+    }
+
     try {
       await updateMutation.mutateAsync({
         designCode,
-        genericName: editValues.genericName,
-        karigarName: editValues.karigarName,
+        genericName: editValues.genericName.trim(),
+        karigarName: editValues.karigarName.trim(),
       });
       toast.success('Mapping updated successfully');
       setEditingRow(null);
@@ -74,7 +87,7 @@ export default function UnmappedCodes() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Unmapped Design Codes</h1>
         <p className="text-muted-foreground">
-          Design codes that are missing generic name or karigar assignment
+          Design codes from orders that are missing generic name or karigar assignment
         </p>
       </div>
 
@@ -85,20 +98,21 @@ export default function UnmappedCodes() {
               <TableHead>Design Code</TableHead>
               <TableHead>Generic Name</TableHead>
               <TableHead>Karigar Name</TableHead>
+              <TableHead>Missing Fields</TableHead>
               <TableHead>Order Count</TableHead>
-              <TableHead className="w-24">Actions</TableHead>
+              <TableHead className="w-32">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {Object.values(groupedOrders).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   All design codes are mapped!
                 </TableCell>
               </TableRow>
             ) : (
               Object.values(groupedOrders).map((group) => (
-                <TableRow key={group.designCode}>
+                <TableRow key={group.designCode} className="bg-amber-50/50 dark:bg-amber-950/10">
                   <TableCell className="font-medium">{group.designCode}</TableCell>
                   <TableCell>
                     {editingRow === group.designCode ? (
@@ -108,9 +122,10 @@ export default function UnmappedCodes() {
                           setEditValues({ ...editValues, genericName: e.target.value })
                         }
                         placeholder="Enter generic name"
+                        className="h-8"
                       />
                     ) : (
-                      group.genericName || <span className="text-muted-foreground">-</span>
+                      group.genericName || <span className="text-muted-foreground italic text-sm"></span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -121,10 +136,16 @@ export default function UnmappedCodes() {
                           setEditValues({ ...editValues, karigarName: e.target.value })
                         }
                         placeholder="Enter karigar name"
+                        className="h-8"
                       />
                     ) : (
-                      group.karigarName || <span className="text-muted-foreground">-</span>
+                      group.karigarName || <span className="text-muted-foreground italic text-sm"></span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-amber-700 dark:text-amber-400 text-sm">
+                      {group.missingFields.join(', ')}
+                    </span>
                   </TableCell>
                   <TableCell>{group.count}</TableCell>
                   <TableCell>
@@ -135,6 +156,7 @@ export default function UnmappedCodes() {
                           variant="ghost"
                           onClick={() => handleSave(group.designCode)}
                           disabled={updateMutation.isPending}
+                          className="h-8 w-8"
                         >
                           <Check className="h-4 w-4" />
                         </Button>
@@ -143,6 +165,7 @@ export default function UnmappedCodes() {
                           variant="ghost"
                           onClick={handleCancel}
                           disabled={updateMutation.isPending}
+                          className="h-8 w-8"
                         >
                           <X className="h-4 w-4" />
                         </Button>

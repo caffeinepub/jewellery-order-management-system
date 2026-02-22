@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Order } from '@/backend';
+import { Order } from '../../backend';
 import {
   Dialog,
   DialogContent,
@@ -7,70 +7,62 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+} from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 interface SuppliedQtyDialogProps {
   order: Order;
-  onClose: () => void;
-  onConfirm: (suppliedQty: number) => void;
+  onSubmit: (suppliedQty: number) => void;
+  onCancel: () => void;
 }
 
-export default function SuppliedQtyDialog({ order, onClose, onConfirm }: SuppliedQtyDialogProps) {
-  const [suppliedQty, setSuppliedQty] = useState('');
-  const [error, setError] = useState('');
+export function SuppliedQtyDialog({ order, onSubmit, onCancel }: SuppliedQtyDialogProps) {
+  const [suppliedQty, setSuppliedQty] = useState<string>('');
+  const [error, setError] = useState<string>('');
 
-  const handleConfirm = () => {
-    const qty = Number(suppliedQty);
-    const orderQty = Number(order.quantity);
+  const totalQty = Number(order.quantity);
 
-    if (!suppliedQty || isNaN(qty)) {
+  const handleSubmit = () => {
+    const qty = parseInt(suppliedQty, 10);
+
+    if (isNaN(qty) || qty <= 0) {
       setError('Please enter a valid quantity');
       return;
     }
 
-    if (qty <= 0) {
-      setError('Quantity must be greater than 0');
+    if (qty > totalQty) {
+      setError(`Supplied quantity cannot exceed total order quantity (${totalQty})`);
       return;
     }
 
-    if (qty > orderQty) {
-      setError(`Supplied quantity cannot exceed order quantity (${orderQty})`);
-      return;
-    }
-
-    onConfirm(qty);
-    toast.success('Status updated successfully');
+    onSubmit(qty);
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={true} onOpenChange={onCancel}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Enter Supplied Quantity</DialogTitle>
+          <DialogTitle>Enter Supplied Qty</DialogTitle>
           <DialogDescription>
-            This is an RB order. Please enter the supplied quantity before marking as Ready.
+            Order: {order.orderNo} | Design: {order.design}
           </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>Order Details</Label>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <div>Order No: {order.orderNo}</div>
-              <div>Design: {order.design}</div>
-              <div>Total Quantity: {Number(order.quantity)}</div>
-            </div>
+            <Label htmlFor="totalQty">Total Order Quantity</Label>
+            <Input id="totalQty" value={totalQty} disabled />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="supplied-qty">Supplied Quantity</Label>
+            <Label htmlFor="suppliedQty">Supplied Quantity *</Label>
             <Input
-              id="supplied-qty"
+              id="suppliedQty"
               type="number"
               min="1"
-              max={Number(order.quantity)}
+              max={totalQty}
               value={suppliedQty}
               onChange={(e) => {
                 setSuppliedQty(e.target.value);
@@ -81,11 +73,12 @@ export default function SuppliedQtyDialog({ order, onClose, onConfirm }: Supplie
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm}>Confirm</Button>
+          <Button onClick={handleSubmit}>Submit</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,99 +1,211 @@
 {
   "kind": "build_request",
-  "title": "Fix row selection behavior, design mapping save error, and mobile PDF export",
+  "title": "Fix row selection, sidebar display, ingest errors, design editing, and export functionality",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Modify OrderTable row click behavior: clicking anywhere on a row must select the row and highlight it with multi-select support, except when clicking on the Design Code text. When the Design Code text is clicked, it must open the Design Image Preview modal without selecting the row or toggling the checkbox.",
+      "text": "Fix row selection highlighting across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars). Clicking anywhere on a row except the design column should select/highlight the row. Clicking on the design column should continue to show the design image popup without selecting the row.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-user-final"
         ],
         "quotes": [
-          "Clicking anywhere on row → selects row",
-          "Clicking on Design Code text must: ❌ NOT select the row ❌ NOT toggle checkbox ✅ Open Design Image Preview"
+          "Selection of rows across the tabs is not happening. The selection can be done by clicking anywhere on the row expect design. Clicking on design shows the design image in pop up screen. The row selection across the tabs should be highlighted"
         ]
       },
       "acceptanceCriteria": [
-        "Clicking on any part of a row except the Design Code text selects the row",
-        "Selected rows are visually highlighted",
-        "Multi-select works by clicking multiple rows",
-        "Clicking the Design Code text opens the Design Image Preview modal",
-        "Clicking the Design Code text does not select the row or toggle its checkbox"
+        "Row selection works consistently across Total Orders, Ready, Hallmark, Customer Orders, and Karigars tabs",
+        "Clicking anywhere on a row (except design column) highlights the row with visual feedback",
+        "Clicking on the design column shows the design image modal without selecting the row",
+        "Selected rows maintain their highlighted state until deselected"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Remove the eye icon button from the right corner of each row in OrderTable. Image preview must only be triggered by clicking on the Design Code text.",
+      "text": "Fix sidebar display on iPhone browser at 100% zoom level so the entire sidebar is visible. Prevent sidebar from overlapping page content at 50% zoom level on both iPhone browser and desktop web browsers.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-user-final"
         ],
         "quotes": [
-          "Remove eye icon from right corner",
-          "Image preview must ONLY open via clicking Design Code"
+          "Overall app sidebar is not shown in 100% zoom in iPhone browser. Supporting screenshot is shared. And in 50% zoom in iPhone browser the side bar overlaps contents of the page ( same happens in web page , used in desktop )"
         ]
       },
       "acceptanceCriteria": [
-        "Eye icon button is completely removed from each row",
-        "Design Image Preview can only be opened by clicking the Design Code text"
+        "Sidebar is fully visible at 100% zoom on iPhone browser",
+        "Sidebar does not overlap page content at 50% zoom on iPhone browser",
+        "Sidebar does not overlap page content at 50% zoom on desktop browsers",
+        "Sidebar responsive behavior works correctly across all zoom levels"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Fix the 'Failed to update design mapping' error in EditDesignModal. When Save is clicked: Step 1 - Validate that Karigar selected is not empty. Step 2 - Update the Master Mapping Table with the new karigar assignment. Step 3 - Update only Pending orders with this design code to reflect the new karigar. Do NOT update orders with status 'Ready' or 'Hallmark'.",
+      "text": "Fix the 'failed to ingest orders' error that occurs after uploading an Excel file on the Ingest Orders page. Ensure the upload and save operations complete successfully.",
       "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-user-final"
         ],
         "quotes": [
-          "Failed to update design mapping",
-          "Karigar selected must not be empty",
-          "Update Master Mapping Table",
-          "Update Pending Orders Only",
-          "Do NOT update: Ready, Hallmark"
+          "In ingest page after excel is uploaded it shows failed to ingest orders. Kindly fix it"
         ]
       },
       "acceptanceCriteria": [
-        "Validation error is shown if no karigar is selected when saving",
-        "Master design mapping is successfully updated in the backend",
-        "All orders with 'Pending' status and matching design code are updated with the new karigar",
-        "Orders with 'Ready' or 'Hallmark' status are not modified",
-        "Success message confirms the update without errors"
+        "Excel file uploads successfully without errors on the Ingest Orders page",
+        "Orders are saved to the backend without failure",
+        "Success confirmation is displayed to the user after successful ingestion",
+        "Error messages are clear and actionable if validation fails"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Fix PDF export in KarigarDetail page so that exported PDFs open correctly on iPhone mobile browsers instead of failing to download or open.",
-      "target": "frontend",
+      "text": "Optimize the speed of Excel file upload and order saving operations on the Ingest Orders page. Reduce processing time and improve responsiveness.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-user-final"
         ],
         "quotes": [
-          "pdf exported in Karigar page doesn't open or gets downloaded in mobile app especially iPhone"
+          "make sure uploading the excel and saving happens fast and not slow"
         ]
       },
       "acceptanceCriteria": [
-        "PDF export from KarigarDetail page successfully opens on iPhone Safari",
-        "PDF is properly rendered and viewable on mobile devices",
-        "No download failures or blank screens occur on iPhone"
+        "Excel parsing completes in under 3 seconds for files with up to 1000 rows",
+        "Order saving operations show progress feedback",
+        "UI remains responsive during upload and save operations",
+        "Batch processing is optimized for large datasets"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "On the Master Designs page, display uploaded design mappings in a table underneath the upload area. Enable inline editing of the design code column for each row.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-user-final"
+        ],
+        "quotes": [
+          "In master excel page the rows uploaded is to be shown underneath, and it should be able to edit and modify the design code"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Uploaded master design rows appear in a table below the upload section",
+        "Design code column is editable inline",
+        "Changes to design code are validated before saving",
+        "Table displays all fields: design code, generic name, and karigar name"
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "Add a Karigar dropdown in the Master Designs editing interface that shows the list of karigars extracted from the Master Design Excel file. Allow selection from this dropdown when editing design mappings.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-user-final"
+        ],
+        "quotes": [
+          "Karigar dropdown shows the extracted list from Master Design"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Karigar dropdown displays all unique karigar names from the uploaded Master Design file",
+        "Dropdown is populated after successful Master Design file upload",
+        "Selected karigar updates the design mapping correctly",
+        "Dropdown supports searching/filtering karigar names"
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "text": "Implement cascading updates so that when a design code is modified in the Master Designs page, all pending orders with that design code are automatically updated with the new mapping (generic name and karigar assignment).",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-user-final"
+        ],
+        "quotes": [
+          "Updates cascade to all pending orders with that Design Code"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Modifying a design code in Master Designs updates all pending orders with that code",
+        "Backend efficiently handles bulk updates for affected orders",
+        "User receives confirmation of how many orders were updated",
+        "Updates are atomic and do not leave data in inconsistent state"
+      ]
+    },
+    {
+      "id": "REQ-8",
+      "text": "Ensure all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) display the correct and up-to-date design mappings after design codes are modified in the Master Designs page.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-user-final"
+        ],
+        "quotes": [
+          "All dashboard tabs display the correct mappings"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Dashboard tabs automatically refresh after design mappings are updated",
+        "All tabs show consistent and current mapping data",
+        "No stale data is displayed in any dashboard tab",
+        "React Query cache is properly invalidated after mapping updates"
+      ]
+    },
+    {
+      "id": "REQ-9",
+      "text": "Fix JPEG export functionality to work correctly on iPhone browsers. Ensure exported JPEG files download successfully and contain the expected order data.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-user-final"
+        ],
+        "quotes": [
+          "Exporting JPEG's and PDFs is not happening. Atleast not in iPhone browser. Kindly fix it."
+        ]
+      },
+      "acceptanceCriteria": [
+        "JPEG export works on iPhone Safari browser",
+        "JPEG files download successfully without errors",
+        "Exported JPEG contains all visible order data from the current view",
+        "File naming follows consistent convention with timestamp"
+      ]
+    },
+    {
+      "id": "REQ-10",
+      "text": "Fix PDF export functionality to work correctly on iPhone browsers. Ensure exported PDF files download successfully and contain the expected order data with proper formatting.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-user-final"
+        ],
+        "quotes": [
+          "Exporting JPEG's and PDFs is not happening. Atleast not in iPhone browser. Kindly fix it."
+        ]
+      },
+      "acceptanceCriteria": [
+        "PDF export works on iPhone Safari browser",
+        "PDF files download successfully without errors",
+        "Exported PDF maintains table formatting and readability",
+        "All order columns are included in the exported PDF",
+        "File naming follows consistent convention with timestamp"
       ]
     }
   ],
   "constraints": [
-    "Do not modify backend authentication or Internet Identity integration",
-    "Preserve existing OrderTable bulk selection and export functionality",
-    "Maintain current PDF structure with design images and green headers"
+    "Do not modify the backend schema or order data structure",
+    "Maintain existing design image modal functionality when clicking design column",
+    "Preserve all existing dashboard tab filtering and search capabilities",
+    "Ensure export functionality works across desktop and mobile browsers"
   ],
   "nonGoals": [
-    "Changing PDF visual styling or layout beyond mobile compatibility",
-    "Modifying order status transitions or workflow logic",
-    "Adding new design mapping features beyond the fix"
+    "Adding new dashboard tabs or order statuses",
+    "Changing the Master Design Excel file format or required columns",
+    "Implementing new authentication or authorization features",
+    "Modifying the barcode scanning or tag printing workflows"
   ],
   "imageRequirements": {
     "required": [],

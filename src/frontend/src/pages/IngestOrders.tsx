@@ -1,14 +1,13 @@
-import { useState } from 'react';
-import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
-import { toast } from 'sonner';
-import { parseOrdersExcel } from '../utils/excelParser';
-import { useSaveOrder, useGetOrders } from '../hooks/useQueries';
-import { useActor } from '../hooks/useActor';
-import type { OrderType } from '../backend';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Upload, AlertCircle } from "lucide-react";
+import { useActor } from "@/hooks/useActor";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { OrderType } from "@/backend";
+import { normalizeDesignCode } from "@/utils/excelParser";
 
 interface ParsedOrder {
   orderNo: string;
@@ -22,245 +21,288 @@ interface ParsedOrder {
   orderId: string;
 }
 
-interface UploadResult {
-  success: number;
-  failed: number;
-  errors: Array<{ row: number; error: string }>;
-}
-
-const BATCH_SIZE = 50;
-
 export default function IngestOrders() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<UploadResult | null>(null);
-  const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>([]);
-
   const { actor } = useActor();
-  const saveOrderMutation = useSaveOrder();
-  const { refetch: refetchOrders } = useGetOrders();
+  const queryClient = useQueryClient();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [failedOrders, setFailedOrders] = useState<
+    Array<{ row: number; error: string; data: any }>
+  >([]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    setFile(selectedFile);
-    setResult(null);
-    setParsedOrders([]);
-
-    try {
-      const orders = await parseOrdersExcel(selectedFile);
-      setParsedOrders(orders);
-      toast.success(`Parsed ${orders.length} orders from Excel`);
-    } catch (error) {
-      console.error('Error parsing Excel:', error);
-      toast.error('Failed to parse Excel file. Please check the format.');
-      setFile(null);
-    }
-  };
-
-  const processBatch = async (orders: ParsedOrder[], startIdx: number): Promise<UploadResult> => {
-    const batchResult: UploadResult = { success: 0, failed: 0, errors: [] };
-    const endIdx = Math.min(startIdx + BATCH_SIZE, orders.length);
-    const batch = orders.slice(startIdx, endIdx);
-
-    for (let i = 0; i < batch.length; i++) {
-      const order = batch[i];
-      const currentRow = startIdx + i + 2; // +2 for header row and 0-based index
-
-      try {
-        if (!actor) throw new Error('Actor not initialized');
-
-        // Call backend to save order - backend will handle mapping lookup
-        // If mapping doesn't exist, backend will trap with error
-        await actor.saveOrder(
-          order.orderNo,
-          order.orderType,
-          order.product,
-          order.design,
-          order.weight,
-          order.size,
-          order.quantity,
-          order.remarks,
-          order.orderId
-        );
-
-        batchResult.success++;
-      } catch (error: any) {
-        batchResult.failed++;
-        const errorMsg = error?.message || 'Unknown error';
-        batchResult.errors.push({
-          row: currentRow,
-          error: errorMsg.includes('Design mapping not found')
-            ? `Design code "${order.design}" not found in Master Design Excel. Please upload Master Design Excel first.`
-            : errorMsg,
-        });
-      }
-
-      // Update progress
-      const totalProcessed = startIdx + i + 1;
-      setProgress(Math.round((totalProcessed / orders.length) * 100));
-    }
-
-    return batchResult;
-  };
-
-  const handleUpload = async () => {
-    if (!file || parsedOrders.length === 0) {
-      toast.error('Please select a valid Excel file first');
-      return;
-    }
-
-    if (!actor) {
-      toast.error('Backend not initialized. Please wait and try again.');
-      return;
-    }
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !actor) return;
 
     setIsProcessing(true);
-    setProgress(0);
-
-    const finalResult: UploadResult = { success: 0, failed: 0, errors: [] };
+    setProgress({ current: 0, total: 0 });
+    setFailedOrders([]);
 
     try {
-      // Process orders in batches
-      for (let i = 0; i < parsedOrders.length; i += BATCH_SIZE) {
-        const batchResult = await processBatch(parsedOrders, i);
-        finalResult.success += batchResult.success;
-        finalResult.failed += batchResult.failed;
-        finalResult.errors.push(...batchResult.errors);
+      const XLSX = await import(
+        "https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any
+      );
 
-        // Small delay between batches to prevent overwhelming the backend
-        if (i + BATCH_SIZE < parsedOrders.length) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      if (jsonData.length === 0) {
+        toast.error("Excel file is empty");
+        setIsProcessing(false);
+        return;
+      }
+
+      setProgress({ current: 0, total: jsonData.length });
+
+      const orders: ParsedOrder[] = [];
+      const failed: Array<{ row: number; error: string; data: any }> = [];
+
+      for (let i = 0; i < jsonData.length; i++) {
+        const row: any = jsonData[i];
+        const rowNumber = i + 2;
+
+        try {
+          const orderNo = String(row["Order No"] || "").trim();
+          const orderTypeRaw = String(row["Type"] || "").trim().toUpperCase();
+          const product = String(row["Product"] || "").trim();
+          const designRaw = String(row["Design"] || "").trim();
+          const weightRaw = row["Wt"];
+          const sizeRaw = row["Size"];
+          const quantityRaw = row["Qty"];
+          const remarks = String(row["Remarks"] || "").trim();
+
+          if (!orderNo) {
+            failed.push({
+              row: rowNumber,
+              error: "Missing Order No",
+              data: row,
+            });
+            continue;
+          }
+
+          if (!orderTypeRaw || (orderTypeRaw !== "CO" && orderTypeRaw !== "RB")) {
+            failed.push({
+              row: rowNumber,
+              error: `Invalid Type: ${orderTypeRaw}. Must be CO or RB`,
+              data: row,
+            });
+            continue;
+          }
+
+          if (!product) {
+            failed.push({
+              row: rowNumber,
+              error: "Missing Product",
+              data: row,
+            });
+            continue;
+          }
+
+          if (!designRaw) {
+            failed.push({
+              row: rowNumber,
+              error: "Missing Design",
+              data: row,
+            });
+            continue;
+          }
+
+          const weight = parseFloat(String(weightRaw));
+          const size = parseFloat(String(sizeRaw));
+          const quantity = parseInt(String(quantityRaw), 10);
+
+          if (isNaN(weight) || weight <= 0) {
+            failed.push({
+              row: rowNumber,
+              error: `Invalid Weight: ${weightRaw}`,
+              data: row,
+            });
+            continue;
+          }
+
+          if (isNaN(size) || size <= 0) {
+            failed.push({
+              row: rowNumber,
+              error: `Invalid Size: ${sizeRaw}`,
+              data: row,
+            });
+            continue;
+          }
+
+          if (isNaN(quantity) || quantity <= 0) {
+            failed.push({
+              row: rowNumber,
+              error: `Invalid Quantity: ${quantityRaw}`,
+              data: row,
+            });
+            continue;
+          }
+
+          const design = normalizeDesignCode(designRaw);
+          const orderType: OrderType = orderTypeRaw as OrderType;
+          const orderId = `${orderNo}-${Date.now()}-${i}`;
+
+          orders.push({
+            orderNo,
+            orderType,
+            product,
+            design,
+            weight,
+            size,
+            quantity: BigInt(quantity),
+            remarks,
+            orderId,
+          });
+        } catch (error) {
+          failed.push({
+            row: rowNumber,
+            error: error instanceof Error ? error.message : "Unknown error",
+            data: row,
+          });
         }
       }
 
-      setResult(finalResult);
+      setFailedOrders(failed);
 
-      if (finalResult.success > 0) {
-        await refetchOrders();
-        toast.success(`Successfully uploaded ${finalResult.success} orders`);
+      if (orders.length === 0) {
+        toast.error("No valid orders to save");
+        setIsProcessing(false);
+        return;
       }
 
-      if (finalResult.failed > 0) {
-        toast.error(`Failed to upload ${finalResult.failed} orders. Check details below.`);
+      const BATCH_SIZE = 200;
+      const batches: ParsedOrder[][] = [];
+      for (let i = 0; i < orders.length; i += BATCH_SIZE) {
+        batches.push(orders.slice(i, i + BATCH_SIZE));
       }
 
-      // Clear file input
-      setFile(null);
-      setParsedOrders([]);
+      let savedCount = 0;
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        
+        await Promise.all(
+          batch.map((order) =>
+            actor.saveOrder(
+              order.orderNo,
+              order.orderType,
+              order.product,
+              order.design,
+              order.weight,
+              order.size,
+              order.quantity,
+              order.remarks,
+              order.orderId
+            )
+          )
+        );
+
+        savedCount += batch.length;
+        setProgress({ current: savedCount, total: orders.length });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+
+      if (failed.length > 0) {
+        toast.warning(
+          `Ingested ${savedCount} orders. ${failed.length} rows failed validation.`
+        );
+      } else {
+        toast.success(`Successfully ingested ${savedCount} orders!`);
+      }
     } catch (error) {
-      console.error('Error during upload:', error);
-      toast.error('An unexpected error occurred during upload');
+      console.error("Error processing file:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to process file"
+      );
     } finally {
       setIsProcessing(false);
-      setProgress(100);
+      event.target.value = "";
     }
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Ingest Orders</h1>
-        <p className="text-muted-foreground">Upload Excel file to import orders into the system</p>
-      </div>
+    <div className="container mx-auto p-6 max-w-4xl">
+      <h1 className="text-3xl font-bold mb-6">Ingest Orders</h1>
 
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Important:</strong> Before uploading orders, make sure you have uploaded the Master Design Excel
-          with all design code mappings. Orders with unmapped design codes will fail to upload.
+      <Alert className="mb-6 border-amber-500 bg-amber-50">
+        <AlertCircle className="h-4 w-4 text-amber-600" />
+        <AlertDescription className="text-amber-800">
+          <strong>Important:</strong> Please upload the Master Design Excel file
+          first from the Master Designs page to ensure proper design code
+          mapping.
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
           <CardTitle>Upload Orders Excel</CardTitle>
-          <CardDescription>
-            Select an Excel file containing order data. The file will be parsed and validated before upload.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Upload an Excel file with columns: Order No, Type, Product,
+              Design, Wt, Size, Qty, Remarks
+            </p>
             <input
               type="file"
               accept=".xlsx,.xls"
-              onChange={handleFileChange}
+              onChange={handleFileUpload}
               disabled={isProcessing}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="hidden"
+              id="file-upload"
             />
-            <Button onClick={handleUpload} disabled={!file || isProcessing || parsedOrders.length === 0}>
-              <Upload className="mr-2 h-4 w-4" />
-              {isProcessing ? 'Processing...' : 'Upload'}
-            </Button>
+            <label htmlFor="file-upload">
+              <Button asChild disabled={isProcessing}>
+                <span className="cursor-pointer">
+                  {isProcessing ? "Processing..." : "Choose File"}
+                </span>
+              </Button>
+            </label>
           </div>
 
-          {parsedOrders.length > 0 && !isProcessing && (
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm font-medium">Ready to upload: {parsedOrders.length} orders parsed</p>
-            </div>
-          )}
-
-          {isProcessing && (
+          {isProcessing && progress.total > 0 && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Processing orders...</span>
-                <span>{progress}%</span>
+                <span>
+                  {progress.current} / {progress.total}
+                </span>
               </div>
-              <Progress value={progress} />
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-accent h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(progress.current / progress.total) * 100}%`,
+                  }}
+                />
+              </div>
             </div>
           )}
 
-          {result && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <div>
-                        <p className="text-2xl font-bold">{result.success}</p>
-                        <p className="text-sm text-muted-foreground">Successful</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-5 w-5 text-red-600" />
-                      <div>
-                        <p className="text-2xl font-bold">{result.failed}</p>
-                        <p className="text-sm text-muted-foreground">Failed</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {result.errors.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Upload Errors</CardTitle>
-                    <CardDescription>The following orders failed to upload:</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {result.errors.map((error, idx) => (
-                        <Alert key={idx} variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>Row {error.row}:</strong> {error.error}
-                          </AlertDescription>
-                        </Alert>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+          {failedOrders.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>{failedOrders.length} rows failed validation:</strong>
+                <ul className="mt-2 space-y-1 text-xs max-h-40 overflow-y-auto">
+                  {failedOrders.slice(0, 10).map((fail, idx) => (
+                    <li key={idx}>
+                      Row {fail.row}: {fail.error}
+                    </li>
+                  ))}
+                  {failedOrders.length > 10 && (
+                    <li className="font-medium">
+                      ... and {failedOrders.length - 10} more
+                    </li>
+                  )}
+                </ul>
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>

@@ -1,77 +1,206 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix row selection behavior, design mapping save error, and mobile PDF export",
+  "title": "Fix row selection, sidebar display, ingest errors, design editing, and export functionality",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Modify OrderTable row click behavior to select rows on click (except Design Code text) and open Design Image Preview modal only when Design Code text is clicked",
+      "summary": "Fix row selection highlighting across all dashboard tabs so clicking anywhere on a row (except design column) selects/highlights it, while clicking design column shows image popup without selection",
       "acceptanceCriteria": [
-        "Clicking on any part of a row except the Design Code text selects the row",
-        "Selected rows are visually highlighted",
-        "Multi-select works by clicking multiple rows",
-        "Clicking the Design Code text opens the Design Image Preview modal",
-        "Clicking the Design Code text does not select the row or toggle its checkbox"
+        "Row selection works consistently across Total Orders, Ready, Hallmark, Customer Orders, and Karigars tabs",
+        "Clicking anywhere on a row (except design column) highlights the row with visual feedback",
+        "Clicking on the design column shows the design image modal without selecting the row",
+        "Selected rows maintain their highlighted state until deselected"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Modify row click handler to select rows when clicking anywhere except the Design Code text. Add event handler to Design Code text that stops event propagation and opens the Design Image Preview modal without toggling selection. Ensure multi-select functionality is preserved and selected rows are visually highlighted."
+          "description": "Add row selection state management and onClick handlers to table rows. Implement visual highlighting for selected rows using CSS classes. Prevent row selection when clicking on the design column cell by stopping event propagation. Ensure selected row state persists until explicitly deselected by clicking again or selecting a different row."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Remove the eye icon button from OrderTable rows so Design Image Preview is only triggered by clicking Design Code text",
+      "summary": "Fix sidebar display to be fully visible at 100% zoom on iPhone browser and prevent sidebar from overlapping page content at 50% zoom on both iPhone and desktop browsers",
       "acceptanceCriteria": [
-        "Eye icon button is completely removed from each row",
-        "Design Image Preview can only be opened by clicking the Design Code text"
+        "Sidebar is fully visible at 100% zoom on iPhone browser",
+        "Sidebar does not overlap page content at 50% zoom on iPhone browser",
+        "Sidebar does not overlap page content at 50% zoom on desktop browsers",
+        "Sidebar responsive behavior works correctly across all zoom levels"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "path": "frontend/src/components/layout/AppSidebar.tsx",
           "operation": "modify",
-          "description": "Remove the eye icon button from the right corner of each row in the table. Ensure the Design Image Preview modal can only be opened by clicking the Design Code text as implemented in REQ-1."
+          "description": "Review and fix sidebar positioning and z-index values to ensure proper stacking at all zoom levels. Add responsive CSS adjustments for mobile viewports to prevent content overlap. Ensure sidebar container has appropriate width constraints and viewport-relative positioning that works across zoom levels from 50% to 100% on both desktop and mobile browsers."
+        },
+        {
+          "path": "frontend/src/index.css",
+          "operation": "modify",
+          "description": "Add or update CSS rules for sidebar layout and positioning to handle zoom levels properly. Include media queries for mobile devices ensuring sidebar visibility at 100% zoom and preventing overlap at 50% zoom. Apply viewport-relative units (vh, vw) where appropriate to maintain proper spacing across zoom levels."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Fix 'Failed to update design mapping' error in EditDesignModal by adding karigar validation and ensuring only Pending orders are updated when design mapping is saved",
+      "summary": "Fix the 'failed to ingest orders' error that occurs after uploading an Excel file on the Ingest Orders page",
       "acceptanceCriteria": [
-        "Validation error is shown if no karigar is selected when saving",
-        "Master design mapping is successfully updated in the backend",
-        "All orders with 'Pending' status and matching design code are updated with the new karigar",
-        "Orders with 'Ready' or 'Hallmark' status are not modified",
-        "Success message confirms the update without errors"
+        "Excel file uploads successfully without errors on the Ingest Orders page",
+        "Orders are saved to the backend without failure",
+        "Success confirmation is displayed to the user after successful ingestion",
+        "Error messages are clear and actionable if validation fails"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/masterdesigns/EditDesignModal.tsx",
+          "path": "frontend/src/pages/IngestOrders.tsx",
           "operation": "modify",
-          "description": "Add validation to ensure karigar is selected before saving. When Save is clicked: Step 1 - Validate that selectedKarigar or newKarigarName is not empty and show an error if validation fails. Step 2 - Call backend method saveDesignMapping to update the Master Mapping Table with the design code, generic name, and new karigar assignment. Step 3 - Call backend method reassignDesign to update only Pending orders with this design code to reflect the new karigar (backend will filter for Pending status only). Display success toast on completion and handle errors appropriately."
+          "description": "Debug and fix the order ingestion error handling logic. Review the Excel parsing, validation, and backend save flow to identify the failure point. Ensure proper error handling for design code validation against master design mappings. Add detailed error logging to track where the ingestion fails. Update success/error toast notifications to provide clear feedback. Ensure all order fields are properly formatted before calling backend saveOrder method."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Fix PDF export in KarigarDetail page to open correctly on iPhone mobile browsers by using window.open instead of anchor tag download",
+      "summary": "Optimize the speed of Excel file upload and order saving operations on the Ingest Orders page",
       "acceptanceCriteria": [
-        "PDF export from KarigarDetail page successfully opens on iPhone Safari",
-        "PDF is properly rendered and viewable on mobile devices",
-        "No download failures or blank screens occur on iPhone"
+        "Excel parsing completes in under 3 seconds for files with up to 1000 rows",
+        "Order saving operations show progress feedback",
+        "UI remains responsive during upload and save operations",
+        "Batch processing is optimized for large datasets"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "path": "frontend/src/pages/IngestOrders.tsx",
           "operation": "modify",
-          "description": "Modify the PDF export functionality to use window.open() with the blob URL instead of creating an anchor element with download attribute. This ensures PDFs open correctly in iPhone mobile browsers (Safari) rather than failing to download. After generating the PDF blob, call window.open(blobUrl, '_blank') to open the PDF in a new tab where it can be viewed and optionally saved by the user."
+          "description": "Optimize Excel parsing by implementing efficient SheetJS parsing options and minimizing unnecessary data transformations. Implement chunked batch processing for large order sets to improve responsiveness. Add progress indicators showing percentage completion during parsing and saving. Use web workers or async processing to keep UI responsive during heavy operations. Optimize the validation step by batching design code existence checks."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Display uploaded design mappings in a table underneath the upload area on Master Designs page with inline editing of design code column",
+      "acceptanceCriteria": [
+        "Uploaded master design rows appear in a table below the upload section",
+        "Design code column is editable inline",
+        "Changes to design code are validated before saving",
+        "Table displays all fields: design code, generic name, and karigar name"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/MasterDesigns.tsx",
+          "operation": "modify",
+          "description": "Add a table component below the upload section that displays all uploaded design mappings from the backend getAllMasterDesignMappings query. Implement inline editing for the design code column using contentEditable or input fields. Add validation to ensure design codes are unique before saving changes. Display all three fields (design code, generic name, karigar name) in the table with appropriate column headers. Include save/cancel buttons for edited rows."
+        }
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "summary": "Add a Karigar dropdown in Master Designs editing interface that shows karigars extracted from the Master Design Excel file",
+      "acceptanceCriteria": [
+        "Karigar dropdown displays all unique karigar names from the uploaded Master Design file",
+        "Dropdown is populated after successful Master Design file upload",
+        "Selected karigar updates the design mapping correctly",
+        "Dropdown supports searching/filtering karigar names"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/MasterDesigns.tsx",
+          "operation": "modify",
+          "description": "Fetch karigar list using the getMasterDesignKarigars backend method. Add a Select/ComboBox dropdown component to the editing interface populated with unique karigar names from the uploaded Master Design file. Implement search/filter functionality within the dropdown for easy karigar selection. Update the design mapping state when a karigar is selected from the dropdown. Refresh the dropdown after successful Master Design file upload."
+        }
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "summary": "Implement cascading updates so modifying a design code in Master Designs automatically updates all pending orders with that design code",
+      "acceptanceCriteria": [
+        "Modifying a design code in Master Designs updates all pending orders with that code",
+        "Backend efficiently handles bulk updates for affected orders",
+        "User receives confirmation of how many orders were updated",
+        "Updates are atomic and do not leave data in inconsistent state"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/MasterDesigns.tsx",
+          "operation": "modify",
+          "description": "When a design code mapping is updated, trigger a cascading update to all pending orders using the backend methods. After saving a design mapping change, call the appropriate backend method to update all orders with the modified design code. Display a confirmation toast showing how many orders were affected by the mapping change. Invalidate React Query cache for orders to refresh dashboard views with updated mappings."
+        }
+      ]
+    },
+    {
+      "id": "REQ-8",
+      "summary": "Ensure all dashboard tabs display correct and up-to-date design mappings after design codes are modified in Master Designs page",
+      "acceptanceCriteria": [
+        "Dashboard tabs automatically refresh after design mappings are updated",
+        "All tabs show consistent and current mapping data",
+        "No stale data is displayed in any dashboard tab",
+        "React Query cache is properly invalidated after mapping updates"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Ensure React Query cache invalidation is properly triggered when design mappings are updated. Add listeners or refetch logic to refresh dashboard data when returning from Master Designs page. Verify that all tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) use the latest query data without stale cache entries."
         },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the query key includes all relevant filters and that React Query automatically refetches when cache is invalidated. Verify that orders display current generic names and karigar assignments after Master Designs updates."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the query key includes all relevant filters and that React Query automatically refetches when cache is invalidated. Verify that orders display current generic names and karigar assignments after Master Designs updates."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the query key includes all relevant filters and that React Query automatically refetches when cache is invalidated. Verify that orders display current generic names and karigar assignments after Master Designs updates."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the query key includes all relevant filters and that React Query automatically refetches when cache is invalidated. Verify that orders display current generic names and karigar assignments after Master Designs updates."
+        },
+        {
+          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the query refetches when cache is invalidated and displays updated karigar assignments from modified design mappings."
+        }
+      ]
+    },
+    {
+      "id": "REQ-9",
+      "summary": "Fix JPEG export functionality to work correctly on iPhone browsers",
+      "acceptanceCriteria": [
+        "JPEG export works on iPhone Safari browser",
+        "JPEG files download successfully without errors",
+        "Exported JPEG contains all visible order data from the current view",
+        "File naming follows consistent convention with timestamp"
+      ],
+      "file_operations": [
         {
           "path": "frontend/src/utils/exportUtils.ts",
           "operation": "modify",
-          "description": "Update the exportToPDF function to return the blob URL instead of automatically triggering download via anchor element. Remove the anchor.download logic and let the calling component (KarigarDetail) handle opening the PDF with window.open(). Ensure the PDF generation logic (HTML conversion, design image embedding, green headers) remains unchanged."
+          "description": "Fix the JPEG export function to work on iPhone Safari. Review iOS-specific download handling for blob URLs. Ensure proper MIME type handling for JPEG files on iOS. Test and fix any canvas rendering issues that may prevent JPEG generation on iPhone browsers. Add proper error handling with user-friendly messages if export fails on iOS. Ensure the download trigger mechanism (anchor element with download attribute or alternative approach) works reliably on iPhone Safari."
+        }
+      ]
+    },
+    {
+      "id": "REQ-10",
+      "summary": "Fix PDF export functionality to work correctly on iPhone browsers",
+      "acceptanceCriteria": [
+        "PDF export works on iPhone Safari browser",
+        "PDF files download successfully without errors",
+        "Exported PDF maintains table formatting and readability",
+        "All order columns are included in the exported PDF",
+        "File naming follows consistent convention with timestamp"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/exportUtils.ts",
+          "operation": "modify",
+          "description": "Fix the PDF export function to work on iPhone Safari using jsPDF with autoTable. Review iOS-specific download handling for PDF blobs. Ensure proper MIME type and blob handling for iOS. Test jsPDF rendering on iPhone Safari and fix any compatibility issues. Verify that the download mechanism (blob URL + anchor click or iOS-specific approach) triggers successfully on iPhone. Add error handling with clear user feedback if PDF generation or download fails on iOS."
         }
       ]
     }
