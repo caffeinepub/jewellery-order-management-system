@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrdersByStatus, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType } from "@/backend";
+import { OrderStatus, OrderType, Order } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,7 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function ReadyTab() {
+interface ReadyTabProps {
+  onFilteredOrdersChange?: (orders: Order[]) => void;
+}
+
+export default function ReadyTab({ onFilteredOrdersChange }: ReadyTabProps) {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -59,6 +63,13 @@ export default function ReadyTab() {
 
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText, dateRange]);
+
+  // Notify parent of filtered orders change
+  useMemo(() => {
+    if (onFilteredOrdersChange) {
+      onFilteredOrdersChange(filteredOrders);
+    }
+  }, [filteredOrders, onFilteredOrdersChange]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;

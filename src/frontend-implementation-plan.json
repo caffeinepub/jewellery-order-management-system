@@ -1,75 +1,96 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Excel parsing to normalize design codes for proper matching",
+  "title": "Fix order status filtering, tab-specific metrics, and column ordering",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Normalize design codes in excelParser.ts by trimming whitespace and converting to uppercase",
+      "summary": "Filter Total Orders tab to show only Pending status orders and remove them immediately when marked as ready",
       "acceptanceCriteria": [
-        "Design codes from uploaded Excel files are trimmed of leading/trailing whitespace",
-        "Design codes are converted to uppercase for matching (e.g., 'chtmn40952' becomes 'CHTMN40952')",
-        "Normalization applies to both Master Design Excel parsing and order Excel parsing"
+        "Total Orders tab filters orders to show only status 'Pending'",
+        "After marking orders as ready, those orders disappear from Total Orders tab",
+        "Orders appear in Ready tab after status update"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/excelParser.ts",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Add a utility function normalizeDesignCode that trims whitespace and converts to uppercase. Update parseOrderExcel to normalize design codes read from order Excel files. Update parseMasterDesignExcel to normalize design codes read from Column A before creating MappingRecords. Ensure normalization is applied consistently in both parsing functions so that design codes from orders match design codes from master designs."
+          "description": "Update the component to filter orders by status 'Pending' only (exclude 'ReturnFromHallmark'). Ensure the useOrders hook includes statusFilter parameter set to OrderStatus.Pending. The component currently fetches pending and return-from-hallmark orders, but should only display Pending status orders."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Ensure that after bulk status update to Ready, the React Query cache is properly invalidated so the Total Orders tab reflects the removal of those orders immediately. Verify the mutation's onSuccess callback triggers the appropriate query invalidation."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Update Master Design Excel parsing to correctly identify columns A, B, C as DESIGN CODE, Generic Name, and Karigar Name",
+      "summary": "Remove orders from karigar's pending list immediately when marked as ready in Karigars tab detail view",
       "acceptanceCriteria": [
-        "Column A values are read as design codes",
-        "Column B values are read as generic names",
-        "Column C values are read as karigar names",
-        "Parser validates that these columns exist in the uploaded Excel file"
+        "Karigar detail view shows only pending orders for that karigar",
+        "After marking orders as ready, they are removed from karigar's pending list",
+        "Orders appear in Ready tab after status update"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/excelParser.ts",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Update parseMasterDesignExcel function to explicitly read Column A as designCode, Column B as genericName, and Column C as karigarName (instead of relying on column header detection). Add validation to ensure all three columns exist and contain data. Skip empty rows. Return error messages if required columns are missing or invalid."
+          "description": "Update the karigar detail page to filter orders by Pending status only. Ensure the query hook properly filters by karigarName and status=Pending. Verify that after marking orders as ready, the query is invalidated and the filtered list updates to remove those orders from the view."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded",
+      "summary": "Update SummaryCards to calculate metrics based on currently active tab's filtered data instead of all orders",
       "acceptanceCriteria": [
-        "After Master Design Excel upload, all orders with matching design codes are updated with Generic Name and Karigar Name",
-        "Orders that were previously unmapped are removed from the unmapped section if they now have matches",
-        "Update happens immediately without requiring manual action"
+        "In Total Orders tab, summary cards show counts/totals for pending orders only",
+        "In Ready tab, summary cards show counts/totals for ready orders only",
+        "In Hallmark tab, summary cards show counts/totals for hallmark orders only",
+        "In Customer Orders tab, summary cards show counts/totals for CO type orders only",
+        "Metrics update immediately when switching tabs"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/MasterDesigns.tsx",
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
           "operation": "modify",
-          "description": "After successfully uploading the Master Design Excel and saving design mappings via uploadDesignMapping mutation, add a call to backend capability assignOrdersToKarigar to automatically apply the newly uploaded mappings to all existing orders with matching design codes. Pass the newly parsed mappings array to trigger the backend update. Ensure this happens before showing the success toast so that orders are immediately updated and the unmapped count decreases."
+          "description": "Refactor SummaryCards to accept filtered orders as a prop instead of fetching all orders internally. Calculate Total Orders count, Total Weight, Total Quantity, and Customer Orders count based on the provided filtered data. Update the component interface to receive orders array and compute metrics client-side."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/pages/Dashboard.tsx",
           "operation": "modify",
-          "description": "Update the uploadDesignMapping mutation to invalidate both designMappings and orders queries after successful upload, ensuring that the dashboard and unmapped section reflect the newly applied mappings immediately. Add invalidateQueries calls for both 'orders' and 'designMappings' query keys in the onSuccess callback."
+          "description": "Update Dashboard to pass tab-specific filtered orders to SummaryCards component. For each tab (Total Orders, Ready, Hallmark, Customer Orders, Karigars), provide the appropriate filtered dataset to SummaryCards so metrics reflect only the visible orders in the active tab. Ensure metrics update when switching between tabs."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Display confirmation message showing mapping success count after Master Design Excel upload",
+      "summary": "Filter Customer Orders tab to display only orders with type 'CO'",
       "acceptanceCriteria": [
-        "After upload, display a success message with count of mapped design codes",
-        "Show count of orders that were updated with new mappings",
-        "If any design codes failed to map, display warning with details"
+        "Customer Orders tab displays only orders with type 'CO'",
+        "Orders with type 'RB' or other types are not visible in this tab"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/MasterDesigns.tsx",
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
           "operation": "modify",
-          "description": "After the Master Design Excel upload completes, fetch the updated orders using getOrdersWithMappings backend capability to count how many orders now have mappings. Calculate the difference between unmapped orders before and after upload. Display a success toast showing the number of design codes uploaded and the number of orders that were successfully mapped. If any design codes from the Excel are already in the system, show a count of updated mappings versus new mappings."
+          "description": "Update the component to use the useOrders hook with typeFilter parameter set to OrderType.CO. This ensures only CO type orders are fetched and displayed. The current implementation may not be applying the type filter correctly."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Reorder table columns to display: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product",
+      "acceptanceCriteria": [
+        "OrderTable component displays columns in specified order",
+        "Column order is consistent across Total Orders, Ready, Hallmark, Customer Orders, and Karigar detail tabs",
+        "All existing columns remain functional with new ordering"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Reorder the table column definitions to match the exact sequence: Generic name, Karigar name, wt (weight), size, qty (quantity), design code, remarks, order number, type, product. Update the TableHeader and TableRow rendering logic to reflect this new column order. Ensure all column functionality (sorting, filtering, rendering) remains intact with the new ordering. Verify export functionality (Excel, PDF, JPEG) respects the new column order."
         }
       ]
     }

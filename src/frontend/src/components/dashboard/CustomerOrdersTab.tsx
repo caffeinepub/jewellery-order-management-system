@@ -1,19 +1,38 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrdersByType } from "@/hooks/useQueries";
-import { OrderType } from "@/backend";
+import { OrderType, Order } from "@/backend";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
-export default function CustomerOrdersTab() {
+interface CustomerOrdersTabProps {
+  onFilteredOrdersChange?: (orders: Order[]) => void;
+}
+
+export default function CustomerOrdersTab({ onFilteredOrdersChange }: CustomerOrdersTabProps) {
   const [searchText, setSearchText] = useState("");
   const { data: orders = [], isLoading } = useGetOrdersByType(OrderType.CO);
 
-  const filteredOrders = orders.filter((order) => {
-    if (!searchText.trim()) return true;
-    const search = searchText.toLowerCase();
-    return order.orderNo.toLowerCase().includes(search);
-  });
+  const filteredOrders = useMemo(() => {
+    let result = orders;
+
+    // Filter by order number (search)
+    if (searchText.trim()) {
+      const search = searchText.toLowerCase();
+      result = result.filter((order) =>
+        order.orderNo.toLowerCase().includes(search)
+      );
+    }
+
+    return result;
+  }, [orders, searchText]);
+
+  // Notify parent of filtered orders change
+  useMemo(() => {
+    if (onFilteredOrdersChange) {
+      onFilteredOrdersChange(filteredOrders);
+    }
+  }, [filteredOrders, onFilteredOrdersChange]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;

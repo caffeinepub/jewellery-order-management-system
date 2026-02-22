@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
 import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType } from "@/backend";
+import { OrderStatus, OrderType, Order } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -13,7 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function TotalOrdersTab() {
+interface TotalOrdersTabProps {
+  onFilteredOrdersChange?: (orders: Order[]) => void;
+}
+
+export default function TotalOrdersTab({ onFilteredOrdersChange }: TotalOrdersTabProps) {
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
   const [searchText, setSearchText] = useState("");
   const [karigarFilter, setKarigarFilter] = useState<string>("All");
@@ -22,10 +26,9 @@ export default function TotalOrdersTab() {
   const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
 
   const filteredOrders = useMemo(() => {
+    // Only show Pending status orders (exclude ReturnFromHallmark)
     let result = orders.filter(
-      (order) =>
-        order.status === OrderStatus.Pending ||
-        order.status === OrderStatus.ReturnFromHallmark
+      (order) => order.status === OrderStatus.Pending
     );
 
     // Filter by order type
@@ -48,6 +51,13 @@ export default function TotalOrdersTab() {
 
     return result;
   }, [orders, orderTypeFilter, karigarFilter, searchText]);
+
+  // Notify parent of filtered orders change
+  useMemo(() => {
+    if (onFilteredOrdersChange) {
+      onFilteredOrdersChange(filteredOrders);
+    }
+  }, [filteredOrders, onFilteredOrdersChange]);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;

@@ -1,46 +1,53 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management system with Excel-based design code mapping for Generic Name and Karigar Name fields",
+  "summary": "Order management dashboard for jewelry manufacturing with tabs for Total Orders, Ready Orders, Karigar Orders, and Customer Orders. Includes order filtering, status updates, and real-time metrics.",
   "architectural_notes": [
-    "Master Design Excel format: Column A = DESIGN CODE (uppercase), Column B = Generic Name, Column C = Karigar Name",
-    "Design code matching requires normalization: uppercase conversion and whitespace trimming",
-    "Dashboard displays unmapped design codes as 'Missing: Generic Name & Karigar Name'"
+    "Dashboard has multiple tabs: Total Orders, Ready Orders, Karigar Orders, Customer Orders",
+    "Orders have status field (pending/ready) that determines tab placement",
+    "Tab-specific metrics displayed in dashboard header icons",
+    "Order type filtering implemented for Customer Orders tab (CO only)"
   ],
-  "known_issues": [
-    "Design codes from orders not matching Master Design Excel despite existence in file (case sensitivity/whitespace issue)"
-  ],
-  "isFixRequest": true,
+  "known_issues": [],
+  "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-update-excel-parsing-logic-in-excelparser-ts-to-normalize-all-design-codes-by-trimming-whitespace-and-converting-to-uppercase-before-comparison",
-      "title": "Update Excel parsing logic in excelParser.ts to normalize all design codes by trimming whitespace and converting to uppercase before comparison",
+      "id": "feature-modify-total-orders-tab-to-display-only-orders-with-status-pending-when-rows-are-selected-and-marked-as-ready-remove-them-from-the-total-orders-view-immediately",
+      "title": "Modify Total Orders tab to display only orders with status 'Pending'. When rows are selected and marked as ready, remove them from the Total Orders view immediately.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-the-master-design-excel-parsing-to-correctly-identify-column-a-as-design-code-column-b-as-generic-name-and-column-c-as-karigar-name",
-      "title": "Update the Master Design Excel parsing to correctly identify Column A as DESIGN CODE, Column B as Generic Name, and Column C as Karigar Name",
+      "id": "feature-in-karigars-tab-when-viewing-a-specific-karigar-s-pending-orders-and-marking-them-as-ready-remove-those-orders-from-the-karigar-s-pending-order-list-immediately",
+      "title": "In Karigars tab, when viewing a specific karigar's pending orders and marking them as ready, remove those orders from the karigar's pending order list immediately.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-automatically-update-existing-orders-with-matching-design-codes-when-master-design-excel-is-uploaded-mapping-generic-name-and-karigar-name-to-orders",
-      "title": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded, mapping Generic Name and Karigar Name to orders",
+      "id": "feature-update-summarycards-component-to-calculate-and-display-metrics-total-orders-count-total-weight-total-quantity-customer-orders-count-based-on-the-currently-active-tab-s-filtered-data-not-all-orders",
+      "title": "Update SummaryCards component to calculate and display metrics (Total Orders count, Total Weight, Total Quantity, Customer Orders count) based on the currently active tab's filtered data, not all orders.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-display-a-confirmation-message-on-the-master-design-page-after-excel-upload-showing-how-many-design-codes-were-successfully-mapped",
-      "title": "Display a confirmation message on the Master Design page after Excel upload showing how many design codes were successfully mapped",
+      "id": "feature-modify-customer-orders-tab-to-filter-and-display-only-orders-where-order-type-is-co-excluding-all-other-order-types",
+      "title": "Modify Customer Orders tab to filter and display only orders where order type is 'CO', excluding all other order types.",
       "reqIds": [
         "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-reorder-all-table-columns-across-all-dashboard-tabs-to-display-data-in-this-exact-sequence-generic-name-karigar-name-wt-size-qty-design-code-remarks-order-number-type-product",
+      "title": "Reorder all table columns across all dashboard tabs to display data in this exact sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product.",
+      "reqIds": [
+        "REQ-5"
       ],
       "version": 1
     }
@@ -48,24 +55,36 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix Excel parsing to normalize design codes (uppercase, trim whitespace) for proper matching",
+      "summary": "Total Orders tab shows pending orders; selecting and marking as ready removes from Total and moves to Ready tab",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Show confirmation of successful mappings after Excel upload on Master Design page",
+      "summary": "Karigar tab: selecting pending orders and marking as ready removes from Karigar pending list and moves to Ready tab",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-3",
-      "summary": "Automatically update existing orders when Master Design Excel is uploaded",
+      "summary": "Dashboard icons (Total orders, weight, qty, customer orders) reflect values for currently selected tab and update dynamically on tab change",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Customer Orders tab filters to show only order type 'CO'",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Display dashboard data in all tabs with sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product",
       "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Jewellery Order Manager",
+  "projectName": "Fix order status filtering, tab-specific metrics, and column ordering",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

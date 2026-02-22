@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, AlertCircle } from "lucide-react";
+import { Download } from "lucide-react";
 import { Order } from "@/backend";
 import DesignImageModal from "./DesignImageModal";
 import { exportToExcel, exportToPDF, exportToJPEG } from "@/utils/exportUtils";
@@ -166,16 +166,16 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                   />
                 </TableHead>
               )}
-              <TableHead>Order No</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Design Code</TableHead>
               <TableHead>Generic Name</TableHead>
               <TableHead>Karigar Name</TableHead>
               <TableHead>Weight</TableHead>
               <TableHead>Size</TableHead>
               <TableHead>Qty</TableHead>
+              <TableHead>Design Code</TableHead>
               <TableHead>Remarks</TableHead>
+              <TableHead>Order No</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Product</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -221,17 +221,6 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                             />
                           </TableCell>
                         )}
-                        <TableCell>{order.orderNo}</TableCell>
-                        <TableCell>{order.orderType}</TableCell>
-                        <TableCell>{order.product}</TableCell>
-                        <TableCell>
-                          <button
-                            onClick={(e) => handleDesignClick(order.design, e)}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            {order.design}
-                          </button>
-                        </TableCell>
                         <TableCell>
                           {order.genericName || (
                             <span className="text-muted-foreground italic text-sm"></span>
@@ -245,7 +234,18 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
                         <TableCell>{order.weight}</TableCell>
                         <TableCell>{order.size}</TableCell>
                         <TableCell>{Number(order.quantity)}</TableCell>
+                        <TableCell>
+                          <button
+                            onClick={(e) => handleDesignClick(order.design, e)}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {order.design}
+                          </button>
+                        </TableCell>
                         <TableCell>{order.remarks}</TableCell>
+                        <TableCell>{order.orderNo}</TableCell>
+                        <TableCell>{order.orderType}</TableCell>
+                        <TableCell>{order.product}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -267,10 +267,9 @@ export default function OrderTable({ orders, showDateFilter = false, enableBulkA
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Status Update</AlertDialogTitle>
+            <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark {selectedRows.size} order(s) as Ready?
-              This action cannot be undone.
+              Are you sure you want to mark {selectedRows.size} order(s) as Ready? This action will move them from the pending list to the ready list.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

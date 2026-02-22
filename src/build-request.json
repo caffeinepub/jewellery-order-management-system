@@ -1,95 +1,109 @@
 {
   "kind": "build_request",
-  "title": "Fix Excel parsing to normalize design codes for proper matching",
-  "projectName": "Jewellery Order Manager",
+  "title": "Fix order status filtering, tab-specific metrics, and column ordering",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Update Excel parsing logic in excelParser.ts to normalize all design codes by trimming whitespace and converting to uppercase before comparison",
+      "text": "Modify Total Orders tab to display only orders with status 'Pending'. When rows are selected and marked as ready, remove them from the Total Orders view immediately.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-last"
         ],
         "quotes": [
-          "Normalize all design codes - trim whitespace and ensure uppercase comparison"
+          "Total orders should show orders with status pending and when rows are selected to update it as ready, the row gets removed from total orders and moved to ready"
         ]
       },
       "acceptanceCriteria": [
-        "Design codes from uploaded Excel files are trimmed of leading/trailing whitespace",
-        "Design codes are converted to uppercase for matching (e.g., 'chtmn40952' becomes 'CHTMN40952')",
-        "Normalization applies to both Master Design Excel parsing and order Excel parsing"
+        "Total Orders tab filters orders to show only status 'Pending'",
+        "After marking orders as ready, those orders disappear from Total Orders tab",
+        "Orders appear in Ready tab after status update"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Update the Master Design Excel parsing to correctly identify Column A as DESIGN CODE, Column B as Generic Name, and Column C as Karigar Name",
+      "text": "In Karigars tab, when viewing a specific karigar's pending orders and marking them as ready, remove those orders from the karigar's pending order list immediately.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-last"
         ],
         "quotes": [
-          "Is Column A labeled 'DESIGN CODE' and contains codes like 'CHTMN40952'?"
+          "Same way from Karigar tabs, if selected and marked as ready it should remove from Karigar pending order list and move to ready"
         ]
       },
       "acceptanceCriteria": [
-        "Column A values are read as design codes",
-        "Column B values are read as generic names",
-        "Column C values are read as karigar names",
-        "Parser validates that these columns exist in the uploaded Excel file"
+        "Karigar detail view shows only pending orders for that karigar",
+        "After marking orders as ready, they are removed from karigar's pending list",
+        "Orders appear in Ready tab after status update"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded, mapping Generic Name and Karigar Name to orders",
-      "target": "both",
+      "text": "Update SummaryCards component to calculate and display metrics (Total Orders count, Total Weight, Total Quantity, Customer Orders count) based on the currently active tab's filtered data, not all orders.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-last"
         ],
         "quotes": [
-          "Automatically map matching codes when you upload the Excel on the Master Design page",
-          "Update existing orders immediately so the Dashboard no longer shows them as unmapped"
+          "The icons in dashboard ( Total orders. weight , qty, customer orders) should reflect true values as selected in current tab and keeps changing according to the tab"
         ]
       },
       "acceptanceCriteria": [
-        "After Master Design Excel upload, all orders with matching design codes are updated with Generic Name and Karigar Name",
-        "Orders that were previously unmapped are removed from the unmapped section if they now have matches",
-        "Update happens immediately without requiring manual action"
+        "In Total Orders tab, summary cards show counts/totals for pending orders only",
+        "In Ready tab, summary cards show counts/totals for ready orders only",
+        "In Hallmark tab, summary cards show counts/totals for hallmark orders only",
+        "In Customer Orders tab, summary cards show counts/totals for CO type orders only",
+        "Metrics update immediately when switching tabs"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Display a confirmation message on the Master Design page after Excel upload showing how many design codes were successfully mapped",
+      "text": "Modify Customer Orders tab to filter and display only orders where order type is 'CO', excluding all other order types.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-5"
+          "msg-last"
         ],
         "quotes": [
-          "Show confirmation of successful mappings"
+          "Customer order tab should only show order type *CO* and not any other type"
         ]
       },
       "acceptanceCriteria": [
-        "After upload, display a success message with count of mapped design codes",
-        "Show count of orders that were updated with new mappings",
-        "If any design codes failed to map, display warning with details"
+        "Customer Orders tab displays only orders with type 'CO'",
+        "Orders with type 'RB' or other types are not visible in this tab"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Reorder all table columns across all dashboard tabs to display data in this exact sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-last"
+        ],
+        "quotes": [
+          "Display the data in the dashboard as in this sequence. ( in all tabs ) - Generic name, Karigar name, wt , size , qty. design code, remarks, order number, type, product"
+        ]
+      },
+      "acceptanceCriteria": [
+        "OrderTable component displays columns in specified order",
+        "Column order is consistent across Total Orders, Ready, Hallmark, Customer Orders, and Karigar detail tabs",
+        "All existing columns remain functional with new ordering"
       ]
     }
   ],
   "constraints": [
-    "Design codes in the Master Design Excel are in uppercase (Column A)",
-    "Column A is DESIGN CODE, Column B is Generic Name, Column C is Karigar Name",
-    "Existing Master Design page functionality must be preserved",
-    "Single-actor Motoko backend architecture must be maintained"
+    "Do not modify backend order status logic or data models",
+    "Maintain existing bulk selection and status update functionality",
+    "Keep export functionality (Excel, PDF, JPEG) working with new column order"
   ],
   "nonGoals": [
-    "Changing the Excel file format or column structure",
-    "Adding new columns beyond the three specified",
-    "Supporting case-sensitive design code matching",
-    "Creating a new Master Design page (it already exists)"
+    "Changing order status workflow or adding new statuses",
+    "Modifying order ingestion or Excel parsing logic",
+    "Adding new tabs or removing existing tabs"
   ],
   "imageRequirements": {
     "required": [],

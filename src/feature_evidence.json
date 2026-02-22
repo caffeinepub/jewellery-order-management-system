@@ -2,10 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-excel-parsing-logic-in-excelparser-ts-to-normalize-all-design-codes-by-trimming-whitespace-and-converting-to-uppercase-before-comparison",
-      "featureTitle": "Update Excel parsing logic in excelParser.ts to normalize all design codes by trimming whitespace and converting to uppercase before comparison",
+      "featureId": "feature-modify-total-orders-tab-to-display-only-orders-with-status-pending-when-rows-are-selected-and-marked-as-ready-remove-them-from-the-total-orders-view-immediately",
+      "featureTitle": "Modify Total Orders tab to display only orders with status 'Pending'. When rows are selected and marked as ready, remove them from the Total Orders view immediately.",
       "files": [
-        "frontend/src/utils/excelParser.ts"
+        "frontend/src/components/dashboard/OrderTable.tsx",
+        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -23,10 +24,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-update-the-master-design-excel-parsing-to-correctly-identify-column-a-as-design-code-column-b-as-generic-name-and-column-c-as-karigar-name",
-      "featureTitle": "Update the Master Design Excel parsing to correctly identify Column A as DESIGN CODE, Column B as Generic Name, and Column C as Karigar Name",
+      "featureId": "feature-in-karigars-tab-when-viewing-a-specific-karigar-s-pending-orders-and-marking-them-as-ready-remove-those-orders-from-the-karigar-s-pending-order-list-immediately",
+      "featureTitle": "In Karigars tab, when viewing a specific karigar's pending orders and marking them as ready, remove those orders from the karigar's pending order list immediately.",
       "files": [
-        "frontend/src/utils/excelParser.ts"
+        "frontend/src/pages/KarigarDetail.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -44,11 +45,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-automatically-update-existing-orders-with-matching-design-codes-when-master-design-excel-is-uploaded-mapping-generic-name-and-karigar-name-to-orders",
-      "featureTitle": "Automatically update existing orders with matching design codes when Master Design Excel is uploaded, mapping Generic Name and Karigar Name to orders",
+      "featureId": "feature-update-summarycards-component-to-calculate-and-display-metrics-total-orders-count-total-weight-total-quantity-customer-orders-count-based-on-the-currently-active-tab-s-filtered-data-not-all-orders",
+      "featureTitle": "Update SummaryCards component to calculate and display metrics (Total Orders count, Total Weight, Total Quantity, Customer Orders count) based on the currently active tab's filtered data, not all orders.",
       "files": [
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/MasterDesigns.tsx"
+        "frontend/src/components/dashboard/SummaryCards.tsx",
+        "frontend/src/pages/Dashboard.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -66,10 +67,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-display-a-confirmation-message-on-the-master-design-page-after-excel-upload-showing-how-many-design-codes-were-successfully-mapped",
-      "featureTitle": "Display a confirmation message on the Master Design page after Excel upload showing how many design codes were successfully mapped",
+      "featureId": "feature-modify-customer-orders-tab-to-filter-and-display-only-orders-where-order-type-is-co-excluding-all-other-order-types",
+      "featureTitle": "Modify Customer Orders tab to filter and display only orders where order type is 'CO', excluding all other order types.",
       "files": [
-        "frontend/src/pages/MasterDesigns.tsx"
+        "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -83,6 +84,27 @@
       ],
       "testIds": [
         "REQ-4"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-reorder-all-table-columns-across-all-dashboard-tabs-to-display-data-in-this-exact-sequence-generic-name-karigar-name-wt-size-qty-design-code-remarks-order-number-type-product",
+      "featureTitle": "Reorder all table columns across all dashboard tabs to display data in this exact sequence: Generic name, Karigar name, wt, size, qty, design code, remarks, order number, type, product.",
+      "files": [
+        "frontend/src/components/dashboard/OrderTable.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-5"
       ],
       "confidence": "high"
     }
