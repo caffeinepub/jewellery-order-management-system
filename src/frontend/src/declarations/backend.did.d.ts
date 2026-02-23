@@ -33,6 +33,7 @@ export interface MappingRecord {
 export interface Order {
   'weight' : number,
   'status' : OrderStatus,
+  'readyDate' : [] | [Time],
   'createdAt' : Time,
   'size' : number,
   'orderType' : OrderType,
@@ -87,6 +88,10 @@ export interface _SERVICE {
     [Array<[string, DesignMapping]>],
     undefined
   >,
+  'batchUpdateOrderStatus' : ActorMethod<
+    [Array<string>, OrderStatus],
+    undefined
+  >,
   'batchUploadDesignImages' : ActorMethod<
     [Array<[string, ExternalBlob]>],
     undefined
@@ -109,9 +114,11 @@ export interface _SERVICE {
   >,
   'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
+  'getReadyOrdersByDateRange' : ActorMethod<[Time, Time], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'markOrdersAsReady' : ActorMethod<[Array<string>], undefined>,
+  'markOrdersAsReturned' : ActorMethod<[Array<string>], undefined>,
   'reassignDesign' : ActorMethod<[string, string], undefined>,
   'resetActiveOrders' : ActorMethod<[], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
@@ -121,6 +128,7 @@ export interface _SERVICE {
   >,
   'supplyAndReturnOrder' : ActorMethod<[string, bigint], undefined>,
   'supplyOrder' : ActorMethod<[string, bigint], undefined>,
+  'updateDesignGroupStatus' : ActorMethod<[Array<string>], undefined>,
   'updateDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,

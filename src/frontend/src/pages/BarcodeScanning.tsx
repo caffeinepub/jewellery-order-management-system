@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useQRScanner } from '@/qr-code/useQRScanner';
-import { useBulkUpdateStatus } from '@/hooks/useQueries';
+import { useBatchUpdateOrderStatus } from '@/hooks/useQueries';
 import { OrderStatus } from '@/backend';
 import { toast } from 'sonner';
 import { Camera, CameraOff, Trash2, Scan, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -39,7 +39,7 @@ export default function BarcodeScanning() {
     maxResults: 100,
   });
 
-  const bulkUpdateMutation = useBulkUpdateStatus();
+  const batchUpdateMutation = useBatchUpdateOrderStatus();
 
   // Extract order ID from barcode data
   const extractOrderId = (barcodeData: string): string | null => {
@@ -186,7 +186,7 @@ export default function BarcodeScanning() {
     }
 
     try {
-      await bulkUpdateMutation.mutateAsync({
+      await batchUpdateMutation.mutateAsync({
         orderIds: scannedOrders,
         newStatus: OrderStatus.Ready,
       });
@@ -459,11 +459,10 @@ export default function BarcodeScanning() {
 
                   <Button
                     onClick={handleMarkAsReady}
-                    disabled={bulkUpdateMutation.isPending}
-                    className="w-full"
-                    size="lg"
+                    disabled={batchUpdateMutation.isPending}
+                    className="w-full bg-gold hover:bg-gold-hover"
                   >
-                    {bulkUpdateMutation.isPending
+                    {batchUpdateMutation.isPending
                       ? 'Updating...'
                       : `Mark ${scannedOrders.length} Order(s) as Ready`}
                   </Button>

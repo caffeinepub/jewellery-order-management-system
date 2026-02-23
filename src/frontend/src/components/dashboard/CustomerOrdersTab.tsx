@@ -15,11 +15,14 @@ export default function CustomerOrdersTab() {
       (order) => order.orderType === OrderType.CO && order.status === OrderStatus.Pending
     );
 
-    // Filter by order number (search)
+    // Filter by search text (order number, design code, or generic name)
     if (searchText.trim()) {
       const search = searchText.toLowerCase();
-      result = result.filter((order) =>
-        order.orderNo.toLowerCase().includes(search)
+      result = result.filter(
+        (order) =>
+          order.orderNo.toLowerCase().includes(search) ||
+          order.design.toLowerCase().includes(search) ||
+          (order.genericName && order.genericName.toLowerCase().includes(search))
       );
     }
 
@@ -35,7 +38,7 @@ export default function CustomerOrdersTab() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by Order Number..."
+          placeholder="Search by Order Number, Design Code, or Generic Name..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           className="pl-9"

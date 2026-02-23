@@ -1,25 +1,14 @@
 import Map "mo:core/Map";
-import Text "mo:core/Text";
-import Storage "blob-storage/Storage";
 import Time "mo:core/Time";
 
 module {
-  type OrderType = {
-    #CO;
-    #RB;
-    #SO;
-  };
-
-  type OrderStatus = {
-    #Pending;
-    #Ready;
-    #Hallmark;
-    #ReturnFromHallmark;
-  };
-
-  type Order = {
+  type OldOrder = {
     orderNo : Text;
-    orderType : OrderType;
+    orderType : {
+      #CO;
+      #RB;
+      #SO;
+    };
     product : Text;
     design : Text;
     weight : Float;
@@ -28,18 +17,61 @@ module {
     remarks : Text;
     genericName : ?Text;
     karigarName : ?Text;
-    status : OrderStatus;
+    status : {
+      #Pending;
+      #Ready;
+      #Hallmark;
+      #ReturnFromHallmark;
+    };
     orderId : Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
   };
 
   type OldActor = {
-    orders : Map.Map<Text, Order>;
-    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    orders : Map.Map<Text, OldOrder>;
   };
 
-  public func run(old : OldActor) : { orders : Map.Map<Text, Order>; designImages : Map.Map<Text, Storage.ExternalBlob> } {
-    old;
+  type NewOrder = {
+    orderNo : Text;
+    orderType : {
+      #CO;
+      #RB;
+      #SO;
+    };
+    product : Text;
+    design : Text;
+    weight : Float;
+    size : Float;
+    quantity : Nat;
+    remarks : Text;
+    genericName : ?Text;
+    karigarName : ?Text;
+    status : {
+      #Pending;
+      #Ready;
+      #Hallmark;
+      #ReturnFromHallmark;
+    };
+    orderId : Text;
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+    readyDate : ?Time.Time;
+  };
+
+  type NewActor = {
+    orders : Map.Map<Text, NewOrder>;
+  };
+
+  // Migration function called by the main actor via the with-clause
+  public func run(old : OldActor) : NewActor {
+    let newOrders = old.orders.map<Text, OldOrder, NewOrder>(
+      func(_orderId, oldOrder) {
+        { oldOrder with
+          readyDate = if (oldOrder.status == #Ready) { ?oldOrder.updatedAt } else { null }
+        };
+      }
+    );
+    { orders = newOrders };
   };
 };

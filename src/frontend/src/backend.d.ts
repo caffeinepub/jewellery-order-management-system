@@ -37,6 +37,7 @@ export interface Karigar {
 export interface Order {
     weight: number;
     status: OrderStatus;
+    readyDate?: Time;
     createdAt: Time;
     size: number;
     orderType: OrderType;
@@ -65,6 +66,7 @@ export interface backendInterface {
     addKarigar(name: string): Promise<void>;
     assignOrdersToKarigar(mappings: Array<MappingRecord>): Promise<void>;
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
+    batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     deleteOrder(orderId: string): Promise<void>;
     deleteReadyOrder(orderId: string): Promise<void>;
@@ -78,15 +80,18 @@ export interface backendInterface {
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
+    getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
+    markOrdersAsReturned(orderIds: Array<string>): Promise<void>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
+    updateDesignGroupStatus(designCodes: Array<string>): Promise<void>;
     updateDesignMapping(designCode: string, newGenericName: string, newKarigarName: string): Promise<void>;
     updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;

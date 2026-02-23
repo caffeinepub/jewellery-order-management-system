@@ -1,155 +1,169 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Dashboard reordering, row highlighting, search enhancements, RB quantity fixes, ready tab deletion, and Tag Printing redesign",
+  "title": "Frontend enhancements for Tag Printing, Hallmark workflow, and export improvements",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Reorder OrderTable columns to display: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status while preserving all existing functionality",
-      "acceptanceCriteria": [
-        "Dashboard table columns appear in the order: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status",
-        "Row selection checkboxes continue to work",
-        "Design image modal opens when clicking design codes",
-        "Karigar mapping functionality remains intact",
-        "Status can still be changed from pending to ready"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "Reorder the column definitions in the table header and body to display columns in the exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Ensure all existing column functionality (click handlers for design images, karigar name display, status indicators) is preserved during reordering."
-        }
-      ]
-    },
-    {
       "id": "REQ-2",
-      "summary": "Add red highlight to selected table rows when checkbox is checked",
+      "summary": "Display Generic Name in Tag Printing design groups",
       "acceptanceCriteria": [
-        "Selected rows display a red highlight",
-        "Highlight color is visually distinct and accessible",
-        "Highlight updates immediately when row selection changes"
+        "Tag Printing page shows Generic Name for each design group",
+        "Generic Name is displayed in a clear, readable format within each design card",
+        "Existing design code and order number display remains intact"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "path": "frontend/src/pages/TagPrinting.tsx",
           "operation": "modify",
-          "description": "Add conditional className or style to table rows (tbody tr elements) that applies a red background highlight when the row is selected. Use the selectedOrders state to determine selection. Ensure the highlight color is accessible and visually distinct (e.g., bg-red-50 or bg-red-100 with proper contrast)."
+          "description": "Update the design group card rendering to display the Generic Name alongside Design Code and order numbers. Extract Generic Name from the first order in each design group and display it prominently in the card header or body. Ensure the layout accommodates the additional field without disrupting existing design code and order number displays."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Add search functionality by design code and order number in TotalOrdersTab, ReadyTab, and HallmarkTab",
+      "summary": "Add date-wise filtering on Tag Printing page based on READY status timestamp",
       "acceptanceCriteria": [
-        "Total Orders tab includes search by design code and order number",
-        "Ready tab includes search by design code and order number",
-        "Hallmark tab includes search by design code and order number",
-        "Search filters display orders matching either field",
-        "Existing search functionality is preserved and enhanced"
+        "Date filter UI is present on Tag Printing page",
+        "Filter operates based on the timestamp when order status changed to READY",
+        "Only design groups containing orders that match the date criteria are displayed",
+        "Filter can be cleared to show all READY orders"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Enhance the existing search filter to match orders by both design code and order number. Update the filter logic to check if searchQuery matches either order.design or order.orderNo (case-insensitive). Preserve all existing filtering (status, type, karigar)."
+          "description": "Add a new React Query hook useGetReadyOrdersByDateRange that calls the backend capability getReadyOrdersByDateRange with startDate and endDate parameters. Follow the existing query pattern used in useGetReadyOrders and useGetAllOrders."
         },
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "path": "frontend/src/pages/TagPrinting.tsx",
           "operation": "modify",
-          "description": "Enhance the existing search filter to match orders by both design code and order number. Update the filter logic to check if searchQuery matches either order.design or order.orderNo (case-insensitive). Preserve all existing filtering (type, karigar, date range)."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Enhance the existing search filter to match orders by both design code and order number. Update the filter logic to check if searchQuery matches either order.design or order.orderNo (case-insensitive). Preserve all existing filtering (type, karigar, date range)."
+          "description": "Add date range filter UI using shadcn/ui DatePicker or date input components. Include state management for start date and end date. When dates are selected, use the useGetReadyOrdersByDateRange hook instead of useGetReadyOrders. Provide a 'Clear Filter' button to reset dates and show all READY orders. Display the filtered design groups based on the date-filtered orders. Position the date filter controls above the design group cards for easy access."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Fix RB order supplied quantity validation to allow full quantity entry and implement order splitting logic for partial supplies",
+      "summary": "Bulk status change from READY to HALLMARK for design groups on Tag Printing page",
       "acceptanceCriteria": [
-        "User can enter the full order quantity for RB orders (e.g., 5 out of 5)",
-        "When full quantity is supplied, order moves to Ready tab and is removed from Total Orders",
-        "When partial quantity is supplied, order splits into two: one Ready order with supplied quantity and one Pending order with remaining quantity",
-        "Both frontend validation and backend logic support this behavior",
-        "Query invalidation ensures tabs update immediately after supply action"
+        "Each design group on Tag Printing page has a selection checkbox",
+        "Bulk action button changes status of all orders in selected design groups from READY to HALLMARK",
+        "Orders with HALLMARK status appear in the Hallmark tab",
+        "Orders no longer appear in the Ready tab after status change",
+        "Confirmation dialog appears before applying the status change"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "operation": "modify",
-          "description": "Remove or adjust the validation logic that prevents entering the full order quantity. Allow suppliedQty to equal order.quantity (not just be less than it). Ensure the mutation calls the appropriate backend function (supplyOrder for full quantity, supplyAndReturnOrder for partial quantity). Add clear messaging to the user about the split behavior. Preserve query invalidation for ['orders', 'ready-orders'] to refresh both tabs immediately."
-        },
-        {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Verify that the supplyOrder and supplyAndReturnOrder mutations properly invalidate both ['orders'] and ['ready-orders'] queries to ensure TotalOrdersTab and ReadyTab refresh after RB order supply actions. Add any missing query invalidations if needed."
+          "description": "Add a new mutation hook useUpdateDesignGroupStatus that calls the backend capability updateDesignGroupStatus with an array of design codes. Follow the existing mutation pattern used in useBatchUpdateOrderStatus. Ensure proper query invalidation for ready orders and hallmark orders after successful mutation."
+        },
+        {
+          "path": "frontend/src/pages/TagPrinting.tsx",
+          "operation": "modify",
+          "description": "Add selection state management to track selected design groups using checkboxes. Include a checkbox in each design group card header. Add a bulk action button (e.g., 'Move to Hallmark') that is enabled only when one or more design groups are selected. Implement a confirmation dialog (using shadcn/ui AlertDialog) that displays the count of selected design groups and confirms the status change action. On confirmation, call useUpdateDesignGroupStatus with the selected design codes. Display success/error toasts after the operation. Clear selections after successful update."
         }
       ]
     },
     {
       "id": "REQ-5",
-      "summary": "Add delete button to each Ready tab row that reverts the order back to Pending status in Total Orders",
+      "summary": "Bulk status change to Returned in Hallmark tab",
       "acceptanceCriteria": [
-        "Each row in Ready tab displays a delete button",
-        "Clicking delete moves the order back to Total Orders",
-        "Order status changes from Ready to Pending",
-        "Backend function handles the status reversal",
-        "Tabs update immediately after deletion without page refresh"
+        "Hallmark tab includes checkboxes for selecting individual orders",
+        "Button to change selected orders' status to Returned is present",
+        "Orders with Returned status appear in Total Orders tab",
+        "Orders with Returned status no longer appear in Hallmark tab",
+        "Status column displays 'Returned' for these orders",
+        "Confirmation dialog appears before applying the status change"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a delete button column or action in the ReadyTab view. Create a mutation hook that calls backend.deleteReadyOrder(orderId) when the button is clicked. After successful deletion, invalidate both ['orders'] and ['ready-orders'] queries to refresh TotalOrdersTab and ReadyTab. Add user confirmation dialog before deletion and show success/error toast notifications."
+          "description": "Add a new mutation hook useMarkOrdersAsReturned that calls the backend capability markOrdersAsReturned with an array of order IDs. Follow the existing mutation pattern and ensure proper query invalidation for hallmark orders and total orders after successful mutation."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Add bulk selection state management to track selected order IDs using checkboxes. Integrate checkboxes into the OrderTable component by passing a selection prop. Add a bulk action button (e.g., 'Mark as Returned') positioned above the table, enabled only when orders are selected. Implement a confirmation dialog (using shadcn/ui AlertDialog) that displays the count of selected orders and confirms the status change. On confirmation, call useMarkOrdersAsReturned with the selected order IDs. Display success/error toasts. Clear selections after successful update. Ensure the OrderTable component supports the selection feature."
         },
         {
           "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Add optional onDelete prop to OrderTable component that accepts a callback function. When provided, render a delete icon/button in each row. Wire the delete button to call onDelete(order.orderId). Ensure the button is styled consistently with other action buttons in the table."
+          "description": "Add support for optional bulk selection mode by accepting selection-related props (selectedIds, onSelectionChange, selectionEnabled). When selection is enabled, render a checkbox column as the first column in the table. Include a header checkbox for select-all functionality. Update row rendering to include individual checkboxes that toggle selection state. Ensure checkbox column does not interfere with existing export and delete functionality."
         }
       ]
     },
     {
       "id": "REQ-6",
-      "summary": "Remove all existing Tag Printing logic including MPN system integration, webview modal, and login session tracking",
+      "summary": "Add Excel export option on Hallmark tab",
       "acceptanceCriteria": [
-        "All existing tag printing logic is removed from TagPrinting.tsx",
-        "WebviewModal integration is removed",
-        "MPN system references are removed",
-        "Login session tracking is removed",
-        "Page is cleared for new implementation"
+        "Export button is visible on the Hallmark tab",
+        "Clicking export generates an Excel file with all Hallmark orders",
+        "Excel file includes all relevant order columns (order number, design code, karigar name, generic name, weight, quantity, status, etc.)",
+        "Export functionality works on both desktop and mobile devices"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/TagPrinting.tsx",
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
           "operation": "modify",
-          "description": "Remove all existing logic from TagPrinting.tsx including: WebviewModal usage, MPN system URL references, login session state management, order processing workflows, and any iframe-based integration code. Clear the component to a blank slate ready for new implementation. Keep only the basic page wrapper/layout structure."
-        },
-        {
-          "path": "frontend/src/components/tagprinting/WebviewModal.tsx",
-          "operation": "delete",
-          "description": "Delete the WebviewModal component file as it is no longer needed after removing the MPN system integration from Tag Printing page."
+          "description": "Add an Excel export button positioned prominently near the top of the tab (e.g., in the same row as filters or bulk actions). Use the existing exportToExcel utility function from frontend/src/utils/exportUtils.ts to generate the Excel file with all displayed Hallmark orders. Ensure the export includes all relevant columns: order number, design code, karigar name, generic name, weight, quantity, status, order type, product, size, remarks, and dates. Display a loading indicator while exporting and a success toast upon completion."
         }
       ]
     },
     {
       "id": "REQ-7",
-      "summary": "Redesign Tag Printing page to display READY orders grouped by designCode with copy functionality for order numbers",
+      "summary": "Fix PDF export on Karigar tab for mobile devices",
       "acceptanceCriteria": [
-        "Tag Printing page fetches only READY status orders",
-        "Orders are grouped by designCode",
-        "Each group displays: design code, total order count, and list of order numbers",
-        "Each group has a 'Copy for MPN' button",
-        "Clicking the button copies only that group's order numbers in comma-separated format using join(',')",
-        "Copy action provides user feedback (e.g., toast notification)"
+        "PDF export initiates a proper download on iOS devices",
+        "PDF export initiates a proper download on Android devices",
+        "Users can access the downloaded PDF file from their device's download folder",
+        "Success message indicates successful download rather than generic 'file exported' message"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/TagPrinting.tsx",
+          "path": "frontend/src/utils/exportUtils.ts",
           "operation": "modify",
-          "description": "Implement new Tag Printing page design: Fetch READY status orders using useReadyOrders hook from useQueries.ts. Group orders by designCode using a Map or object. For each design group, display: the design code as a heading, total order count, and a list of order numbers. Add a 'Copy for MPN' button for each group that copies the group's order numbers using orderNumbers.join(',') to clipboard. Show toast notification on successful copy. Use card-based layout with clear visual separation between design groups."
+          "description": "Update the exportToPDF function to improve mobile download handling. For iOS devices, use a different approach: create a blob URL, open it in a new window/tab (window.open), and provide user instructions if needed. For Android devices, ensure the download attribute is properly set and trigger the download link click. Update the isMobile detection logic to accurately identify iOS and Android. Enhance error handling and provide device-specific fallback mechanisms. Update success messages to be more descriptive (e.g., 'PDF downloaded successfully' instead of 'file exported')."
+        },
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Update the PDF export button click handler to display more informative success/error toasts. For mobile devices, include additional guidance in the toast message (e.g., 'PDF downloaded. Check your Downloads folder.'). Ensure the toast duration is appropriate for mobile users to read the message."
+        }
+      ]
+    },
+    {
+      "id": "REQ-8",
+      "summary": "Increase image size in exported PDF and JPEG files for Karigar tab",
+      "acceptanceCriteria": [
+        "Design images in PDF exports are larger than current implementation",
+        "Design images in JPEG exports are larger than current implementation",
+        "Images maintain aspect ratio and quality when enlarged",
+        "Exported documents remain well-formatted with the larger images"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/exportUtils.ts",
+          "operation": "modify",
+          "description": "Increase the image dimensions in both exportToPDF and exportToJPEG functions. For PDF exports, increase the image width in the HTML template (currently likely constrained by max-width or fixed dimensions). For JPEG exports, increase the canvas dimensions used for rendering. Ensure aspect ratios are maintained by calculating height proportionally. Test that larger images do not cause layout overflow or quality degradation. Adjust padding/margins as needed to accommodate larger images while maintaining document structure."
+        }
+      ]
+    },
+    {
+      "id": "REQ-9",
+      "summary": "Add export options for Daily Orders and Total Orders in Karigar tab",
+      "acceptanceCriteria": [
+        "Export button or dropdown is present in the Karigar detail page",
+        "User can select to export Daily Orders",
+        "User can select to export Total Orders",
+        "Each export generates a properly formatted Excel file with the corresponding data",
+        "Export functionality works on both desktop and mobile devices"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Add an export dropdown or separate export buttons for Daily Orders and Total Orders. Position these export options near the existing PDF/JPEG export buttons for consistency. Implement onClick handlers that call exportToExcel from frontend/src/utils/exportUtils.ts with the respective order datasets (dailyOrders and totalOrders). Ensure each export includes all relevant columns. Display loading states during export and success toasts upon completion. Verify the export functionality works on both desktop and mobile devices."
         }
       ]
     }

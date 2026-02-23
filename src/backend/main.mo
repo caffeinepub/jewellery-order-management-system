@@ -4,11 +4,11 @@ import Text "mo:core/Text";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
-import Migration "migration";
+
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
+import Migration "migration";
 
-// Specify migration in with-clause
 (with migration = Migration.run)
 actor {
   include MixinStorage();
@@ -41,6 +41,7 @@ actor {
     orderId : Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
+    readyDate : ?Time.Time;
   };
 
   type DesignMapping = {
@@ -86,6 +87,12 @@ actor {
     orderId : Text,
   ) : async () {
     let timestamp = Time.now();
+
+    let (genericName, karigarName) = switch (designMappings.get(design)) {
+      case (null) { (null, null) };
+      case (?mapping) { (?(mapping.genericName), ?(mapping.karigarName)) };
+    };
+
     let order : Order = {
       orderNo;
       orderType;
@@ -94,13 +101,14 @@ actor {
       weight;
       size;
       quantity;
-      genericName = null;
-      karigarName = null;
+      genericName;
+      karigarName;
       remarks;
       status = #Pending;
       orderId;
       createdAt = timestamp;
       updatedAt = timestamp;
+      readyDate = null;
     };
 
     orders.add(orderId, order);
@@ -120,6 +128,7 @@ actor {
             quantity = suppliedQuantity;
             status = #Ready;
             updatedAt = Time.now();
+            readyDate = ?Time.now();
           };
           orders.add(orderId, readyOrder);
         };
@@ -390,6 +399,7 @@ actor {
             order with
             status = #Ready;
             updatedAt = Time.now();
+            readyDate = ?Time.now();
           };
           orders.add(orderId, updatedOrder);
         };
@@ -443,7 +453,6 @@ actor {
     orders := remainingOrders;
   };
 
-  // New function to allow deleting "Ready" orders and moving them back to "Pending".
   public shared ({ caller }) func deleteReadyOrder(orderId : Text) : async () {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
@@ -455,6 +464,85 @@ actor {
           orders.add(orderId, pendingOrder);
         } else {
           Runtime.trap("Only 'Ready' orders can be moved back to 'Pending' status");
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func batchUpdateOrderStatus(
+    orderIds : [Text],
+    newStatus : OrderStatus,
+  ) : async () {
+    for (orderId in orderIds.values()) {
+      switch (orders.get(orderId)) {
+        case (null) {
+          Runtime.trap("Order with id " # orderId # " not found");
+        };
+        case (?order) {
+          let updatedOrder : Order = {
+            order with
+            status = newStatus;
+            updatedAt = Time.now();
+            readyDate = if (newStatus == #Ready) { ?Time.now() } else { order.readyDate };
+          };
+          orders.add(orderId, updatedOrder);
+        };
+      };
+    };
+  };
+
+  // New query to get orders by ready date range
+  public query ({ caller }) func getReadyOrdersByDateRange(startDate : Time.Time, endDate : Time.Time) : async [Order] {
+    orders.values().toArray().filter(
+      func(order) {
+        order.status == #Ready and
+        (switch (order.readyDate) {
+          case (null) { false };
+          case (?date) { date >= startDate and date <= endDate };
+        });
+      }
+    );
+  };
+
+  // New function to update status of all orders in a design group from READY to HALLMARK
+  public shared ({ caller }) func updateDesignGroupStatus(designCodes : [Text]) : async () {
+    for (code in designCodes.values()) {
+      switch (orders.get(code)) {
+        case (null) {
+          Runtime.trap("Order with id " # code # " not found");
+        };
+        case (?order) {
+          if (order.status != #Ready) {
+            Runtime.trap("Order must be in Ready state to be marked as Hallmark");
+          };
+          let updatedOrder : Order = {
+            order with
+            status = #Hallmark;
+            updatedAt = Time.now();
+          };
+          orders.add(code, updatedOrder);
+        };
+      };
+    };
+  };
+
+  // New function to update status of selected orders from HALLMARK to Returned
+  public shared ({ caller }) func markOrdersAsReturned(orderIds : [Text]) : async () {
+    for (orderId in orderIds.values()) {
+      switch (orders.get(orderId)) {
+        case (null) {
+          Runtime.trap("Order with id " # orderId # " not found");
+        };
+        case (?order) {
+          if (order.status != #Hallmark) {
+            Runtime.trap("Order must be in Hallmark state to be marked as Returned");
+          };
+          let updatedOrder : Order = {
+            order with
+            status = #ReturnFromHallmark;
+            updatedAt = Time.now();
+          };
+          orders.add(orderId, updatedOrder);
         };
       };
     };

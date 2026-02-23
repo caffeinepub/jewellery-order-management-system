@@ -39,6 +39,7 @@ interface OrderTableProps {
   enableBulkActions?: boolean;
   onMarkAsReady?: (selectedOrders: Order[]) => void;
   onDelete?: (orderId: string) => void;
+  enableExport?: boolean;
 }
 
 export default function OrderTable({ 
@@ -46,7 +47,8 @@ export default function OrderTable({
   showDateFilter = false, 
   enableBulkActions = false,
   onMarkAsReady,
-  onDelete
+  onDelete,
+  enableExport = false
 }: OrderTableProps) {
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -149,13 +151,11 @@ export default function OrderTable({
     try {
       if (format === "excel") {
         exportToExcel(orders);
-        toast.success(`Exported to ${format.toUpperCase()}`);
+        toast.success("Exported to Excel");
       } else if (format === "pdf") {
         await exportToPDF(orders, actor);
-        toast.success(`Exported to ${format.toUpperCase()}`);
       } else if (format === "jpeg") {
         await exportToJPEG(orders, actor);
-        toast.success(`Exported to ${format.toUpperCase()}`);
       }
     } catch (error) {
       toast.error(`Failed to export ${format.toUpperCase()}`);
@@ -179,13 +179,13 @@ export default function OrderTable({
 
   return (
     <div className="space-y-4">
-      {enableBulkActions && (
+      {(enableBulkActions || enableExport) && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
             {selectedRows.size > 0 && `${selectedRows.size} order(s) selected`}
           </div>
           <div className="flex gap-2">
-            {selectedRows.size > 0 && (
+            {enableBulkActions && selectedRows.size > 0 && (
               <Button
                 onClick={handleMarkAsReady}
                 size="sm"
@@ -194,25 +194,27 @@ export default function OrderTable({
                 Mark as Ready
               </Button>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={isExporting}>
-                  <Download className="mr-2 h-4 w-4" />
-                  {isExporting ? "Exporting..." : "Export"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleExport("excel")}>
-                  Export to Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                  Export to PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("jpeg")}>
-                  Export to JPEG
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {enableExport && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isExporting}>
+                    <Download className="mr-2 h-4 w-4" />
+                    {isExporting ? "Exporting..." : "Export"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExport("excel")}>
+                    Export to Excel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                    Export to PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("jpeg")}>
+                    Export to JPEG
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       )}
@@ -307,7 +309,7 @@ export default function OrderTable({
                             : "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
                         }`}
                       >
-                        {order.status}
+                        {order.status === OrderStatus.ReturnFromHallmark ? "Returned" : order.status}
                       </span>
                     </TableCell>
                     {onDelete && (

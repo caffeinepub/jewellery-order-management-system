@@ -2,31 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-reorder-the-columns-in-the-dashboard-ordertable-component-to-display-in-this-exact-sequence-generic-name-karigar-name-design-wt-size-qty-type-remarks-status-preserve-all-existing-functionality-including-row-selection-design-image-viewing-karigar-mapping-and-status-change-from-pending-to-ready",
-      "featureTitle": "Reorder the columns in the dashboard OrderTable component to display in this exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Preserve all existing functionality including row selection, design image viewing, karigar mapping, and status change from pending to ready.",
+      "featureId": "feature-update-the-tag-printing-page-to-display-the-generic-name-alongside-each-design-group-design-groups-should-continue-to-show-the-design-code-order-numbers-and-now-also-include-the-generic-name-for-each-group",
+      "featureTitle": "Update the Tag Printing page to display the Generic Name alongside each design group. Design groups should continue to show the Design Code, order numbers, and now also include the Generic Name for each group.",
       "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-1"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-add-red-highlight-color-to-selected-rows-in-the-ordertable-component-when-a-row-is-selected-via-checkbox",
-      "featureTitle": "Add red highlight color to selected rows in the OrderTable component when a row is selected via checkbox.",
-      "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx"
+        "frontend/src/pages/TagPrinting.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -44,12 +23,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-add-search-functionality-by-both-design-code-and-order-number-in-the-totalorderstab-readytab-and-hallmarktab-components-the-search-should-filter-orders-matching-either-the-design-code-or-order-number",
-      "featureTitle": "Add search functionality by both design code and order number in the TotalOrdersTab, ReadyTab, and HallmarkTab components. The search should filter orders matching either the design code or order number.",
+      "featureId": "feature-add-date-wise-filtering-on-the-tag-printing-page-based-on-the-date-when-an-order-s-status-was-changed-to-ready-include-a-date-range-picker-or-date-filter-ui-that-allows-users-to-filter-design-groups-by-when-orders-became-ready",
+      "featureTitle": "Add date-wise filtering on the Tag Printing page based on the date when an order's status was changed to READY. Include a date range picker or date filter UI that allows users to filter design groups by when orders became READY.",
       "files": [
-        "frontend/src/components/dashboard/HallmarkTab.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/TagPrinting.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -67,11 +45,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-rb-type-orders-supplied-quantity-validation-in-the-suppliedqtydialog-component-to-allow-entering-the-full-order-quantity-when-the-full-quantity-is-supplied-e-g-5-out-of-5-the-order-should-be-marked-as-ready-and-moved-to-the-ready-tab-if-a-partial-quantity-is-supplied-e-g-3-out-of-5-split-the-order-create-a-ready-order-with-the-supplied-quantity-and-keep-a-pending-order-with-the-remaining-quantity-in-total-orders",
-      "featureTitle": "Fix the RB type orders supplied quantity validation in the SuppliedQtyDialog component to allow entering the full order quantity. When the full quantity is supplied (e.g., 5 out of 5), the order should be marked as Ready and moved to the Ready tab. If a partial quantity is supplied (e.g., 3 out of 5), split the order: create a Ready order with the supplied quantity and keep a Pending order with the remaining quantity in Total Orders.",
+      "featureId": "feature-add-functionality-on-the-tag-printing-page-to-select-an-entire-design-group-and-change-its-status-from-ready-to-hallmark-provide-a-checkbox-or-selection-mechanism-for-each-design-group-and-a-bulk-action-button-to-update-the-selected-groups-once-updated-those-orders-should-move-from-the-ready-tab-to-the-hallmark-tab",
+      "featureTitle": "Add functionality on the Tag Printing page to select an entire design group and change its status from READY to HALLMARK. Provide a checkbox or selection mechanism for each design group, and a bulk action button to update the selected groups. Once updated, those orders should move from the Ready tab to the Hallmark tab.",
       "files": [
-        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/TagPrinting.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -89,11 +67,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-add-a-delete-button-to-each-row-in-the-readytab-component-when-clicked-the-order-should-be-moved-back-to-total-orders-with-pending-status-implement-both-the-frontend-ui-control-and-backend-logic-to-handle-this-status-reversal",
-      "featureTitle": "Add a delete button to each row in the ReadyTab component. When clicked, the order should be moved back to Total Orders with Pending status. Implement both the frontend UI control and backend logic to handle this status reversal.",
+      "featureId": "feature-in-the-hallmark-tab-add-functionality-to-select-multiple-orders-and-change-their-status-to-returned-provide-checkboxes-for-order-selection-and-a-button-to-mark-selected-orders-as-returned-when-marked-as-returned-orders-should-move-from-the-hallmark-tab-back-to-the-total-orders-tab-with-their-status-displaying-as-returned",
+      "featureTitle": "In the Hallmark tab, add functionality to select multiple orders and change their status to Returned. Provide checkboxes for order selection and a button to mark selected orders as Returned. When marked as Returned, orders should move from the Hallmark tab back to the Total Orders tab with their status displaying as Returned.",
       "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx"
+        "frontend/src/components/dashboard/HallmarkTab.tsx",
+        "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -111,11 +89,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-remove-all-previous-tag-printing-logic-and-integrations-from-the-tagprinting-tsx-page-including-the-mpn-system-webview-modal-login-session-tracking-and-order-processing-workflows",
-      "featureTitle": "Remove all previous Tag Printing logic and integrations from the TagPrinting.tsx page, including the MPN system webview modal, login session tracking, and order processing workflows.",
+      "featureId": "feature-add-an-export-option-on-the-hallmark-page-that-allows-users-to-export-the-displayed-orders-to-excel-format-the-export-button-should-be-prominently-placed-and-function-similarly-to-existing-export-functionality-on-other-tabs",
+      "featureTitle": "Add an export option on the Hallmark page that allows users to export the displayed orders to Excel format. The export button should be prominently placed and function similarly to existing export functionality on other tabs.",
       "files": [
-        "frontend/src/components/tagprinting/WebviewModal.tsx",
-        "frontend/src/pages/TagPrinting.tsx"
+        "frontend/src/components/dashboard/HallmarkTab.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -133,10 +110,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-redesign-the-tag-printing-page-to-display-ready-status-orders-grouped-by-designcode-for-each-design-group-show-the-design-code-total-count-of-orders-in-that-design-list-of-order-numbers-and-a-copy-for-mpn-button-when-the-button-is-clicked-copy-only-that-group-s-order-numbers-as-a-clean-comma-separated-string-using-join-format-e-g-order1-order2-order3",
-      "featureTitle": "Redesign the Tag Printing page to display READY status orders grouped by designCode. For each design group, show: the design code, total count of orders in that design, list of order numbers, and a 'Copy for MPN' button. When the button is clicked, copy only that group's order numbers as a clean comma-separated string using join(',') format (e.g., order1,order2,order3).",
+      "featureId": "feature-fix-the-pdf-export-functionality-on-the-karigar-tab-to-ensure-exported-pdfs-download-properly-on-mobile-devices-instead-of-only-displaying-the-message-file-exported-implement-proper-mobile-download-handling-for-ios-and-android-devices",
+      "featureTitle": "Fix the PDF export functionality on the Karigar tab to ensure exported PDFs download properly on mobile devices instead of only displaying the message 'file exported'. Implement proper mobile download handling for iOS and Android devices.",
       "files": [
-        "frontend/src/pages/TagPrinting.tsx"
+        "frontend/src/pages/KarigarDetail.tsx",
+        "frontend/src/utils/exportUtils.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -150,6 +128,48 @@
       ],
       "testIds": [
         "REQ-7"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-increase-the-image-size-in-exported-pdf-and-jpeg-files-for-the-karigar-tab-to-improve-clarity-and-readability-design-images-should-be-larger-and-more-detailed-in-the-exported-documents",
+      "featureTitle": "Increase the image size in exported PDF and JPEG files for the Karigar tab to improve clarity and readability. Design images should be larger and more detailed in the exported documents.",
+      "files": [
+        "frontend/src/utils/exportUtils.ts"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-8"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-export-options-for-both-daily-orders-and-total-orders-in-the-karigar-tab-provide-separate-export-buttons-or-a-dropdown-menu-to-allow-users-to-export-either-the-daily-orders-or-total-orders-for-the-selected-karigar",
+      "featureTitle": "Add export options for both Daily Orders and Total Orders in the Karigar tab. Provide separate export buttons or a dropdown menu to allow users to export either the daily orders or total orders for the selected karigar.",
+      "files": [
+        "frontend/src/pages/KarigarDetail.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-9"
       ],
       "confidence": "high"
     }

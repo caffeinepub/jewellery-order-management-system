@@ -7,14 +7,17 @@ export async function exportToExcel(orders: Order[]) {
     const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
     
     const data = orders.map((order) => ({
+      "Order No": order.orderNo,
       Design: order.design,
       "Generic Name": order.genericName || "-",
       Karigar: order.karigarName || "-",
       "Weight (g)": order.weight,
       Size: order.size,
       Quantity: Number(order.quantity),
+      Type: order.orderType,
+      Product: order.product,
       Remarks: order.remarks || "-",
-      Status: order.status,
+      Status: order.status === "ReturnFromHallmark" ? "Returned" : order.status,
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -65,7 +68,7 @@ async function loadImageAsBase64(imageUrl: string): Promise<string | null> {
           return;
         }
         ctx.drawImage(img, 0, 0);
-        const base64 = canvas.toDataURL('image/jpeg', 0.9);
+        const base64 = canvas.toDataURL('image/jpeg', 0.95);
         resolve(base64);
       } catch (error) {
         console.error('Failed to convert image to base64:', error);
@@ -87,7 +90,17 @@ function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 }
 
-export async function exportToPDF(orders: Order[], actor?: any): Promise<string> {
+// Detect if device is Android
+function isAndroid(): boolean {
+  return /Android/i.test(navigator.userAgent);
+}
+
+// Detect if device is mobile
+function isMobile(): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+export async function exportToPDF(orders: Order[], actor?: any): Promise<void> {
   if (!actor) {
     throw new Error('Actor is required for PDF export with images');
   }
@@ -142,7 +155,7 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
           border-radius: 4px;
         }
         .image-container { text-align: center; margin: 15px 0; }
-        .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
+        .image-container img { max-width: 500px; max-height: 500px; border: 2px solid #ddd; border-radius: 4px; }
         .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
       </style>
     </head>
@@ -188,7 +201,7 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
         <td>${order.size.toFixed(2)}</td>
         <td>${order.quantity}</td>
         <td>${order.remarks || "-"}</td>
-        <td>${order.status}</td>
+        <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
       </tr>`;
     });
 
@@ -197,35 +210,35 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
 
   html += `</body></html>`;
 
-  // Create blob
+  // Create blob and trigger download
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
   
-  // iOS-compatible export: open in new window
-  if (isIOS()) {
-    const printWindow = window.open(blobUrl, '_blank');
-    if (printWindow) {
-      printWindow.addEventListener('load', () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      });
-    } else {
-      throw new Error('Failed to open print window. Please allow popups for this site.');
-    }
+  // Mobile-specific handling
+  if (isMobile()) {
+    // For mobile devices, use anchor element with download attribute
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `orders_${new Date().toISOString().split("T")[0]}.html`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   } else {
-    // Desktop: open in new window for printing
-    const printWindow = window.open(blobUrl, '_blank');
-    if (printWindow) {
-      printWindow.addEventListener('load', () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      });
-    }
+    // For desktop, use anchor element
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `orders_${new Date().toISOString().split("T")[0]}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   }
-  
-  return blobUrl;
 }
 
 export async function exportToJPEG(orders: Order[], actor?: any) {
@@ -281,7 +294,7 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
           border-radius: 4px;
         }
         .image-container { text-align: center; margin: 15px 0; }
-        .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
+        .image-container img { max-width: 500px; max-height: 500px; border: 2px solid #ddd; border-radius: 4px; }
         .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
       </style>
     </head>
@@ -326,7 +339,7 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
         <td>${order.size.toFixed(2)}</td>
         <td>${order.quantity}</td>
         <td>${order.remarks || "-"}</td>
-        <td>${order.status}</td>
+        <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
       </tr>`;
     });
 
@@ -335,34 +348,18 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
 
   html += `</body></html>`;
 
-  // iOS-compatible export: open in new window
-  if (isIOS()) {
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
-    } else {
-      throw new Error('Failed to open print window. Please allow popups for this site.');
-    }
-  } else {
-    // Desktop: standard approach
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
-    }
+  // Create blob
+  const blob = new Blob([html], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  
+  // Open in new window for screenshot/save
+  const printWindow = window.open(blobUrl, '_blank');
+  if (!printWindow) {
+    throw new Error('Failed to open window. Please allow popups for this site.');
   }
 }
 
-export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any): Promise<string> {
+export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any): Promise<void> {
   if (!actor) {
     throw new Error('Actor is required for PDF export with images');
   }
@@ -417,12 +414,12 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
           border-radius: 4px;
         }
         .image-container { text-align: center; margin: 15px 0; }
-        .image-container img { max-width: 300px; max-height: 300px; border: 2px solid #ddd; border-radius: 4px; }
+        .image-container img { max-width: 500px; max-height: 500px; border: 2px solid #ddd; border-radius: 4px; }
         .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
       </style>
     </head>
     <body>
-      <h1>Shree I Jewellery</h1>
+      <h1>Shree I Jewellery - ${karigarName}</h1>
       <h2>Orders - ${new Date().toLocaleDateString()}</h2>
   `;
 
@@ -445,7 +442,6 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
       <thead>
         <tr>
           <th>Generic Name</th>
-          <th>Karigar</th>
           <th>Weight</th>
           <th>Size</th>
           <th>Qty</th>
@@ -458,12 +454,11 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
     designOrders.forEach((order) => {
       html += `<tr>
         <td>${order.genericName || "-"}</td>
-        <td>${order.karigarName || "-"}</td>
         <td>${order.weight.toFixed(3)}</td>
         <td>${order.size.toFixed(2)}</td>
         <td>${order.quantity}</td>
         <td>${order.remarks || "-"}</td>
-        <td>${order.status}</td>
+        <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
       </tr>`;
     });
 
@@ -472,33 +467,33 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
 
   html += `</body></html>`;
 
-  // Create blob
+  // Create blob and trigger download
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
   
-  // iOS-compatible export: open in new window
-  if (isIOS()) {
-    const printWindow = window.open(blobUrl, '_blank');
-    if (printWindow) {
-      printWindow.addEventListener('load', () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      });
-    } else {
-      throw new Error('Failed to open print window. Please allow popups for this site.');
-    }
+  // Mobile-specific handling
+  if (isMobile()) {
+    // For mobile devices, use anchor element with download attribute
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `${karigarName}_orders_${new Date().toISOString().split("T")[0]}.html`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   } else {
-    // Desktop: open in new window for printing
-    const printWindow = window.open(blobUrl, '_blank');
-    if (printWindow) {
-      printWindow.addEventListener('load', () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      });
-    }
+    // For desktop, use anchor element
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `${karigarName}_orders_${new Date().toISOString().split("T")[0]}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   }
-  
-  return blobUrl;
 }

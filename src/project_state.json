@@ -1,70 +1,78 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management dashboard with Karigar mapping, design viewing, status tracking, and tag printing functionality",
+  "summary": "Jewelry order management system with Master Design lookup, Karigar/Generic name auto-fill, Tag Printing with design groups, Hallmark workflow (READY → HALLMARK → Returned), and export functionality across multiple tabs",
   "architectural_notes": [
-    "Dashboard displays order data with columns: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status",
-    "Row selection features: design view, Karigar mapping, status changes (pending to ready)",
-    "RB type orders: full quantity update triggers auto-move from total orders to ready tab; partial updates keep pending qty in total orders",
-    "Ready tab rows can be deleted, moving orders back to total orders with pending status",
-    "Tag Printing groups READY orders by designCode with order count and comma-separated order numbers for MPN copying"
+    "Master Design table lookup: Design Code → Karigar Name + Generic Name",
+    "Order status workflow: READY → HALLMARK → Returned → Total Orders",
+    "Tab-based dashboard with dynamic order movement based on status changes",
+    "Export functionality required across Hallmark and Karigar tabs (PDF/JPEG)",
+    "Mobile-responsive PDF downloads with enhanced image resolution"
   ],
   "known_issues": [],
-  "isFixRequest": true,
+  "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-reorder-the-columns-in-the-dashboard-ordertable-component-to-display-in-this-exact-sequence-generic-name-karigar-name-design-wt-size-qty-type-remarks-status-preserve-all-existing-functionality-including-row-selection-design-image-viewing-karigar-mapping-and-status-change-from-pending-to-ready",
-      "title": "Reorder the columns in the dashboard OrderTable component to display in this exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Preserve all existing functionality including row selection, design image viewing, karigar mapping, and status change from pending to ready.",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-add-red-highlight-color-to-selected-rows-in-the-ordertable-component-when-a-row-is-selected-via-checkbox",
-      "title": "Add red highlight color to selected rows in the OrderTable component when a row is selected via checkbox.",
+      "id": "feature-update-the-tag-printing-page-to-display-the-generic-name-alongside-each-design-group-design-groups-should-continue-to-show-the-design-code-order-numbers-and-now-also-include-the-generic-name-for-each-group",
+      "title": "Update the Tag Printing page to display the Generic Name alongside each design group. Design groups should continue to show the Design Code, order numbers, and now also include the Generic Name for each group.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-search-functionality-by-both-design-code-and-order-number-in-the-totalorderstab-readytab-and-hallmarktab-components-the-search-should-filter-orders-matching-either-the-design-code-or-order-number",
-      "title": "Add search functionality by both design code and order number in the TotalOrdersTab, ReadyTab, and HallmarkTab components. The search should filter orders matching either the design code or order number.",
+      "id": "feature-add-date-wise-filtering-on-the-tag-printing-page-based-on-the-date-when-an-order-s-status-was-changed-to-ready-include-a-date-range-picker-or-date-filter-ui-that-allows-users-to-filter-design-groups-by-when-orders-became-ready",
+      "title": "Add date-wise filtering on the Tag Printing page based on the date when an order's status was changed to READY. Include a date range picker or date filter UI that allows users to filter design groups by when orders became READY.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-rb-type-orders-supplied-quantity-validation-in-the-suppliedqtydialog-component-to-allow-entering-the-full-order-quantity-when-the-full-quantity-is-supplied-e-g-5-out-of-5-the-order-should-be-marked-as-ready-and-moved-to-the-ready-tab-if-a-partial-quantity-is-supplied-e-g-3-out-of-5-split-the-order-create-a-ready-order-with-the-supplied-quantity-and-keep-a-pending-order-with-the-remaining-quantity-in-total-orders",
-      "title": "Fix the RB type orders supplied quantity validation in the SuppliedQtyDialog component to allow entering the full order quantity. When the full quantity is supplied (e.g., 5 out of 5), the order should be marked as Ready and moved to the Ready tab. If a partial quantity is supplied (e.g., 3 out of 5), split the order: create a Ready order with the supplied quantity and keep a Pending order with the remaining quantity in Total Orders.",
+      "id": "feature-add-functionality-on-the-tag-printing-page-to-select-an-entire-design-group-and-change-its-status-from-ready-to-hallmark-provide-a-checkbox-or-selection-mechanism-for-each-design-group-and-a-bulk-action-button-to-update-the-selected-groups-once-updated-those-orders-should-move-from-the-ready-tab-to-the-hallmark-tab",
+      "title": "Add functionality on the Tag Printing page to select an entire design group and change its status from READY to HALLMARK. Provide a checkbox or selection mechanism for each design group, and a bulk action button to update the selected groups. Once updated, those orders should move from the Ready tab to the Hallmark tab.",
       "reqIds": [
         "REQ-4"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-a-delete-button-to-each-row-in-the-readytab-component-when-clicked-the-order-should-be-moved-back-to-total-orders-with-pending-status-implement-both-the-frontend-ui-control-and-backend-logic-to-handle-this-status-reversal",
-      "title": "Add a delete button to each row in the ReadyTab component. When clicked, the order should be moved back to Total Orders with Pending status. Implement both the frontend UI control and backend logic to handle this status reversal.",
+      "id": "feature-in-the-hallmark-tab-add-functionality-to-select-multiple-orders-and-change-their-status-to-returned-provide-checkboxes-for-order-selection-and-a-button-to-mark-selected-orders-as-returned-when-marked-as-returned-orders-should-move-from-the-hallmark-tab-back-to-the-total-orders-tab-with-their-status-displaying-as-returned",
+      "title": "In the Hallmark tab, add functionality to select multiple orders and change their status to Returned. Provide checkboxes for order selection and a button to mark selected orders as Returned. When marked as Returned, orders should move from the Hallmark tab back to the Total Orders tab with their status displaying as Returned.",
       "reqIds": [
         "REQ-5"
       ],
       "version": 1
     },
     {
-      "id": "feature-remove-all-previous-tag-printing-logic-and-integrations-from-the-tagprinting-tsx-page-including-the-mpn-system-webview-modal-login-session-tracking-and-order-processing-workflows",
-      "title": "Remove all previous Tag Printing logic and integrations from the TagPrinting.tsx page, including the MPN system webview modal, login session tracking, and order processing workflows.",
+      "id": "feature-add-an-export-option-on-the-hallmark-page-that-allows-users-to-export-the-displayed-orders-to-excel-format-the-export-button-should-be-prominently-placed-and-function-similarly-to-existing-export-functionality-on-other-tabs",
+      "title": "Add an export option on the Hallmark page that allows users to export the displayed orders to Excel format. The export button should be prominently placed and function similarly to existing export functionality on other tabs.",
       "reqIds": [
         "REQ-6"
       ],
       "version": 1
     },
     {
-      "id": "feature-redesign-the-tag-printing-page-to-display-ready-status-orders-grouped-by-designcode-for-each-design-group-show-the-design-code-total-count-of-orders-in-that-design-list-of-order-numbers-and-a-copy-for-mpn-button-when-the-button-is-clicked-copy-only-that-group-s-order-numbers-as-a-clean-comma-separated-string-using-join-format-e-g-order1-order2-order3",
-      "title": "Redesign the Tag Printing page to display READY status orders grouped by designCode. For each design group, show: the design code, total count of orders in that design, list of order numbers, and a 'Copy for MPN' button. When the button is clicked, copy only that group's order numbers as a clean comma-separated string using join(',') format (e.g., order1,order2,order3).",
+      "id": "feature-fix-the-pdf-export-functionality-on-the-karigar-tab-to-ensure-exported-pdfs-download-properly-on-mobile-devices-instead-of-only-displaying-the-message-file-exported-implement-proper-mobile-download-handling-for-ios-and-android-devices",
+      "title": "Fix the PDF export functionality on the Karigar tab to ensure exported PDFs download properly on mobile devices instead of only displaying the message 'file exported'. Implement proper mobile download handling for iOS and Android devices.",
       "reqIds": [
         "REQ-7"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-increase-the-image-size-in-exported-pdf-and-jpeg-files-for-the-karigar-tab-to-improve-clarity-and-readability-design-images-should-be-larger-and-more-detailed-in-the-exported-documents",
+      "title": "Increase the image size in exported PDF and JPEG files for the Karigar tab to improve clarity and readability. Design images should be larger and more detailed in the exported documents.",
+      "reqIds": [
+        "REQ-8"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-export-options-for-both-daily-orders-and-total-orders-in-the-karigar-tab-provide-separate-export-buttons-or-a-dropdown-menu-to-allow-users-to-export-either-the-daily-orders-or-total-orders-for-the-selected-karigar",
+      "title": "Add export options for both Daily Orders and Total Orders in the Karigar tab. Provide separate export buttons or a dropdown menu to allow users to export either the daily orders or total orders for the selected karigar.",
+      "reqIds": [
+        "REQ-9"
       ],
       "version": 1
     }
@@ -72,48 +80,56 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Reorder dashboard columns: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status",
+      "summary": "Auto-fill Karigar Name and Generic Name from Master Design based on Design Code",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Add red highlight color when a row is selected",
+      "summary": "Tag Printing: Display Generic Name with design groups and add date-wise filtering by READY status change date",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-3",
-      "summary": "Add search by design and order number in total orders, ready, and hallmark tabs",
+      "summary": "Tag Printing: Select entire design group and change status from READY to HALLMARK",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-4",
-      "summary": "Fix RB type orders quantity update to allow full quantity selection and auto-move completed orders to ready tab",
+      "summary": "Hallmark tab: Select orders and change status to Returned, moving them back to Total Orders tab",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-5",
-      "summary": "Add delete option in ready tab rows that moves orders back to total orders with pending status",
+      "summary": "Add export option on Hallmark page",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-6",
-      "summary": "Remove all previous Tag Printing logic and integrations",
+      "summary": "Karigar tab: Fix PDF download on mobile devices and increase image size in exported PDF/JPEG files",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-7",
-      "summary": "Redesign Tag Printing page to group READY orders by designCode with copy for MPN button",
+      "summary": "Karigar tab: Add export options for Daily Orders and Total Orders",
       "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-8",
+      "summary": "Implement automatic lookup of Design Code in Master Design data when orders are ingested or created. When a matching Design Code is found, automatically populate the Karigar Name and Generic Name fields in the Orders table with the values from Master Design.",
+      "reqIds": [
+        "REQ-1"
+      ],
       "status": "pending"
     }
   ],
-  "projectName": "Jewellery Order Management",
+  "projectName": "Jewelry Order Management",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

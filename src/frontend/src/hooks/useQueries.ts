@@ -10,7 +10,7 @@ export function useGetAllOrders() {
     queryKey: ["orders"],
     queryFn: async () => {
       if (!actor) return [];
-      const orders = await actor.getAllOrders();
+      const orders = await actor.getOrdersWithMappings();
       
       return orders.map((order) => ({
         ...order,
@@ -29,7 +29,27 @@ export function useGetReadyOrders() {
     queryKey: ["ready-orders"],
     queryFn: async () => {
       if (!actor) return [];
-      const orders = await actor.getReadyOrders();
+      const orders = await actor.getOrdersWithMappings();
+      
+      return orders
+        .filter((order) => order.status === OrderStatus.Ready)
+        .map((order) => ({
+          ...order,
+          genericName: order.genericName || undefined,
+          karigarName: order.karigarName || undefined,
+        }));
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetReadyOrdersByDateRange() {
+  const { actor, isFetching } = useActor();
+
+  return useMutation({
+    mutationFn: async ({ startDate, endDate }: { startDate: bigint; endDate: bigint }) => {
+      if (!actor) return [];
+      const orders = await actor.getReadyOrdersByDateRange(startDate, endDate);
       
       return orders.map((order) => ({
         ...order,
@@ -37,7 +57,6 @@ export function useGetReadyOrders() {
         karigarName: order.karigarName || undefined,
       }));
     },
-    enabled: !!actor && !isFetching,
   });
 }
 
@@ -88,7 +107,7 @@ export function useGetOrdersByKarigar(karigarName: string) {
     queryKey: ["orders", "karigar", karigarName],
     queryFn: async () => {
       if (!actor) return [];
-      const orders = await actor.getAllOrders();
+      const orders = await actor.getOrdersWithMappings();
       
       return orders
         .filter((order) => order.karigarName === karigarName)
@@ -539,7 +558,7 @@ export function useDeleteReadyOrder() {
   });
 }
 
-export function useBulkUpdateStatus() {
+export function useBatchUpdateOrderStatus() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
@@ -552,18 +571,46 @@ export function useBulkUpdateStatus() {
       newStatus: OrderStatus;
     }) => {
       if (!actor) throw new Error("Actor not initialized");
-      
-      if (newStatus === OrderStatus.Ready) {
-        await actor.markOrdersAsReady(orderIds);
-      } else {
-        throw new Error("Only Ready status is supported for bulk updates");
-      }
+      await actor.batchUpdateOrderStatus(orderIds, newStatus);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["ready-orders"] });
       queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
       queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
+    },
+  });
+}
+
+export function useUpdateDesignGroupStatus() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (designCodes: string[]) => {
+      if (!actor) throw new Error("Actor not initialized");
+      await actor.updateDesignGroupStatus(designCodes);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ready-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+    },
+  });
+}
+
+export function useMarkOrdersAsReturned() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderIds: string[]) => {
+      if (!actor) throw new Error("Actor not initialized");
+      await actor.markOrdersAsReturned(orderIds);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
     },
   });
 }

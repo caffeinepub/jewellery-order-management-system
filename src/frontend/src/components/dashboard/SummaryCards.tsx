@@ -20,11 +20,6 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
       return [];
     }
 
-    // If no active tab or karigars tab, show all orders
-    if (!activeTab || activeTab === "karigars") {
-      return orders;
-    }
-
     // Filter based on active tab
     let result = orders;
     
@@ -55,11 +50,9 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
         break;
 
       case "hallmark":
-        // Hallmark tab: Hallmark and ReturnFromHallmark orders
+        // Hallmark tab: Hallmark orders only
         result = orders.filter(
-          (order) =>
-            order?.status === OrderStatus.Hallmark ||
-            order?.status === OrderStatus.ReturnFromHallmark
+          (order) => order?.status === OrderStatus.Hallmark
         );
         break;
 
@@ -72,6 +65,15 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
         );
         break;
 
+      case "karigars":
+        // Karigars tab: show same as total orders (Pending and ReturnFromHallmark)
+        result = orders.filter(
+          (order) =>
+            order?.status === OrderStatus.Pending ||
+            order?.status === OrderStatus.ReturnFromHallmark
+        );
+        break;
+
       default:
         result = orders;
     }
@@ -80,8 +82,9 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
   }, [orders, activeTab]);
 
   // Calculate metrics with safe fallbacks using optional chaining
+  // Total weight = sum of (weight × quantity) for all rows
   const totalOrders = filteredOrders?.length ?? 0;
-  const totalWeight = filteredOrders?.reduce((sum, order) => sum + (order?.weight ?? 0), 0) ?? 0;
+  const totalWeight = filteredOrders?.reduce((sum, order) => sum + ((order?.weight ?? 0) * Number(order?.quantity ?? 0)), 0) ?? 0;
   const totalQuantity = filteredOrders?.reduce((sum, order) => sum + Number(order?.quantity ?? 0), 0) ?? 0;
   const customerOrders = filteredOrders?.filter((order) => order?.orderType === OrderType.CO)?.length ?? 0;
 
