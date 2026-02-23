@@ -97,10 +97,10 @@ export interface MappingRecord {
 export type Time = bigint;
 export interface DesignMapping {
     createdAt: Time;
-    createdBy: Principal;
+    createdBy: string;
     karigarName: string;
     updatedAt: Time;
-    updatedBy?: Principal;
+    updatedBy?: string;
     genericName: string;
     designCode: string;
 }
@@ -114,7 +114,7 @@ export interface _CaffeineStorageCreateCertificateResult {
 export interface Karigar {
     name: string;
     createdAt: Time;
-    createdBy: Principal;
+    createdBy: string;
 }
 export interface Order {
     weight: number;
@@ -369,14 +369,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getDesignImage(arg0);
-                return from_candid_opt_n28(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getDesignImage(arg0);
-            return from_candid_opt_n28(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
         }
     }
     async getDesignMapping(arg0: string): Promise<DesignMapping> {
@@ -411,14 +411,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getMasterDesignExcel();
-                return from_candid_opt_n28(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getMasterDesignExcel();
-            return from_candid_opt_n28(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
         }
     }
     async getMasterDesignKarigars(): Promise<Array<string>> {
@@ -438,14 +438,14 @@ export class Backend implements backendInterface {
     async getOrders(arg0: OrderStatus | null, arg1: OrderType | null, arg2: string | null): Promise<Array<Order>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getOrders(to_candid_opt_n30(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n33(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n36(this._uploadFile, this._downloadFile, arg2));
+                const result = await this.actor.getOrders(to_candid_opt_n29(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n32(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n35(this._uploadFile, this._downloadFile, arg2));
                 return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getOrders(to_candid_opt_n30(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n33(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n36(this._uploadFile, this._downloadFile, arg2));
+            const result = await this.actor.getOrders(to_candid_opt_n29(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n32(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n35(this._uploadFile, this._downloadFile, arg2));
             return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -536,14 +536,14 @@ export class Backend implements backendInterface {
     async saveOrder(arg0: string, arg1: OrderType, arg2: string, arg3: string, arg4: number, arg5: number, arg6: bigint, arg7: string, arg8: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n34(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n33(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n34(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n33(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
             return result;
         }
     }
@@ -635,7 +635,7 @@ export class Backend implements backendInterface {
 function from_candid_DesignMapping_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _DesignMapping): DesignMapping {
     return from_candid_record_n18(_uploadFile, _downloadFile, value);
 }
-async function from_candid_ExternalBlob_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExternalBlob): Promise<ExternalBlob> {
+async function from_candid_ExternalBlob_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExternalBlob): Promise<ExternalBlob> {
     return await _downloadFile(value);
 }
 function from_candid_OrderStatus_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrderStatus): OrderStatus {
@@ -650,14 +650,11 @@ function from_candid_Order_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint
 function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: __CaffeineStorageRefillResult): _CaffeineStorageRefillResult {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [Principal]): Principal | null {
+function from_candid_opt_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
-    return value.length === 0 ? null : value[0];
-}
-async function from_candid_opt_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ExternalBlob]): Promise<ExternalBlob | null> {
-    return value.length === 0 ? null : await from_candid_ExternalBlob_n29(_uploadFile, _downloadFile, value[0]);
+async function from_candid_opt_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ExternalBlob]): Promise<ExternalBlob | null> {
+    return value.length === 0 ? null : await from_candid_ExternalBlob_n28(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];
@@ -667,18 +664,18 @@ function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Ar
 }
 function from_candid_record_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     createdAt: _Time;
-    createdBy: Principal;
+    createdBy: string;
     karigarName: string;
     updatedAt: _Time;
-    updatedBy: [] | [Principal];
+    updatedBy: [] | [string];
     genericName: string;
     designCode: string;
 }): {
     createdAt: Time;
-    createdBy: Principal;
+    createdBy: string;
     karigarName: string;
     updatedAt: Time;
-    updatedBy?: Principal;
+    updatedBy?: string;
     genericName: string;
     designCode: string;
 } {
@@ -732,9 +729,9 @@ function from_candid_record_n22(_uploadFile: (file: ExternalBlob) => Promise<Uin
         design: value.design,
         orderId: value.orderId,
         orderNo: value.orderNo,
-        karigarName: record_opt_to_undefined(from_candid_opt_n27(_uploadFile, _downloadFile, value.karigarName)),
+        karigarName: record_opt_to_undefined(from_candid_opt_n19(_uploadFile, _downloadFile, value.karigarName)),
         updatedAt: value.updatedAt,
-        genericName: record_opt_to_undefined(from_candid_opt_n27(_uploadFile, _downloadFile, value.genericName)),
+        genericName: record_opt_to_undefined(from_candid_opt_n19(_uploadFile, _downloadFile, value.genericName)),
         quantity: value.quantity,
         remarks: value.remarks,
         product: value.product
@@ -788,11 +785,11 @@ function to_candid_DesignMapping_n10(_uploadFile: (file: ExternalBlob) => Promis
 async function to_candid_ExternalBlob_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExternalBlob): Promise<_ExternalBlob> {
     return await _uploadFile(value);
 }
-function to_candid_OrderStatus_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): _OrderStatus {
-    return to_candid_variant_n32(_uploadFile, _downloadFile, value);
+function to_candid_OrderStatus_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): _OrderStatus {
+    return to_candid_variant_n31(_uploadFile, _downloadFile, value);
 }
-function to_candid_OrderType_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): _OrderType {
-    return to_candid_variant_n35(_uploadFile, _downloadFile, value);
+function to_candid_OrderType_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): _OrderType {
+    return to_candid_variant_n34(_uploadFile, _downloadFile, value);
 }
 function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation): __CaffeineStorageRefillInformation {
     return to_candid_record_n3(_uploadFile, _downloadFile, value);
@@ -800,29 +797,29 @@ function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: Exte
 function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation | null): [] | [__CaffeineStorageRefillInformation] {
     return value === null ? candid_none() : candid_some(to_candid__CaffeineStorageRefillInformation_n2(_uploadFile, _downloadFile, value));
 }
-function to_candid_opt_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus | null): [] | [_OrderStatus] {
-    return value === null ? candid_none() : candid_some(to_candid_OrderStatus_n31(_uploadFile, _downloadFile, value));
+function to_candid_opt_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus | null): [] | [_OrderStatus] {
+    return value === null ? candid_none() : candid_some(to_candid_OrderStatus_n30(_uploadFile, _downloadFile, value));
 }
-function to_candid_opt_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType | null): [] | [_OrderType] {
-    return value === null ? candid_none() : candid_some(to_candid_OrderType_n34(_uploadFile, _downloadFile, value));
+function to_candid_opt_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType | null): [] | [_OrderType] {
+    return value === null ? candid_none() : candid_some(to_candid_OrderType_n33(_uploadFile, _downloadFile, value));
 }
-function to_candid_opt_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+function to_candid_opt_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
     return value === null ? candid_none() : candid_some(value);
 }
 function to_candid_record_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     createdAt: Time;
-    createdBy: Principal;
+    createdBy: string;
     karigarName: string;
     updatedAt: Time;
-    updatedBy?: Principal;
+    updatedBy?: string;
     genericName: string;
     designCode: string;
 }): {
     createdAt: _Time;
-    createdBy: Principal;
+    createdBy: string;
     karigarName: string;
     updatedAt: _Time;
-    updatedBy: [] | [Principal];
+    updatedBy: [] | [string];
     genericName: string;
     designCode: string;
 } {
@@ -857,7 +854,7 @@ function to_candid_tuple_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Ar
         to_candid_DesignMapping_n10(_uploadFile, _downloadFile, value[1])
     ];
 }
-function to_candid_variant_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): {
+function to_candid_variant_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): {
     Ready: null;
 } | {
     Hallmark: null;
@@ -876,7 +873,7 @@ function to_candid_variant_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint
         Pending: null
     } : value;
 }
-function to_candid_variant_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): {
+function to_candid_variant_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): {
     CO: null;
 } | {
     RB: null;

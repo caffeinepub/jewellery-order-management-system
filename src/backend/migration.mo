@@ -1,44 +1,25 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
-import Text "mo:core/Text";
+import Time "mo:core/Time";
+import Storage "blob-storage/Storage";
+import Principal "mo:core/Principal";
 
 module {
-  // Old types
-  type PersistentOrder = {
-    orderNo : Text;
-    orderType : {
-      #CO;
-      #RB;
-    };
-    product : Text;
-    design : Text;
-    weight : Float;
-    size : Float;
-    quantity : Nat;
-    remarks : Text;
-    status : {
-      #Pending;
-      #Ready;
-      #Hallmark;
-      #ReturnFromHallmark;
-    };
-    orderId : Text;
-    createdAt : Int;
-    updatedAt : Int;
+  type OrderType = {
+    #CO;
+    #RB;
   };
 
-  type OldActor = {
-    orders : Map.Map<Text, PersistentOrder>;
-    readyOrders : Map.Map<Text, PersistentOrder>;
+  type OrderStatus = {
+    #Pending;
+    #Ready;
+    #Hallmark;
+    #ReturnFromHallmark;
   };
 
-  // New types
   type Order = {
     orderNo : Text;
-    orderType : {
-      #CO;
-      #RB;
-    };
+    orderType : OrderType;
     product : Text;
     design : Text;
     weight : Float;
@@ -47,47 +28,94 @@ module {
     remarks : Text;
     genericName : ?Text;
     karigarName : ?Text;
-    status : {
-      #Pending;
-      #Ready;
-      #Hallmark;
-      #ReturnFromHallmark;
-    };
+    status : OrderStatus;
     orderId : Text;
-    createdAt : Int;
-    updatedAt : Int;
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+  };
+
+  type OldDesignMapping = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
+    createdBy : Principal;
+    updatedBy : ?Principal;
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+  };
+
+  type NewDesignMapping = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
+    createdBy : Text;
+    updatedBy : ?Text;
+    createdAt : Time.Time;
+    updatedAt : Time.Time;
+  };
+
+  type OldKarigar = {
+    name : Text;
+    createdBy : Principal;
+    createdAt : Time.Time;
+  };
+
+  type NewKarigar = {
+    name : Text;
+    createdBy : Text;
+    createdAt : Time.Time;
+  };
+
+  type OldActor = {
+    orders : Map.Map<Text, Order>;
+    readyOrders : Map.Map<Text, Order>;
+    designMappings : Map.Map<Text, OldDesignMapping>;
+    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    masterDesignMappings : Map.Map<Text, OldDesignMapping>;
+    karigars : Map.Map<Text, OldKarigar>;
+    masterDesignKarigars : Map.Map<Text, Nat>;
+    masterDesignExcel : ?Storage.ExternalBlob;
+    activeKarigar : ?Text;
   };
 
   type NewActor = {
     orders : Map.Map<Text, Order>;
-    readyOrders : Map.Map<Text, Order>;
+    designMappings : Map.Map<Text, NewDesignMapping>;
+    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    karigars : Map.Map<Text, NewKarigar>;
+    masterDesignKarigars : Map.Map<Text, Nat>;
+    masterDesignExcel : ?Storage.ExternalBlob;
+    activeKarigar : ?Text;
   };
 
   public func run(old : OldActor) : NewActor {
-    let newOrders = old.orders.map<Text, PersistentOrder, Order>(
-      func(_id, oldOrder) {
+    let newDesignMappings = old.designMappings.map<Text, OldDesignMapping, NewDesignMapping>(
+      func(_designCode, mapping) {
         {
-          oldOrder with
-          genericName = null;
-          karigarName = null;
+          mapping with
+          createdBy = mapping.createdBy.toText();
+          updatedBy = mapping.updatedBy.map(func(principal) { principal.toText() });
         };
       }
     );
 
-    let newReadyOrders = old.readyOrders.map<Text, PersistentOrder, Order>(
-      func(_id, oldOrder) {
+    let newKarigars = old.karigars.map<Text, OldKarigar, NewKarigar>(
+      func(_name, karigar) {
         {
-          oldOrder with
-          genericName = null;
-          karigarName = null;
+          karigar with
+          createdBy = karigar.createdBy.toText();
         };
       }
     );
 
     {
-      old with
-      orders = newOrders;
-      readyOrders = newReadyOrders;
+      orders = old.orders;
+      designMappings = newDesignMappings;
+      designImages = old.designImages;
+      karigars = newKarigars;
+      masterDesignKarigars = old.masterDesignKarigars;
+      masterDesignExcel = old.masterDesignExcel;
+      activeKarigar = old.activeKarigar;
     };
   };
 };

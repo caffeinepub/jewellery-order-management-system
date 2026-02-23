@@ -1,24 +1,51 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-23T04:32:06.626Z",
-  "summary": "The implementation addresses REQ-1, REQ-2, and REQ-3 by enriching orders with design mapping data in frontend queries. However, REQ-4 (RB order splitting preservation) appears incomplete - the backend supplyOrder function does not explicitly preserve karigarName and genericName fields when creating split orders.",
+  "generatedAt": "2026-02-23T04:44:47.313Z",
+  "summary": "The diff implements backend migration infrastructure and PDF export functionality, but does not address the core requirements: no investigation or fix for the Ready tab visibility issue (REQ-1), no JPEG export implementation (REQ-2), and the PDF export appears incomplete with truncated code (REQ-3).",
   "missing_requirements": [
     {
-      "id": "REQ-4",
-      "requirement": "Verify that RB order splitting logic preserves karigarName and genericName in both original and newly created order records",
-      "reason": "The backend supplyOrder function creates readyOrder using 'originalOrder with' syntax but does not explicitly preserve karigarName and genericName fields. The diff shows the function but without clear evidence that these optional fields are being preserved during the split operation.",
+      "id": "REQ-1",
+      "requirement": "Investigate and fix why order number 5038CO2600743-001 with Ready status is not appearing in the Ready tab dashboard. Verify the order status filtering logic in the backend query and frontend ReadyTab component.",
+      "reason": "No evidence of investigation, debugging, or fixes to backend query logic or ReadyTab filtering. The backend migration removed 'readyOrders' map but no new query logic for Ready status filtering is shown. ReadyTab component description in frontend-file-summaries.txt mentions filtering by status === 'Ready', but no actual code changes to fix the visibility issue.",
       "evidence": [
+        "backend/main.mo",
+        "backend/migration.mo"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "requirement": "Fix the JPEG export functionality in OrderTable and KarigarDetail components.",
+      "reason": "No JPEG export functionality implemented. The exportUtils.ts file only shows exportToExcel and exportToPDF functions. No exportToJPEG function exists, and no changes to OrderTable or KarigarDetail components for JPEG export are evident.",
+      "evidence": [
+        "frontend/src/utils/exportUtils.ts"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "requirement": "Fix the PDF export functionality including design images in OrderTable and KarigarDetail components.",
+      "reason": "PDF export implementation appears in exportUtils.ts but is truncated mid-function. Cannot verify completeness, error handling, or integration with OrderTable and KarigarDetail components. No evidence of fixes to existing errors or testing of the implementation.",
+      "evidence": [
+        "frontend/src/utils/exportUtils.ts"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Backend migration system that converts Principal types to Text for createdBy/updatedBy fields in DesignMapping and Karigar types, and removes readyOrders map.",
+      "reason": "No migration functionality was requested in BuildRequest. The constraints explicitly state 'Do not modify the backend order data structure', yet the migration removes the readyOrders map and changes type definitions.",
+      "evidence": [
+        "backend/migration.mo",
         "backend/main.mo"
       ]
     }
   ],
-  "hallucinated_features": [],
-  "confidence": 0.75,
+  "confidence": 0.85,
   "changed_files": [
     "backend/main.mo",
+    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/utils/exportUtils.ts",
     "project_state.json"
   ]
 }

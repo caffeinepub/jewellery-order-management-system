@@ -1,23 +1,27 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Business dashboard app with RB order splitting and status filtering. Current focus: fixing Karigar/generic name display issue introduced in Version 41",
-  "architectural_notes": [
-    "Dashboard displays orders with Karigar names and generic names across different tabs",
-    "Version 41 introduced RB order splitting by supplied quantity and status-based filtering (Ready tab)",
-    "Orders are filtered and displayed in Total Orders and Ready Orders tabs with quantity-based logic"
-  ],
+  "summary": "New project",
+  "architectural_notes": [],
   "known_issues": [
-    "Karigar names and generic names not displaying correctly in Version 41 dashboard (worked in Version 35)",
-    "Issue likely caused by order filtering/splitting logic in V41 not preserving name fields"
+    "Order 5038CO2600743-001 marked ready but not appearing in ready tab",
+    "JPEG and PDF export functionality failing"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-verify-that-rb-order-splitting-logic-when-marking-orders-as-ready-with-supplied-quantities-preserves-karigarname-and-genericname-in-both-original-and-newly-created-order-records",
-      "title": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
+      "id": "feature-fix-the-jpeg-export-functionality-in-ordertable-and-karigardetail-components-ensure-the-export-process-correctly-generates-jpeg-files-from-order-data-without-errors",
+      "title": "Fix the JPEG export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates JPEG files from order data without errors.",
       "reqIds": [
-        "REQ-4"
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-pdf-export-functionality-in-ordertable-and-karigardetail-components-ensure-the-export-process-correctly-generates-pdf-files-from-order-data-including-design-images-when-available-without-errors",
+      "title": "Fix the PDF export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates PDF files from order data, including design images when available, without errors.",
+      "reqIds": [
+        "REQ-3"
       ],
       "version": 1
     }
@@ -25,30 +29,14 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs (Total Orders, Ready Orders, Hallmark Orders, Customer Orders) when rendering order rows in OrderTable component",
+      "summary": "Investigate and fix why order number 5038CO2600743-001 with Ready status is not appearing in the Ready tab dashboard. Verify the order status filtering logic in the backend query and frontend ReadyTab component to ensure all orders with Ready status are correctly retrieved and displayed.",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "status": "pending"
     }
   ],
-  "projectName": "Jewellery Order Management",
+  "projectName": "Fix Ready tab order visibility and export functionality",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

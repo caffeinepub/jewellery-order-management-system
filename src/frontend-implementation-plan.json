@@ -1,139 +1,81 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Karigar and generic name display in dashboard",
+  "title": "Fix Ready tab order visibility and export functionality",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
+      "summary": "Fix Ready tab to display all orders with Ready status including order 5038CO2600743-001",
       "acceptanceCriteria": [
-        "Karigar names appear in all order rows across all dashboard tabs",
-        "Karigar names match the values stored in the order records",
-        "No null or undefined values appear where Karigar names should display"
+        "Order 5038CO2600743-001 appears in the Ready tab when it has Ready status",
+        "All other orders with Ready status continue to display correctly",
+        "Backend query correctly filters and returns all Ready status orders",
+        "Frontend ReadyTab correctly renders all Ready orders from the query"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "Review and fix how karigarName field is accessed and displayed in table cells. Ensure the column definition properly reads order.karigarName from each order object and handles undefined/null values with fallback display text. Add defensive checks to prevent display of undefined/null as string literals."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review any data transformations or filtering logic to ensure karigarName is preserved when orders are filtered by status or type."
-        },
-        {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review filtering logic for ready orders to ensure karigarName is preserved in filtered results."
+          "description": "Review and fix the order filtering logic in ReadyTab component. Ensure the component correctly fetches orders with Ready status using the appropriate backend query hook. Verify that all filters (order type, karigar name, search, date range) work correctly with Ready status orders and don't inadvertently exclude valid orders. Check that the OrderTable component receives and displays all filtered Ready orders without data loss."
         },
         {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review filtering logic (by order type, karigar name, order number, date range) to ensure karigarName is preserved throughout all filter operations."
-        },
-        {
-          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review filtering logic for CO-type pending orders to ensure karigarName is preserved when applying status and type filters."
+          "description": "Examine the query hooks used by ReadyTab to fetch Ready status orders. Verify the getReadyOrders or getOrders backend method is called with correct parameters (OrderStatus.Ready). Ensure the query hook properly handles the response data and doesn't apply incorrect client-side filtering that could exclude valid orders. Add error handling and logging to identify any data retrieval issues."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
+      "summary": "Fix JPEG export functionality in OrderTable and KarigarDetail components",
       "acceptanceCriteria": [
-        "Generic names appear in all order rows across all dashboard tabs",
-        "Generic names match the values stored in the order records",
-        "No null or undefined values appear where generic names should display"
+        "JPEG export completes successfully without errors",
+        "Generated JPEG files contain correct order information",
+        "Export works from both OrderTable component and KarigarDetail page",
+        "Loading states and error messages display appropriately during export"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/utils/exportUtils.ts",
+          "operation": "modify",
+          "description": "Fix the JPEG export utility function to correctly generate JPEG files from order data. Review the current implementation for errors such as incorrect canvas rendering, data formatting issues, or missing error handling. Ensure the function properly converts order table data to a JPEG image format, handles design images if available, and returns a downloadable file. Add proper error handling with descriptive error messages and loading state support."
+        },
+        {
           "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Review and fix how genericName field is accessed and displayed in table cells. Ensure the column definition properly reads order.genericName from each order object and handles undefined/null values with fallback display text. Add defensive checks to prevent display of undefined/null as string literals."
+          "description": "Fix the JPEG export functionality triggered from OrderTable component. Ensure the export button correctly calls the fixed exportUtils JPEG function with proper order data. Add loading state display during export process and error message handling for export failures. Verify the exported JPEG file is downloaded with an appropriate filename."
         },
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review any data transformations or filtering logic to ensure genericName is preserved when orders are filtered."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review filtering logic to ensure genericName is preserved in filtered results."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review all filtering logic to ensure genericName is preserved throughout filter operations."
-        },
-        {
-          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review filtering logic to ensure genericName is preserved."
+          "description": "Fix the JPEG export functionality in KarigarDetail page. Ensure the export action correctly passes karigar-specific order data to the JPEG export utility. Add loading indicators and error messages for the export process. Verify the exported file includes the correct karigar name in the filename and contains all filtered orders for that karigar."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
+      "summary": "Fix PDF export functionality in OrderTable and KarigarDetail components with design image support",
       "acceptanceCriteria": [
-        "Filtered order arrays contain complete order objects with all name fields",
-        "No data transformation during filtering removes or nullifies karigarName or genericName",
-        "Orders displayed after applying filters show correct names"
+        "PDF export completes successfully without errors",
+        "Generated PDF files contain correct order information and design images",
+        "Export works from both OrderTable component and KarigarDetail page",
+        "PDF formatting displays order data clearly with proper grouping by design code"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/utils/exportUtils.ts",
           "operation": "modify",
-          "description": "Review useMemo hooks and filter operations that process orders array. Ensure all filter operations use array methods that preserve complete order objects (e.g., .filter() without destructuring or field omission). Verify that no intermediate transformations accidentally strip out karigarName or genericName fields. Add console logging during development to verify filtered orders retain all fields."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Review useMemo hooks and filter operations that process orders array. Ensure all filter operations use array methods that preserve complete order objects. Verify that filtering by order type, karigar name, order number, and date range all maintain karigarName and genericName fields in the filtered results."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Review useMemo hooks and filter operations that process orders array. Ensure all filter operations preserve complete order objects with all name fields intact across multiple filter criteria."
-        },
-        {
-          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Review useMemo hooks and filter operations that process orders array. Ensure filtering logic preserves complete order objects with karigarName and genericName fields."
-        }
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "summary": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
-      "acceptanceCriteria": [
-        "When an RB order is split, both the updated original order and any new order records retain karigarName values",
-        "When an RB order is split, both the updated original order and any new order records retain genericName values",
-        "Split orders display names correctly in the dashboard after the split operation"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "operation": "modify",
-          "description": "Review the logic that handles RB order splitting when supplied quantity is less than total quantity. Ensure that when creating data for the supplyOrder backend call, the frontend passes or expects the backend to preserve karigarName and genericName fields. If the frontend constructs any new order objects locally before syncing, explicitly copy karigarName and genericName from the original order to any split order representation. Add validation to verify these fields are present before submitting."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Review the flow when SuppliedQtyDialog is triggered for RB orders. Ensure that after the supply operation completes and queries are invalidated, the refetched orders include karigarName and genericName. Verify that no local state transformations strip these fields between backend response and component display."
+          "description": "Fix the PDF export utility function to correctly generate PDF files with order data and embedded design images. Review the current implementation for issues such as image loading failures, incorrect PDF formatting, data grouping errors, or library loading problems. Ensure design images are fetched using getDirectURL() from ExternalBlob for proper streaming and caching. Verify orders are grouped by design code with numeric sorting, images are embedded correctly, and the PDF is properly formatted and downloadable. Add comprehensive error handling and progress tracking."
         },
         {
           "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Review the markAsReady flow that triggers SuppliedQtyDialog for RB orders. Ensure that after the supply mutation succeeds and orders are refetched, the table re-renders with complete order objects including karigarName and genericName. Add defensive checks in the rendering logic to handle cases where these fields might be temporarily undefined during refetch."
+          "description": "Fix the PDF export functionality in OrderTable component. Ensure the export button correctly invokes the fixed PDF export utility with complete order data including design codes for image fetching. Add loading state during PDF generation and error messages for failures. Verify that design images are passed to the export function or fetched within the export process using the backend interface."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Review the supplyOrder mutation hook to ensure it properly invalidates order queries after RB order splitting. Verify that when queries are invalidated and refetched, the backend interface correctly maps karigarName and genericName fields from the backend Order type to the frontend. Ensure no type transformations or mapping logic accidentally omits these optional fields."
+          "description": "Fix the PDF export functionality in KarigarDetail page for karigar-specific orders. Ensure the PDF export includes design images by passing design codes or fetching images during export. Add proper loading indicators and error handling. Verify the exported PDF filename includes the karigar name and the document is properly formatted with grouped orders and embedded images."
         }
       ]
     }

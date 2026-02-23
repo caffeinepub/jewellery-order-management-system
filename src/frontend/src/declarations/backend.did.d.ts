@@ -12,10 +12,10 @@ import type { Principal } from '@icp-sdk/core/principal';
 
 export interface DesignMapping {
   'createdAt' : Time,
-  'createdBy' : Principal,
+  'createdBy' : string,
   'karigarName' : string,
   'updatedAt' : Time,
-  'updatedBy' : [] | [Principal],
+  'updatedBy' : [] | [string],
   'genericName' : string,
   'designCode' : string,
 }
@@ -23,7 +23,7 @@ export type ExternalBlob = Uint8Array;
 export interface Karigar {
   'name' : string,
   'createdAt' : Time,
-  'createdBy' : Principal,
+  'createdBy' : string,
 }
 export interface MappingRecord {
   'karigarName' : string,

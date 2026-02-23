@@ -27,10 +27,10 @@ export const MappingRecord = IDL.Record({
 export const Time = IDL.Int;
 export const DesignMapping = IDL.Record({
   'createdAt' : Time,
-  'createdBy' : IDL.Principal,
+  'createdBy' : IDL.Text,
   'karigarName' : IDL.Text,
   'updatedAt' : Time,
-  'updatedBy' : IDL.Opt(IDL.Principal),
+  'updatedBy' : IDL.Opt(IDL.Text),
   'genericName' : IDL.Text,
   'designCode' : IDL.Text,
 });
@@ -61,7 +61,7 @@ export const Order = IDL.Record({
 export const Karigar = IDL.Record({
   'name' : IDL.Text,
   'createdAt' : Time,
-  'createdBy' : IDL.Principal,
+  'createdBy' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
@@ -179,10 +179,10 @@ export const idlFactory = ({ IDL }) => {
   const Time = IDL.Int;
   const DesignMapping = IDL.Record({
     'createdAt' : Time,
-    'createdBy' : IDL.Principal,
+    'createdBy' : IDL.Text,
     'karigarName' : IDL.Text,
     'updatedAt' : Time,
-    'updatedBy' : IDL.Opt(IDL.Principal),
+    'updatedBy' : IDL.Opt(IDL.Text),
     'genericName' : IDL.Text,
     'designCode' : IDL.Text,
   });
@@ -213,7 +213,7 @@ export const idlFactory = ({ IDL }) => {
   const Karigar = IDL.Record({
     'name' : IDL.Text,
     'createdAt' : Time,
-    'createdBy' : IDL.Principal,
+    'createdBy' : IDL.Text,
   });
   
   return IDL.Service({

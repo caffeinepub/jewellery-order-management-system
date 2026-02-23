@@ -35,30 +35,53 @@ function extractNumericPortion(designCode: string): number {
   return match ? parseInt(match[0], 10) : 0;
 }
 
-// Helper function to fetch and convert design image to base64
-async function fetchDesignImageAsBase64(designCode: string, actor: any): Promise<string | null> {
+// Helper function to fetch design image URL
+async function fetchDesignImageURL(designCode: string, actor: any): Promise<string | null> {
   try {
     if (!actor) return null;
     const blob = await actor.getDesignImage(designCode);
     if (!blob) return null;
 
-    // Get bytes from ExternalBlob
-    const bytes = await blob.getBytes();
-    
-    // Convert Uint8Array to base64
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
-    
-    // Return as data URL (assuming JPEG, adjust if needed)
-    return `data:image/jpeg;base64,${base64}`;
+    // Use getDirectURL() for streaming and caching
+    return blob.getDirectURL();
   } catch (error) {
     console.error(`Failed to fetch image for ${designCode}:`, error);
     return null;
   }
+}
+
+// Helper function to load image and convert to base64
+async function loadImageAsBase64(imageUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const base64 = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(base64);
+      } catch (error) {
+        console.error('Failed to convert image to base64:', error);
+        resolve(null);
+      }
+    };
+    
+    img.onerror = () => {
+      console.error('Failed to load image:', imageUrl);
+      resolve(null);
+    };
+    
+    img.src = imageUrl;
+  });
 }
 
 // Detect if device is iOS
@@ -67,6 +90,10 @@ function isIOS(): boolean {
 }
 
 export async function exportToPDF(orders: Order[], actor?: any): Promise<string> {
+  if (!actor) {
+    throw new Error('Actor is required for PDF export with images');
+  }
+
   // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
@@ -81,9 +108,13 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
     return extractNumericPortion(a) - extractNumericPortion(b);
   });
 
-  // Fetch all design images in parallel
+  // Fetch all design image URLs in parallel
   const imagePromises = sortedDesignCodes.map(async (designCode) => {
-    const base64Image = actor ? await fetchDesignImageAsBase64(designCode, actor) : null;
+    const imageUrl = await fetchDesignImageURL(designCode, actor);
+    if (!imageUrl) return { designCode, base64Image: null };
+    
+    // Convert to base64 for embedding in HTML
+    const base64Image = await loadImageAsBase64(imageUrl);
     return { designCode, base64Image };
   });
 
@@ -198,6 +229,10 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
 }
 
 export async function exportToJPEG(orders: Order[], actor?: any) {
+  if (!actor) {
+    throw new Error('Actor is required for JPEG export with images');
+  }
+
   // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
@@ -212,9 +247,13 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
     return extractNumericPortion(a) - extractNumericPortion(b);
   });
 
-  // Fetch all design images in parallel
+  // Fetch all design image URLs in parallel
   const imagePromises = sortedDesignCodes.map(async (designCode) => {
-    const base64Image = actor ? await fetchDesignImageAsBase64(designCode, actor) : null;
+    const imageUrl = await fetchDesignImageURL(designCode, actor);
+    if (!imageUrl) return { designCode, base64Image: null };
+    
+    // Convert to base64 for embedding in HTML
+    const base64Image = await loadImageAsBase64(imageUrl);
     return { designCode, base64Image };
   });
 
@@ -324,6 +363,10 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
 }
 
 export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any): Promise<string> {
+  if (!actor) {
+    throw new Error('Actor is required for PDF export with images');
+  }
+
   // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
@@ -338,9 +381,13 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
     return extractNumericPortion(a) - extractNumericPortion(b);
   });
 
-  // Fetch all design images in parallel
+  // Fetch all design image URLs in parallel
   const imagePromises = sortedDesignCodes.map(async (designCode) => {
-    const base64Image = actor ? await fetchDesignImageAsBase64(designCode, actor) : null;
+    const imageUrl = await fetchDesignImageURL(designCode, actor);
+    if (!imageUrl) return { designCode, base64Image: null };
+    
+    // Convert to base64 for embedding in HTML
+    const base64Image = await loadImageAsBase64(imageUrl);
     return { designCode, base64Image };
   });
 

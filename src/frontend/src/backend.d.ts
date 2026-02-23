@@ -22,17 +22,17 @@ export interface MappingRecord {
 export type Time = bigint;
 export interface DesignMapping {
     createdAt: Time;
-    createdBy: Principal;
+    createdBy: string;
     karigarName: string;
     updatedAt: Time;
-    updatedBy?: Principal;
+    updatedBy?: string;
     genericName: string;
     designCode: string;
 }
 export interface Karigar {
     name: string;
     createdAt: Time;
-    createdBy: Principal;
+    createdBy: string;
 }
 export interface Order {
     weight: number;

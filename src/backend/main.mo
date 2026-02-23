@@ -1,14 +1,14 @@
-import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
-import Array "mo:core/Array";
 import Map "mo:core/Map";
 import Text "mo:core/Text";
-import Principal "mo:core/Principal";
-import Iter "mo:core/Iter";
 import List "mo:core/List";
+import Runtime "mo:core/Runtime";
+import Iter "mo:core/Iter";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -45,15 +45,15 @@ actor {
     designCode : Text;
     genericName : Text;
     karigarName : Text;
-    createdBy : Principal;
-    updatedBy : ?Principal;
+    createdBy : Text;
+    updatedBy : ?Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
   };
 
   type Karigar = {
     name : Text;
-    createdBy : Principal;
+    createdBy : Text;
     createdAt : Time.Time;
   };
 
@@ -64,10 +64,8 @@ actor {
   };
 
   var orders = Map.empty<Text, Order>();
-  var readyOrders = Map.empty<Text, Order>();
   var designMappings = Map.empty<Text, DesignMapping>();
   var designImages = Map.empty<Text, Storage.ExternalBlob>();
-  var masterDesignMappings = Map.empty<Text, DesignMapping>();
   var karigars = Map.empty<Text, Karigar>();
   var masterDesignKarigars = Map.empty<Text, Nat>();
 
@@ -127,7 +125,7 @@ actor {
           status = #Ready;
           updatedAt = Time.now();
         };
-        readyOrders.add(orderId, readyOrder);
+        orders.add(orderId, readyOrder);
       };
     };
   };
@@ -138,7 +136,7 @@ actor {
     };
     let karigar : Karigar = {
       name;
-      createdBy = caller;
+      createdBy = "system";
       createdAt = Time.now();
     };
     karigars.add(name, karigar);
@@ -171,7 +169,7 @@ actor {
       designCode;
       genericName;
       karigarName;
-      createdBy = caller;
+      createdBy = "system";
       updatedBy = null;
       createdAt = timestamp;
       updatedAt = timestamp;
@@ -191,7 +189,7 @@ actor {
           if (not karigars.containsKey(mapping.karigarName)) {
             let karigar : Karigar = {
               name = mapping.karigarName;
-              createdBy = caller;
+              createdBy = "system";
               createdAt = Time.now();
             };
             karigars.add(mapping.karigarName, karigar);
@@ -207,7 +205,7 @@ actor {
           designCode = mapping.designCode;
           genericName = mapping.genericName;
           karigarName = mapping.karigarName;
-          createdBy = caller;
+          createdBy = "system";
           updatedBy = null;
           createdAt = timestamp;
           updatedAt = timestamp;
@@ -228,7 +226,7 @@ actor {
         let updatedMapping : DesignMapping = {
           mapping with
           karigarName = newKarigar;
-          updatedBy = ?caller;
+          updatedBy = ?"system";
           updatedAt = Time.now();
         };
         designMappings.add(designCode, updatedMapping);
@@ -284,7 +282,15 @@ actor {
   };
 
   public query ({ caller }) func getReadyOrders() : async [Order] {
-    readyOrders.values().toArray();
+    let filteredOrders = List.empty<Order>();
+
+    for ((_, order) in orders.entries()) {
+      if (order.status == #Ready) {
+        filteredOrders.add(order);
+      };
+    };
+
+    filteredOrders.toArray();
   };
 
   public shared ({ caller }) func batchSaveDesignMappings(mappings : [(Text, DesignMapping)]) : async () {
@@ -295,7 +301,6 @@ actor {
 
   public shared ({ caller }) func deleteOrder(orderId : Text) : async () {
     orders.remove(orderId);
-    readyOrders.remove(orderId);
   };
 
   public shared ({ caller }) func uploadDesignImage(designCode : Text, blob : Storage.ExternalBlob) : async () {
@@ -314,8 +319,8 @@ actor {
     designCode : Text;
     genericName : Text;
     karigarName : Text;
-    createdBy : Principal;
-    updatedBy : ?Principal;
+    createdBy : Text;
+    updatedBy : ?Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
   };
@@ -333,19 +338,18 @@ actor {
   };
 
   public shared ({ caller }) func uploadDesignMapping(mappingData : [MappingRecord]) : async () {
-    masterDesignMappings.clear();
     for (record in mappingData.values()) {
       let timestamp = Time.now();
       let newMapping : DesignMapping = {
         designCode = record.designCode;
         genericName = record.genericName;
         karigarName = record.karigarName;
-        createdBy = caller;
+        createdBy = "system";
         updatedBy = null;
         createdAt = timestamp;
         updatedAt = timestamp;
       };
-      masterDesignMappings.add(record.designCode, newMapping);
+      designMappings.add(record.designCode, newMapping);
     };
   };
 
@@ -368,7 +372,7 @@ actor {
   };
 
   public query ({ caller }) func getAllMasterDesignMappings() : async [(Text, DesignMapping)] {
-    masterDesignMappings.toArray();
+    designMappings.toArray();
   };
 
   public query ({ caller }) func getOrdersWithMappings() : async [Order] {

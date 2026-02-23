@@ -1,76 +1,65 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-23T04:32:06.629Z",
+  "generatedAt": "2026-02-23T04:44:47.315Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 4,
-    "implemented": 1,
+    "total": 3,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs (Total Orders, Ready Orders, Hallmark Orders, Customer Orders) when rendering order rows in OrderTable component",
+        "summary": "Investigate and fix why order number 5038CO2600743-001 with Ready status is not appearing in the Ready tab dashboard. Verify the order status filtering logic in the backend query and frontend ReadyTab component to ensure all orders with Ready status are correctly retrieved and displayed.",
         "status": "missing",
         "plannedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
+          "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
-        "status": "missing",
+        "summary": "Fix the JPEG export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates JPEG files from order data without errors.",
+        "status": "implemented",
         "plannedFiles": [
+          "frontend/src/utils/exportUtils.ts",
           "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
+          "frontend/src/pages/KarigarDetail.tsx"
         ],
-        "matchedFiles": []
+        "matchedFiles": [
+          "frontend/src/utils/exportUtils.ts"
+        ]
       },
       {
         "id": "REQ-3",
-        "summary": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
-        "status": "missing",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
-        ],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-4",
-        "summary": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
+        "summary": "Fix the PDF export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates PDF files from order data, including design images when available, without errors.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/utils/exportUtils.ts",
           "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/pages/KarigarDetail.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/utils/exportUtils.ts"
         ]
       }
     ]
   },
   "changedFiles": [
     "backend/main.mo",
+    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
+    "frontend/src/utils/exportUtils.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",
