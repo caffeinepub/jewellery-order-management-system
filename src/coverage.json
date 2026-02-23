@@ -1,62 +1,101 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-23T10:32:44.476Z",
+  "generatedAt": "2026-02-23T19:45:42.718Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 5,
-    "implemented": 2,
+    "total": 7,
+    "implemented": 7,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix the updateDesignMapping function in backend to successfully save mappings when generic name and Karigar are provided from the Unmapped Codes page",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Reorder the columns in the dashboard OrderTable component to display in this exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Preserve all existing functionality including row selection, design image viewing, karigar mapping, and status change from pending to ready.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
+        "summary": "Add red highlight color to selected rows in the OrderTable component when a row is selected via checkbox.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/EditDesignModal.tsx",
-          "frontend/src/pages/UnmappedCodes.tsx"
+          "frontend/src/components/dashboard/OrderTable.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/pages/UnmappedCodes.tsx"
+          "frontend/src/components/dashboard/OrderTable.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+        "summary": "Add search functionality by both design code and order number in the TotalOrdersTab, ReadyTab, and HallmarkTab components. The search should filter orders matching either the design code or order number.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ]
       },
       {
         "id": "REQ-4",
-        "summary": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
-        "status": "missing",
+        "summary": "Fix the RB type orders supplied quantity validation in the SuppliedQtyDialog component to allow entering the full order quantity. When the full quantity is supplied (e.g., 5 out of 5), the order should be marked as Ready and moved to the Ready tab. If a partial quantity is supplied (e.g., 3 out of 5), split the order: create a Ready order with the supplied quantity and keep a Pending order with the remaining quantity in Total Orders.",
+        "status": "implemented",
         "plannedFiles": [
-          "frontend/src/pages/KarigarDetail.tsx"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ],
-        "matchedFiles": []
+        "matchedFiles": [
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ]
       },
       {
         "id": "REQ-5",
-        "summary": "Verify the backend markOrdersReady function properly handles SO and CO order types and persists the status change",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Add a delete button to each row in the ReadyTab component. When clicked, the order should be moved back to Total Orders with Pending status. Implement both the frontend UI control and backend logic to handle this status reversal.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx"
+        ]
+      },
+      {
+        "id": "REQ-6",
+        "summary": "Remove all previous Tag Printing logic and integrations from the TagPrinting.tsx page, including the MPN system webview modal, login session tracking, and order processing workflows.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/pages/TagPrinting.tsx",
+          "frontend/src/components/tagprinting/WebviewModal.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/pages/TagPrinting.tsx",
+          "frontend/src/components/tagprinting/WebviewModal.tsx"
+        ]
+      },
+      {
+        "id": "REQ-7",
+        "summary": "Redesign the Tag Printing page to display READY status orders grouped by designCode. For each design group, show: the design code, total count of orders in that design, list of order numbers, and a 'Copy for MPN' button. When the button is clicked, copy only that group's order numbers as a clean comma-separated string using join(',') format (e.g., order1,order2,order3).",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/pages/TagPrinting.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/pages/TagPrinting.tsx"
+        ]
       }
     ]
   },
@@ -69,12 +108,21 @@
     "frontend-implementation-plan.json",
     "frontend/src/backend.d.ts",
     "frontend/src/backend.ts",
+    "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+    "frontend/src/components/dashboard/HallmarkTab.tsx",
     "frontend/src/components/dashboard/OrderTable.tsx",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/components/masterdesigns/EditDesignModal.tsx",
+    "frontend/src/components/tagprinting/WebviewModal.tsx",
     "frontend/src/declarations/backend.did.d.ts",
     "frontend/src/declarations/backend.did.js",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/IngestOrders.tsx",
+    "frontend/src/pages/MasterDesigns.tsx",
+    "frontend/src/pages/TagPrinting.tsx",
     "frontend/src/pages/UnmappedCodes.tsx",
+    "frontend/src/utils/excelParser.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

@@ -2,10 +2,31 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-frontend-editdesignmodal-component-to-properly-handle-the-updatedesignmapping-mutation-response-and-error-states",
-      "featureTitle": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
+      "featureId": "feature-reorder-the-columns-in-the-dashboard-ordertable-component-to-display-in-this-exact-sequence-generic-name-karigar-name-design-wt-size-qty-type-remarks-status-preserve-all-existing-functionality-including-row-selection-design-image-viewing-karigar-mapping-and-status-change-from-pending-to-ready",
+      "featureTitle": "Reorder the columns in the dashboard OrderTable component to display in this exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Preserve all existing functionality including row selection, design image viewing, karigar mapping, and status change from pending to ready.",
       "files": [
-        "frontend/src/pages/UnmappedCodes.tsx"
+        "frontend/src/components/dashboard/OrderTable.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-red-highlight-color-to-selected-rows-in-the-ordertable-component-when-a-row-is-selected-via-checkbox",
+      "featureTitle": "Add red highlight color to selected rows in the OrderTable component when a row is selected via checkbox.",
+      "files": [
+        "frontend/src/components/dashboard/OrderTable.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -23,10 +44,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-mark-as-ready-functionality-in-ordertable-component-for-so-and-co-order-types-when-accessed-from-the-totals-tab",
-      "featureTitle": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+      "featureId": "feature-add-search-functionality-by-both-design-code-and-order-number-in-the-totalorderstab-readytab-and-hallmarktab-components-the-search-should-filter-orders-matching-either-the-design-code-or-order-number",
+      "featureTitle": "Add search functionality by both design code and order number in the TotalOrdersTab, ReadyTab, and HallmarkTab components. The search should filter orders matching either the design code or order number.",
       "files": [
-        "frontend/src/components/dashboard/OrderTable.tsx",
+        "frontend/src/components/dashboard/HallmarkTab.tsx",
+        "frontend/src/components/dashboard/ReadyTab.tsx",
         "frontend/src/components/dashboard/TotalOrdersTab.tsx"
       ],
       "components": [
@@ -41,6 +63,93 @@
       ],
       "testIds": [
         "REQ-3"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-rb-type-orders-supplied-quantity-validation-in-the-suppliedqtydialog-component-to-allow-entering-the-full-order-quantity-when-the-full-quantity-is-supplied-e-g-5-out-of-5-the-order-should-be-marked-as-ready-and-moved-to-the-ready-tab-if-a-partial-quantity-is-supplied-e-g-3-out-of-5-split-the-order-create-a-ready-order-with-the-supplied-quantity-and-keep-a-pending-order-with-the-remaining-quantity-in-total-orders",
+      "featureTitle": "Fix the RB type orders supplied quantity validation in the SuppliedQtyDialog component to allow entering the full order quantity. When the full quantity is supplied (e.g., 5 out of 5), the order should be marked as Ready and moved to the Ready tab. If a partial quantity is supplied (e.g., 3 out of 5), split the order: create a Ready order with the supplied quantity and keep a Pending order with the remaining quantity in Total Orders.",
+      "files": [
+        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-a-delete-button-to-each-row-in-the-readytab-component-when-clicked-the-order-should-be-moved-back-to-total-orders-with-pending-status-implement-both-the-frontend-ui-control-and-backend-logic-to-handle-this-status-reversal",
+      "featureTitle": "Add a delete button to each row in the ReadyTab component. When clicked, the order should be moved back to Total Orders with Pending status. Implement both the frontend UI control and backend logic to handle this status reversal.",
+      "files": [
+        "frontend/src/components/dashboard/OrderTable.tsx",
+        "frontend/src/components/dashboard/ReadyTab.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-5"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-remove-all-previous-tag-printing-logic-and-integrations-from-the-tagprinting-tsx-page-including-the-mpn-system-webview-modal-login-session-tracking-and-order-processing-workflows",
+      "featureTitle": "Remove all previous Tag Printing logic and integrations from the TagPrinting.tsx page, including the MPN system webview modal, login session tracking, and order processing workflows.",
+      "files": [
+        "frontend/src/components/tagprinting/WebviewModal.tsx",
+        "frontend/src/pages/TagPrinting.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-6"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-redesign-the-tag-printing-page-to-display-ready-status-orders-grouped-by-designcode-for-each-design-group-show-the-design-code-total-count-of-orders-in-that-design-list-of-order-numbers-and-a-copy-for-mpn-button-when-the-button-is-clicked-copy-only-that-group-s-order-numbers-as-a-clean-comma-separated-string-using-join-format-e-g-order1-order2-order3",
+      "featureTitle": "Redesign the Tag Printing page to display READY status orders grouped by designCode. For each design group, show: the design code, total count of orders in that design, list of order numbers, and a 'Copy for MPN' button. When the button is clicked, copy only that group's order numbers as a clean comma-separated string using join(',') format (e.g., order1,order2,order3).",
+      "files": [
+        "frontend/src/pages/TagPrinting.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-7"
       ],
       "confidence": "high"
     }

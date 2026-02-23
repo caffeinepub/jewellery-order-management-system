@@ -1,65 +1,155 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix mapping update failures and Ready status transitions",
+  "title": "Dashboard reordering, row highlighting, search enhancements, RB quantity fixes, ready tab deletion, and Tag Printing redesign",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
+      "id": "REQ-1",
+      "summary": "Reorder OrderTable columns to display: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status while preserving all existing functionality",
       "acceptanceCriteria": [
-        "Error messages from backend are properly displayed to the user",
-        "Success state properly triggers toast and modal close",
-        "Loading state is shown during the mutation"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/EditDesignModal.tsx",
-          "operation": "modify",
-          "description": "Fix the mutation error handling in the handleSave function to properly catch and display backend errors. Ensure the mutation's onError callback extracts the error message correctly and shows it via toast. Verify that onSuccess callback properly closes the modal and shows success toast. Add proper loading state disable logic to the save button."
-        },
-        {
-          "path": "frontend/src/pages/UnmappedCodes.tsx",
-          "operation": "modify",
-          "description": "Fix the inline edit save functionality for unmapped design codes. Update the handleSaveMapping function to properly handle the updateDesignMapping mutation response, display error messages from the backend via toast, and remove the design code from the unmapped list on successful save. Ensure loading states are properly managed during the mutation."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
-      "acceptanceCriteria": [
-        "SO orders can be marked as Ready from the Totals tab",
-        "CO orders can be marked as Ready from the Totals tab",
-        "Success toast displays after marking orders as Ready",
-        "Orders immediately appear in the Ready tab after being marked Ready"
+        "Dashboard table columns appear in the order: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status",
+        "Row selection checkboxes continue to work",
+        "Design image modal opens when clicking design codes",
+        "Karigar mapping functionality remains intact",
+        "Status can still be changed from pending to ready"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Fix the handleMarkAsReady function to properly handle SO and CO order types. Ensure the mutation calls updateOrdersStatusToReady with the correct order IDs and properly invalidates queries after success. Verify that the confirmation dialog logic correctly filters SO and CO orders for the mark-as-ready action. Add proper error handling and success toast notifications."
-        },
+          "description": "Reorder the column definitions in the table header and body to display columns in the exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Ensure all existing column functionality (click handlers for design images, karigar name display, status indicators) is preserved during reordering."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Add red highlight to selected table rows when checkbox is checked",
+      "acceptanceCriteria": [
+        "Selected rows display a red highlight",
+        "Highlight color is visually distinct and accessible",
+        "Highlight updates immediately when row selection changes"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Add conditional className or style to table rows (tbody tr elements) that applies a red background highlight when the row is selected. Use the selectedOrders state to determine selection. Ensure the highlight color is accessible and visually distinct (e.g., bg-red-50 or bg-red-100 with proper contrast)."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Add search functionality by design code and order number in TotalOrdersTab, ReadyTab, and HallmarkTab",
+      "acceptanceCriteria": [
+        "Total Orders tab includes search by design code and order number",
+        "Ready tab includes search by design code and order number",
+        "Hallmark tab includes search by design code and order number",
+        "Search filters display orders matching either field",
+        "Existing search functionality is preserved and enhanced"
+      ],
+      "file_operations": [
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Verify that the OrderTable component receives the correct props to enable mark-as-ready functionality for SO and CO orders. Ensure the showActions prop is properly passed and that the order data includes all required fields for the ready status transition."
+          "description": "Enhance the existing search filter to match orders by both design code and order number. Update the filter logic to check if searchQuery matches either order.design or order.orderNo (case-insensitive). Preserve all existing filtering (status, type, karigar)."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Enhance the existing search filter to match orders by both design code and order number. Update the filter logic to check if searchQuery matches either order.design or order.orderNo (case-insensitive). Preserve all existing filtering (type, karigar, date range)."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Enhance the existing search filter to match orders by both design code and order number. Update the filter logic to check if searchQuery matches either order.design or order.orderNo (case-insensitive). Preserve all existing filtering (type, karigar, date range)."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
+      "summary": "Fix RB order supplied quantity validation to allow full quantity entry and implement order splitting logic for partial supplies",
       "acceptanceCriteria": [
-        "SO orders can be marked as Ready from the Karigar detail page",
-        "CO orders can be marked as Ready from the Karigar detail page",
-        "Orders are removed from the karigar's pending list after being marked Ready",
-        "Success confirmation is shown to the user"
+        "User can enter the full order quantity for RB orders (e.g., 5 out of 5)",
+        "When full quantity is supplied, order moves to Ready tab and is removed from Total Orders",
+        "When partial quantity is supplied, order splits into two: one Ready order with supplied quantity and one Pending order with remaining quantity",
+        "Both frontend validation and backend logic support this behavior",
+        "Query invalidation ensures tabs update immediately after supply action"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "operation": "modify",
-          "description": "Fix the mark-as-ready functionality for SO and CO orders displayed on the karigar detail page. Ensure the OrderTable component properly handles the mutation for these order types and that query invalidation updates the karigar's pending order list. Verify that success notifications are shown to the user after marking orders as ready."
+          "description": "Remove or adjust the validation logic that prevents entering the full order quantity. Allow suppliedQty to equal order.quantity (not just be less than it). Ensure the mutation calls the appropriate backend function (supplyOrder for full quantity, supplyAndReturnOrder for partial quantity). Add clear messaging to the user about the split behavior. Preserve query invalidation for ['orders', 'ready-orders'] to refresh both tabs immediately."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Verify that the supplyOrder and supplyAndReturnOrder mutations properly invalidate both ['orders'] and ['ready-orders'] queries to ensure TotalOrdersTab and ReadyTab refresh after RB order supply actions. Add any missing query invalidations if needed."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Add delete button to each Ready tab row that reverts the order back to Pending status in Total Orders",
+      "acceptanceCriteria": [
+        "Each row in Ready tab displays a delete button",
+        "Clicking delete moves the order back to Total Orders",
+        "Order status changes from Ready to Pending",
+        "Backend function handles the status reversal",
+        "Tabs update immediately after deletion without page refresh"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Add a delete button column or action in the ReadyTab view. Create a mutation hook that calls backend.deleteReadyOrder(orderId) when the button is clicked. After successful deletion, invalidate both ['orders'] and ['ready-orders'] queries to refresh TotalOrdersTab and ReadyTab. Add user confirmation dialog before deletion and show success/error toast notifications."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Add optional onDelete prop to OrderTable component that accepts a callback function. When provided, render a delete icon/button in each row. Wire the delete button to call onDelete(order.orderId). Ensure the button is styled consistently with other action buttons in the table."
+        }
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "summary": "Remove all existing Tag Printing logic including MPN system integration, webview modal, and login session tracking",
+      "acceptanceCriteria": [
+        "All existing tag printing logic is removed from TagPrinting.tsx",
+        "WebviewModal integration is removed",
+        "MPN system references are removed",
+        "Login session tracking is removed",
+        "Page is cleared for new implementation"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/TagPrinting.tsx",
+          "operation": "modify",
+          "description": "Remove all existing logic from TagPrinting.tsx including: WebviewModal usage, MPN system URL references, login session state management, order processing workflows, and any iframe-based integration code. Clear the component to a blank slate ready for new implementation. Keep only the basic page wrapper/layout structure."
+        },
+        {
+          "path": "frontend/src/components/tagprinting/WebviewModal.tsx",
+          "operation": "delete",
+          "description": "Delete the WebviewModal component file as it is no longer needed after removing the MPN system integration from Tag Printing page."
+        }
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "summary": "Redesign Tag Printing page to display READY orders grouped by designCode with copy functionality for order numbers",
+      "acceptanceCriteria": [
+        "Tag Printing page fetches only READY status orders",
+        "Orders are grouped by designCode",
+        "Each group displays: design code, total order count, and list of order numbers",
+        "Each group has a 'Copy for MPN' button",
+        "Clicking the button copies only that group's order numbers in comma-separated format using join(',')",
+        "Copy action provides user feedback (e.g., toast notification)"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/TagPrinting.tsx",
+          "operation": "modify",
+          "description": "Implement new Tag Printing page design: Fetch READY status orders using useReadyOrders hook from useQueries.ts. Group orders by designCode using a Map or object. For each design group, display: the design code as a heading, total order count, and a list of order numbers. Add a 'Copy for MPN' button for each group that copies the group's order numbers using orderNumbers.join(',') to clipboard. Show toast notification on successful copy. Use card-based layout with clear visual separation between design groups."
         }
       ]
     }

@@ -1,13 +1,10 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useGetAllOrders } from "@/hooks/useQueries";
 import OrderTable from "./OrderTable";
-import { useGetHallmarkOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderType } from "@/backend";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Search } from "lucide-react";
-import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { Search } from "lucide-react";
+import { OrderType, OrderStatus } from "@/backend";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -15,149 +12,192 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 
 export default function HallmarkTab() {
-  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
-  const [searchText, setSearchText] = useState("");
-  const [karigarFilter, setKarigarFilter] = useState<string>("All");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfDay(new Date()),
-    to: endOfDay(new Date()),
-  });
-
-  const { data: orders = [], isLoading } = useGetHallmarkOrders();
-  const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
-
-  // Deduplicate karigar names
-  const uniqueKarigarList = useMemo(() => {
-    const karigarSet = new Set(uniqueKarigars);
-    return Array.from(karigarSet).sort();
-  }, [uniqueKarigars]);
+  const { data: allOrders = [], isLoading } = useGetAllOrders();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOrderType, setSelectedOrderType] = useState<string>("all");
+  const [selectedKarigar, setSelectedKarigar] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
 
   const filteredOrders = useMemo(() => {
-    let result = orders;
+    return allOrders.filter((order) => {
+      const statusMatch =
+        order.status === OrderStatus.Hallmark ||
+        order.status === OrderStatus.ReturnFromHallmark;
 
-    // Filter by order type
-    if (orderTypeFilter !== "All") {
-      result = result.filter((order) => order.orderType === orderTypeFilter);
-    }
+      if (!statusMatch) return false;
 
-    // Filter by karigar name
-    if (karigarFilter !== "All") {
-      result = result.filter((order) => order.karigarName === karigarFilter);
-    }
+      const searchMatch =
+        searchQuery === "" ||
+        order.orderNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.design.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Filter by order number (search)
-    if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      result = result.filter((order) =>
-        order.orderNo.toLowerCase().includes(search)
-      );
-    }
+      const typeMatch =
+        selectedOrderType === "all" || order.orderType === selectedOrderType;
 
-    // Filter by date range
-    if (dateRange.from && dateRange.to) {
-      result = result.filter((order) => {
-        const orderDate = new Date(Number(order.createdAt) / 1000000);
-        return isWithinInterval(orderDate, { start: dateRange.from, end: dateRange.to });
-      });
-    }
+      const karigarMatch =
+        selectedKarigar === "all" || order.karigarName === selectedKarigar;
 
-    return result;
-  }, [orders, orderTypeFilter, karigarFilter, searchText, dateRange]);
+      let dateMatch = true;
+      if (dateRange.from || dateRange.to) {
+        const orderDate = new Date(Number(order.updatedAt) / 1000000);
+        if (dateRange.from && dateRange.to) {
+          dateMatch = isWithinInterval(orderDate, {
+            start: startOfDay(dateRange.from),
+            end: endOfDay(dateRange.to),
+          });
+        } else if (dateRange.from) {
+          dateMatch = orderDate >= startOfDay(dateRange.from);
+        } else if (dateRange.to) {
+          dateMatch = orderDate <= endOfDay(dateRange.to);
+        }
+      }
+
+      return searchMatch && typeMatch && karigarMatch && dateMatch;
+    });
+  }, [allOrders, searchQuery, selectedOrderType, selectedKarigar, dateRange]);
+
+  const uniqueKarigars = useMemo(() => {
+    const karigars = new Set<string>();
+    allOrders.forEach((order) => {
+      if (
+        order.karigarName &&
+        (order.status === OrderStatus.Hallmark ||
+          order.status === OrderStatus.ReturnFromHallmark)
+      ) {
+        karigars.add(order.karigarName);
+      }
+    });
+    return Array.from(karigars).sort();
+  }, [allOrders]);
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading orders...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-muted-foreground">Loading hallmark orders...</div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by order number or design..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         <div className="flex gap-2">
           <Button
-            variant={orderTypeFilter === "All" ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter("All")}
+            variant={selectedOrderType === "all" ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType("all")}
+            className={
+              selectedOrderType === "all" ? "bg-gold hover:bg-gold-hover" : ""
+            }
           >
             All
           </Button>
           <Button
-            variant={orderTypeFilter === OrderType.CO ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.CO)}
+            variant={selectedOrderType === OrderType.CO ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType(OrderType.CO)}
+            className={
+              selectedOrderType === OrderType.CO
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             CO
           </Button>
           <Button
-            variant={orderTypeFilter === OrderType.RB ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.RB)}
+            variant={selectedOrderType === OrderType.RB ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType(OrderType.RB)}
+            className={
+              selectedOrderType === OrderType.RB
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             RB
           </Button>
         </div>
-        <Select value={karigarFilter} onValueChange={setKarigarFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
+        <Select value={selectedKarigar} onValueChange={setSelectedKarigar}>
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Filter by Karigar" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">All Karigars</SelectItem>
-            {uniqueKarigarList.map((karigar) => (
+            <SelectItem value="all">All Karigars</SelectItem>
+            {uniqueKarigars.map((karigar) => (
               <SelectItem key={karigar} value={karigar}>
                 {karigar}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by Order Number..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="w-[200px]">
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateRange.from && dateRange.to
-                ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
-                : "Select date range"}
+              {dateRange.from ? (
+                dateRange.to ? (
+                  <>
+                    {format(dateRange.from, "MMM dd")} -{" "}
+                    {format(dateRange.to, "MMM dd")}
+                  </>
+                ) : (
+                  format(dateRange.from, "MMM dd, yyyy")
+                )
+              ) : (
+                "Pick a date"
+              )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
-            <div className="p-3 space-y-2">
-              <div className="text-sm font-medium">From Date</div>
-              <Calendar
-                mode="single"
-                selected={dateRange.from}
-                onSelect={(date) => date && setDateRange((prev) => ({ ...prev, from: startOfDay(date) }))}
-              />
-              <div className="text-sm font-medium">To Date</div>
-              <Calendar
-                mode="single"
-                selected={dateRange.to}
-                onSelect={(date) => date && setDateRange((prev) => ({ ...prev, to: endOfDay(date) }))}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() =>
-                  setDateRange({
-                    from: startOfDay(new Date()),
-                    to: endOfDay(new Date()),
-                  })
-                }
-              >
-                Reset to Today
-              </Button>
-            </div>
+            <Calendar
+              mode="range"
+              selected={{
+                from: dateRange.from,
+                to: dateRange.to,
+              }}
+              onSelect={(range) => {
+                setDateRange({
+                  from: range?.from,
+                  to: range?.to,
+                });
+              }}
+              numberOfMonths={2}
+            />
+            {(dateRange.from || dateRange.to) && (
+              <div className="p-3 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDateRange({})}
+                  className="w-full"
+                >
+                  Clear dates
+                </Button>
+              </div>
+            )}
           </PopoverContent>
         </Popover>
       </div>
+
       <OrderTable orders={filteredOrders} />
     </div>
   );

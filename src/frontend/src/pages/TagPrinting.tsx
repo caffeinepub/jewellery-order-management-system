@@ -1,199 +1,104 @@
-import { useState, useEffect } from 'react';
-import { useGetOrdersByStatus } from '@/hooks/useQueries';
-import { OrderStatus } from '@/backend';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Printer, Play, Globe, CheckCircle2 } from 'lucide-react';
-import { toast } from 'sonner';
-import WebviewModal from '@/components/tagprinting/WebviewModal';
-
-const MPN_SYSTEM_URL = 'https://mpn.malabargroup.com/';
+import { useMemo, useState } from "react";
+import { useGetReadyOrders } from "@/hooks/useQueries";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Copy } from "lucide-react";
+import { toast } from "sonner";
 
 export default function TagPrinting() {
-  const { data: readyOrders = [], isLoading } = useGetOrdersByStatus(OrderStatus.Ready);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentBatch, setCurrentBatch] = useState('');
-  const [showWebview, setShowWebview] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { data: readyOrders = [], isLoading } = useGetReadyOrders();
 
-  // Check if session is active (simplified - in production, this would check actual session)
-  useEffect(() => {
-    const savedLoginStatus = localStorage.getItem('tagPrintingLoggedIn');
-    if (savedLoginStatus === 'true') setIsLoggedIn(true);
-  }, []);
-
-  const handleOpenMPNSystem = () => {
-    setShowWebview(true);
-  };
-
-  const handleWebviewClose = () => {
-    setShowWebview(false);
-    // Assume user has logged in after opening the webview
-    setIsLoggedIn(true);
-    localStorage.setItem('tagPrintingLoggedIn', 'true');
-    toast.success('MPN system session active');
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('tagPrintingLoggedIn');
-    toast.info('Logged out from tag printing system');
-  };
-
-  const handleStartAction = async () => {
-    if (!isLoggedIn) {
-      toast.error('Please login to MPN system first');
-      return;
-    }
-
-    setIsProcessing(true);
-    setProgress(0);
-
-    try {
-      const totalOrders = readyOrders.length;
-      
-      for (let i = 0; i < totalOrders; i++) {
-        const order = readyOrders[i];
-        setCurrentBatch(`Processing ${order.orderNo}...`);
-        
-        // Simulate processing
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const newProgress = Math.floor(((i + 1) / totalOrders) * 100);
-        setProgress(newProgress);
+  // Group orders by design code
+  const groupedByDesign = useMemo(() => {
+    const groups: Record<string, string[]> = {};
+    
+    readyOrders.forEach((order) => {
+      if (!groups[order.design]) {
+        groups[order.design] = [];
       }
+      groups[order.design].push(order.orderNo);
+    });
 
-      toast.success(`Processed ${totalOrders} orders for tag printing`);
-      setCurrentBatch('');
+    return groups;
+  }, [readyOrders]);
+
+  const handleCopyOrderNumbers = async (orderNumbers: string[]) => {
+    try {
+      const text = orderNumbers.join(',');
+      await navigator.clipboard.writeText(text);
+      toast.success("Order numbers copied to clipboard");
     } catch (error) {
-      toast.error('Failed to process orders');
-    } finally {
-      setIsProcessing(false);
-      setProgress(0);
+      toast.error("Failed to copy to clipboard");
+      console.error("Copy error:", error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Loading ready orders...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const designCodes = Object.keys(groupedByDesign).sort();
 
   return (
-    <div className="container px-4 sm:px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Tag Printing</h1>
-        <p className="text-muted-foreground mt-1">
-          Print tags for ready orders via MPN system
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-foreground">Tag Printing</h1>
+        <p className="text-muted-foreground mt-2">
+          Ready orders grouped by design code
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg font-medium flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              MPN System Access
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Access the MPN tag printing system. Login is required before starting the action.
-              </p>
-              
-              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                <div className="flex-1">
-                  <div className="text-sm font-medium">Status</div>
-                  <div className="text-xs text-muted-foreground">
-                    {isLoggedIn ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Logged In
-                      </span>
-                    ) : (
-                      <span className="text-amber-600">Not Logged In</span>
-                    )}
-                  </div>
-                </div>
-                {isLoggedIn && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLogout}
-                  >
-                    Logout
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <Button
-              onClick={handleOpenMPNSystem}
-              className="w-full"
-              size="lg"
-            >
-              <Globe className="mr-2 h-4 w-4" />
-              Open MPN System
-            </Button>
-
-            <p className="text-xs text-muted-foreground">
-              The MPN system will open in an in-app browser. Complete your login there.
+      {designCodes.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <p className="text-center text-muted-foreground">
+              No ready orders found
             </p>
           </CardContent>
         </Card>
-
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg font-medium flex items-center gap-2">
-              <Printer className="h-5 w-5" />
-              Tag Printing Action
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Ready Orders</span>
-                <span className="font-semibold">{readyOrders.length}</span>
-              </div>
-              
-              {isProcessing && (
-                <>
-                  <Progress value={progress} className="h-2" />
-                  <p className="text-xs text-muted-foreground">{currentBatch}</p>
-                </>
-              )}
-            </div>
-
-            <Button
-              onClick={handleStartAction}
-              disabled={!isLoggedIn || isProcessing || readyOrders.length === 0}
-              className="w-full"
-              size="lg"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Action
-                </>
-              )}
-            </Button>
-
-            {!isLoggedIn && (
-              <p className="text-xs text-amber-600">
-                ⚠️ Please login to MPN system first
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <WebviewModal
-        url={MPN_SYSTEM_URL}
-        open={showWebview}
-        onClose={handleWebviewClose}
-      />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {designCodes.map((designCode) => {
+            const orderNumbers = groupedByDesign[designCode];
+            return (
+              <Card key={designCode} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-gold">
+                    {designCode}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {orderNumbers.length} order{orderNumbers.length !== 1 ? 's' : ''}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Order Numbers:</p>
+                    <div className="bg-muted rounded-md p-3 max-h-32 overflow-y-auto">
+                      <p className="text-sm font-mono break-all">
+                        {orderNumbers.join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleCopyOrderNumbers(orderNumbers)}
+                    className="w-full bg-gold hover:bg-gold-hover"
+                    size="sm"
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy for MPN
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

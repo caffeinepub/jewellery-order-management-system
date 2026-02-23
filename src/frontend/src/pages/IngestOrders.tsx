@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { parseOrdersExcel } from '../utils/excelParser';
-import { useSaveOrder, useGetOrders } from '../hooks/useQueries';
+import { useSaveOrder, useGetAllOrders } from '../hooks/useQueries';
 import { useActor } from '../hooks/useActor';
 import type { OrderType } from '../backend';
 
@@ -39,7 +39,7 @@ export default function IngestOrders() {
 
   const { actor } = useActor();
   const saveOrderMutation = useSaveOrder();
-  const { refetch: refetchOrders } = useGetOrders();
+  const { refetch: refetchOrders } = useGetAllOrders();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];

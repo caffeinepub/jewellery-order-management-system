@@ -67,6 +67,7 @@ export interface backendInterface {
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     deleteOrder(orderId: string): Promise<void>;
+    deleteReadyOrder(orderId: string): Promise<void>;
     getAllMasterDesignMappings(): Promise<Array<[string, DesignMapping]>>;
     getAllOrders(): Promise<Array<Order>>;
     getDesignImage(designCode: string): Promise<ExternalBlob | null>;
@@ -79,6 +80,7 @@ export interface backendInterface {
     getReadyOrders(): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
+    markOrdersAsReady(orderIds: Array<string>): Promise<void>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
@@ -87,7 +89,6 @@ export interface backendInterface {
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateDesignMapping(designCode: string, newGenericName: string, newKarigarName: string): Promise<void>;
     updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
-    updateOrdersStatusToReady(orderIds: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;
     uploadDesignMapping(mappingData: Array<MappingRecord>): Promise<void>;
     uploadMasterDesignExcel(blob: ExternalBlob): Promise<void>;

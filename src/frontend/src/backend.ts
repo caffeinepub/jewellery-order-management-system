@@ -159,6 +159,7 @@ export interface backendInterface {
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     deleteOrder(orderId: string): Promise<void>;
+    deleteReadyOrder(orderId: string): Promise<void>;
     getAllMasterDesignMappings(): Promise<Array<[string, DesignMapping]>>;
     getAllOrders(): Promise<Array<Order>>;
     getDesignImage(designCode: string): Promise<ExternalBlob | null>;
@@ -171,6 +172,7 @@ export interface backendInterface {
     getReadyOrders(): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
+    markOrdersAsReady(orderIds: Array<string>): Promise<void>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
@@ -179,7 +181,6 @@ export interface backendInterface {
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateDesignMapping(designCode: string, newGenericName: string, newKarigarName: string): Promise<void>;
     updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
-    updateOrdersStatusToReady(orderIds: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;
     uploadDesignMapping(mappingData: Array<MappingRecord>): Promise<void>;
     uploadMasterDesignExcel(blob: ExternalBlob): Promise<void>;
@@ -338,6 +339,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteOrder(arg0);
+            return result;
+        }
+    }
+    async deleteReadyOrder(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteReadyOrder(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteReadyOrder(arg0);
             return result;
         }
     }
@@ -509,6 +524,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async markOrdersAsReady(arg0: Array<string>): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.markOrdersAsReady(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.markOrdersAsReady(arg0);
+            return result;
+        }
+    }
     async reassignDesign(arg0: string, arg1: string): Promise<void> {
         if (this.processError) {
             try {
@@ -618,20 +647,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.updateMasterDesignKarigars(arg0);
-            return result;
-        }
-    }
-    async updateOrdersStatusToReady(arg0: Array<string>): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.updateOrdersStatusToReady(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.updateOrdersStatusToReady(arg0);
             return result;
         }
     }

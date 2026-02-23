@@ -37,12 +37,13 @@ export default function DataResetDialog({ open, onOpenChange }: DataResetDialogP
           <AlertDialogTitle>Reset Active Orders Data</AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p>
-              This action will permanently delete all orders with <strong>Pending</strong> or{' '}
-              <strong>ReturnFromHallmark</strong> status.
+              This action will permanently delete all orders with <strong>Pending</strong>,{' '}
+              <strong>Ready</strong>, or <strong>Return from Hallmark</strong> status.
             </p>
             <p className="font-medium">The following tabs will be affected:</p>
             <ul className="list-disc list-inside pl-2 space-y-1">
               <li>Total Orders</li>
+              <li>Ready</li>
               <li>Karigar</li>
               <li>Customer Orders</li>
               <li>Hallmark</li>

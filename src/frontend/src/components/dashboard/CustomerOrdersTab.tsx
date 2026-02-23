@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import OrderTable from "./OrderTable";
-import { useGetOrders } from "@/hooks/useQueries";
+import { useGetAllOrders } from "@/hooks/useQueries";
 import { OrderType, OrderStatus } from "@/backend";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
 export default function CustomerOrdersTab() {
   const [searchText, setSearchText] = useState("");
-  const { data: orders = [], isLoading } = useGetOrders();
+  const { data: orders = [], isLoading } = useGetAllOrders();
 
   const filteredOrders = useMemo(() => {
     // Filter for CO type orders with Pending status only

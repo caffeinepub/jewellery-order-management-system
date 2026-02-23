@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Edit } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { 
-  useGetAllMasterDesignMappings, 
-  useReassignDesign, 
-  useGetMasterDesignKarigars, 
-  useAddKarigar, 
-  useSaveDesignMapping,
-  useUpdateMasterDesignKarigars,
+import {
+  useUploadMasterDesignExcel,
+  useGetMasterDesignExcel,
   useUploadDesignMapping,
   useAssignOrdersToKarigar,
-  useGetOrdersWithMappings
+  useUpdateMasterDesignKarigars,
+  useGetAllMasterDesignMappings,
+  useGetAllOrders,
+  useReassignDesign,
+  useGetUniqueKarigarsFromDesignMappings,
+  useAddKarigar,
 } from "@/hooks/useQueries";
-import { useActor } from "@/hooks/useActor";
-import { parseMasterDesignExcel } from "@/utils/excelParser";
+import { ExternalBlob, MappingRecord, DesignMapping } from "@/backend";
+import { normalizeDesignCode } from "@/utils/excelParser";
 import {
   Table,
   TableBody,
@@ -23,134 +27,146 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { EditDesignModal } from "@/components/masterdesigns/EditDesignModal";
-import { Progress } from "@/components/ui/progress";
 
 export default function MasterDesigns() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const { data: mappings = [], isLoading } = useGetAllMasterDesignMappings();
-  const { data: masterDesignKarigars = [] } = useGetMasterDesignKarigars();
-  const reassignMutation = useReassignDesign();
-  const addKarigarMutation = useAddKarigar();
-  const saveDesignMappingMutation = useSaveDesignMapping();
-  const updateMasterDesignKarigarsMutation = useUpdateMasterDesignKarigars();
-  const uploadDesignMappingMutation = useUploadDesignMapping();
-  const assignOrdersToKarigarMutation = useAssignOrdersToKarigar();
-  const { data: ordersWithMappings = [] } = useGetOrdersWithMappings();
-  const { actor } = useActor();
-
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [selectedMapping, setSelectedMapping] = useState<{
+  const [editingMapping, setEditingMapping] = useState<{
     designCode: string;
     genericName: string;
     karigarName: string;
   } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !actor) return;
+  const uploadMasterDesignExcelMutation = useUploadMasterDesignExcel();
+  const uploadDesignMappingMutation = useUploadDesignMapping();
+  const assignOrdersToKarigarMutation = useAssignOrdersToKarigar();
+  const updateMasterDesignKarigarsMutation = useUpdateMasterDesignKarigars();
+  const reassignDesignMutation = useReassignDesign();
+  const addKarigarMutation = useAddKarigar();
+  const { data: masterDesignExcel } = useGetMasterDesignExcel();
+  const { data: masterDesignMappings = [] } = useGetAllMasterDesignMappings();
+  const { data: allOrders = [] } = useGetAllOrders();
+  const { data: availableKarigars = [] } = useGetUniqueKarigarsFromDesignMappings();
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+      toast.error("Please upload an Excel file (.xlsx or .xls)");
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress(0);
+
     try {
-      // Count unmapped orders before upload
-      const unmappedBefore = ordersWithMappings.filter(
-        (order) => !order.genericName || !order.karigarName
-      ).length;
+      // Read the file
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Dynamically import XLSX
+      const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
+      
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
-      const result = await parseMasterDesignExcel(file);
-      
-      if (result.errors.length > 0) {
-        toast.error(`Found ${result.errors.length} error(s) in the Excel file`);
-        result.errors.slice(0, 5).forEach((error) => {
-          toast.error(`Row ${error.row}, ${error.field}: ${error.message}`);
-        });
-        if (result.data.length === 0) {
-          return;
-        }
-      }
+      setUploadProgress(20);
 
-      console.log(`📤 Uploading ${result.data.length} design mappings...`);
+      // Parse the Excel data
+      const mappings: MappingRecord[] = [];
+      const uniqueKarigars = new Set<string>();
 
-      // Step 1: Upload to master design mappings table
-      await uploadDesignMappingMutation.mutateAsync(result.data);
-      setUploadProgress(25);
-      
-      // Step 2: Extract unique karigar names and ensure they exist in karigars table
-      const uniqueKarigars = Array.from(new Set(result.data.map(record => record.karigarName)));
-      
-      // Add each karigar if it doesn't exist (backend will skip if exists)
-      for (const karigarName of uniqueKarigars) {
-        try {
-          await addKarigarMutation.mutateAsync(karigarName);
-        } catch (error: any) {
-          // Ignore "already exists" errors
-          if (!error?.message?.includes("already exists")) {
-            console.error(`Failed to add karigar ${karigarName}:`, error);
-          }
-        }
-      }
-      
-      // Update the master design karigars list
-      await updateMasterDesignKarigarsMutation.mutateAsync(uniqueKarigars);
-      setUploadProgress(50);
-      
-      // Step 3: Save each mapping to designMappings so orders can access them
-      let savedCount = 0;
-      for (const mapping of result.data) {
-        try {
-          await saveDesignMappingMutation.mutateAsync({
-            designCode: mapping.designCode,
-            genericName: mapping.genericName,
-            karigarName: mapping.karigarName,
+      // Skip header row
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row || row.length < 3) continue;
+
+        const designCode = normalizeDesignCode(String(row[0] || "").trim());
+        const genericName = String(row[1] || "").trim();
+        const karigarName = String(row[2] || "").trim();
+
+        if (designCode && genericName && karigarName) {
+          mappings.push({
+            designCode,
+            genericName,
+            karigarName,
           });
-          savedCount++;
-          setUploadProgress(50 + Math.round((savedCount / result.data.length) * 25));
-        } catch (error: any) {
-          console.error(`Failed to save mapping for ${mapping.designCode}:`, error);
-          // Continue with other mappings even if one fails
+          uniqueKarigars.add(karigarName);
         }
       }
 
-      // Step 4: Automatically apply mappings to all existing orders with matching design codes
-      console.log(`🔄 Applying mappings to existing orders...`);
-      await assignOrdersToKarigarMutation.mutateAsync(result.data);
+      if (mappings.length === 0) {
+        toast.error("No valid mappings found in the Excel file");
+        setIsUploading(false);
+        return;
+      }
+
+      setUploadProgress(40);
+
+      // Upload the Excel file as blob
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const blob = ExternalBlob.fromBytes(uint8Array);
+      await uploadMasterDesignExcelMutation.mutateAsync(blob);
+
+      setUploadProgress(60);
+
+      // Upload design mappings
+      await uploadDesignMappingMutation.mutateAsync(mappings);
+
+      setUploadProgress(70);
+
+      // Update master design karigars list
+      await updateMasterDesignKarigarsMutation.mutateAsync(Array.from(uniqueKarigars));
+
+      setUploadProgress(80);
+
+      // Assign orders to karigars
+      await assignOrdersToKarigarMutation.mutateAsync(mappings);
+
       setUploadProgress(100);
 
-      // Fetch updated orders to count how many were mapped
-      const updatedOrders = await actor.getOrdersWithMappings();
-      const unmappedAfter = updatedOrders.filter(
-        (order) => !order.genericName || !order.karigarName
-      ).length;
-      const newlyMapped = unmappedBefore - unmappedAfter;
+      // Count newly mapped orders
+      const mappedDesignCodes = new Set(mappings.map((m) => m.designCode));
+      const newlyMappedOrders = allOrders.filter((order) =>
+        mappedDesignCodes.has(order.design)
+      );
 
       toast.success(
-        `Successfully uploaded ${result.data.length} design mappings with ${uniqueKarigars.length} unique karigars. ${newlyMapped > 0 ? `${newlyMapped} order(s) were automatically mapped.` : ''}`
+        `Master Design Excel uploaded successfully! ${mappings.length} designs mapped. ${newlyMappedOrders.length} orders updated.`
       );
-    } catch (error) {
-      toast.error("Failed to upload master design Excel");
-      console.error(error);
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error: any) {
+      console.error("Error uploading Master Design Excel:", error);
+      toast.error(error?.message || "Failed to upload Master Design Excel");
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
-      e.target.value = "";
     }
   };
 
-  const handleEditClick = (mapping: { designCode: string; genericName: string; karigarName: string }) => {
-    setSelectedMapping(mapping);
-    setEditModalOpen(true);
+  const handleEditClick = (mapping: [string, DesignMapping]) => {
+    const [designCode, designMapping] = mapping;
+    setEditingMapping({
+      designCode: designMapping.designCode,
+      genericName: designMapping.genericName,
+      karigarName: designMapping.karigarName,
+    });
   };
 
-  const handleSaveMapping = async (designCode: string, genericName: string, newKarigar: string) => {
-    if (!actor) throw new Error("Actor not initialized");
-    
-    // Step 1: Update master mapping table
-    await saveDesignMappingMutation.mutateAsync({ designCode, genericName, karigarName: newKarigar });
-    
-    // Step 2: Update pending orders only (backend filters for Pending status)
-    await reassignMutation.mutateAsync({ designCode, newKarigar });
+  const handleSaveEdit = async (designCode: string, genericName: string, newKarigar: string) => {
+    await reassignDesignMutation.mutateAsync({
+      designCode,
+      newKarigar,
+    });
   };
 
   const handleAddKarigar = async (name: string) => {
@@ -158,97 +174,137 @@ export default function MasterDesigns() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Master Designs</h1>
-          <p className="text-muted-foreground">
-            Manage design code mappings and karigar assignments
-          </p>
-        </div>
-        <div>
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="master-excel-upload"
-          />
-          <label htmlFor="master-excel-upload">
-            <Button asChild disabled={isUploading}>
-              <span>
-                <Upload className="mr-2 h-4 w-4" />
-                {isUploading ? "Uploading..." : "Upload Master Excel"}
-              </span>
-            </Button>
-          </label>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Master Designs</h1>
+        <p className="text-muted-foreground mt-2">
+          Upload and manage master design mappings
+        </p>
       </div>
 
-      {isUploading && (
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Processing master design mappings...</span>
-            <span>{uploadProgress}%</span>
+      <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <AlertDescription className="text-blue-900 dark:text-blue-100">
+          <strong>Important:</strong> Upload the Master Design Excel file before ingesting orders.
+          This file should contain three columns: Design Code, Generic Name, and Karigar Name.
+        </AlertDescription>
+      </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload Master Design Excel</CardTitle>
+          <CardDescription>
+            Upload an Excel file with design codes, generic names, and karigar assignments
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="master-design-file">Excel File</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                id="master-design-file"
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                disabled={isUploading}
+                className="flex-1"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="bg-gold hover:bg-gold-hover"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {isUploading ? "Uploading..." : "Upload"}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Expected format: Column 1 = Design Code, Column 2 = Generic Name, Column 3 = Karigar Name
+            </p>
           </div>
-          <Progress value={uploadProgress} />
-        </div>
+
+          {isUploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Uploading and processing...</span>
+                <span className="font-medium">{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-gold h-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {masterDesignExcel && !isUploading && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+              <FileSpreadsheet className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <span className="text-sm text-green-900 dark:text-green-100">
+                Master Design Excel file uploaded
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {masterDesignMappings.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Master Design Mappings</CardTitle>
+            <CardDescription>
+              {masterDesignMappings.length} design{masterDesignMappings.length !== 1 ? "s" : ""} mapped
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Design Code</TableHead>
+                    <TableHead>Generic Name</TableHead>
+                    <TableHead>Karigar Name</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {masterDesignMappings.map((mapping) => {
+                    const [designCode, designMapping] = mapping;
+                    return (
+                      <TableRow key={designCode}>
+                        <TableCell className="font-medium">{designMapping.designCode}</TableCell>
+                        <TableCell>{designMapping.genericName}</TableCell>
+                        <TableCell>{designMapping.karigarName}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(mapping)}
+                          >
+                            Edit
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Design Code</TableHead>
-              <TableHead>Generic Name</TableHead>
-              <TableHead>Karigar</TableHead>
-              <TableHead className="w-24">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : mappings.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                  No design mappings found. Upload a Master Excel file to get started.
-                </TableCell>
-              </TableRow>
-            ) : (
-              mappings.map((mapping) => (
-                <TableRow key={mapping.designCode}>
-                  <TableCell className="font-medium">{mapping.designCode}</TableCell>
-                  <TableCell>{mapping.genericName}</TableCell>
-                  <TableCell>{mapping.karigarName}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditClick(mapping)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {selectedMapping && (
+      {editingMapping && (
         <EditDesignModal
-          open={editModalOpen}
-          onOpenChange={setEditModalOpen}
-          designCode={selectedMapping.designCode}
-          genericName={selectedMapping.genericName}
-          currentKarigar={selectedMapping.karigarName}
-          availableKarigars={masterDesignKarigars}
-          onSave={handleSaveMapping}
+          open={!!editingMapping}
+          onOpenChange={(open) => !open && setEditingMapping(null)}
+          designCode={editingMapping.designCode}
+          genericName={editingMapping.genericName}
+          currentKarigar={editingMapping.karigarName}
+          availableKarigars={availableKarigars}
+          onSave={handleSaveEdit}
           onAddKarigar={handleAddKarigar}
         />
       )}

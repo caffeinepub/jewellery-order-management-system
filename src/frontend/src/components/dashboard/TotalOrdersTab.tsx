@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useGetAllOrders } from "@/hooks/useQueries";
 import OrderTable from "./OrderTable";
-import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType, Order } from "@/backend";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { Order, OrderType, OrderStatus } from "@/backend";
+import { Button } from "@/components/ui/button";
+import SuppliedQtyDialog from "./SuppliedQtyDialog";
 import {
   Select,
   SelectContent,
@@ -12,137 +13,150 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import SuppliedQtyDialog from "./SuppliedQtyDialog";
 
 export default function TotalOrdersTab() {
-  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
-  const [searchText, setSearchText] = useState("");
-  const [karigarFilter, setKarigarFilter] = useState<string>("All");
-  const [selectedOrdersForSupply, setSelectedOrdersForSupply] = useState<Order[]>([]);
+  const { data: allOrders = [], isLoading } = useGetAllOrders();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOrderType, setSelectedOrderType] = useState<string>("all");
+  const [selectedKarigar, setSelectedKarigar] = useState<string>("all");
+  const [rbOrdersForSupply, setRbOrdersForSupply] = useState<Order[]>([]);
 
-  const { data: orders = [], isLoading } = useGetOrders();
-  const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
-
-  // Deduplicate karigar names
-  const uniqueKarigarList = useMemo(() => {
-    const karigarSet = new Set(uniqueKarigars);
-    return Array.from(karigarSet).sort();
-  }, [uniqueKarigars]);
-
+  // Filter orders to show only Pending and ReturnFromHallmark status
   const filteredOrders = useMemo(() => {
-    let result = orders.filter(
-      (order) =>
-        order.status === OrderStatus.Pending ||
-        order.status === OrderStatus.ReturnFromHallmark
-    );
+    return allOrders.filter((order) => {
+      // Only show Pending and ReturnFromHallmark orders in Total Orders tab
+      const statusMatch = 
+        order.status === OrderStatus.Pending || 
+        order.status === OrderStatus.ReturnFromHallmark;
+      
+      if (!statusMatch) return false;
 
-    // Filter by order type
-    if (orderTypeFilter !== "All") {
-      result = result.filter((order) => order.orderType === orderTypeFilter);
-    }
+      const searchMatch =
+        searchQuery === "" ||
+        order.orderNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.design.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Filter by karigar name
-    if (karigarFilter !== "All") {
-      result = result.filter((order) => order.karigarName === karigarFilter);
-    }
+      const typeMatch =
+        selectedOrderType === "all" || order.orderType === selectedOrderType;
 
-    // Filter by order number (search)
-    if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      result = result.filter((order) =>
-        order.orderNo.toLowerCase().includes(search)
-      );
-    }
+      const karigarMatch =
+        selectedKarigar === "all" || order.karigarName === selectedKarigar;
 
-    return result;
-  }, [orders, orderTypeFilter, karigarFilter, searchText]);
+      return searchMatch && typeMatch && karigarMatch;
+    });
+  }, [allOrders, searchQuery, selectedOrderType, selectedKarigar]);
+
+  // Get unique karigars from filtered orders
+  const uniqueKarigars = useMemo(() => {
+    const karigars = new Set<string>();
+    allOrders.forEach((order) => {
+      if (order.karigarName && 
+          (order.status === OrderStatus.Pending || order.status === OrderStatus.ReturnFromHallmark)) {
+        karigars.add(order.karigarName);
+      }
+    });
+    return Array.from(karigars).sort();
+  }, [allOrders]);
 
   const handleMarkAsReady = (selectedOrders: Order[]) => {
-    // Check if any selected orders are RB type with Pending status
-    const rbPendingOrders = selectedOrders.filter(
-      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
-    );
-
-    if (rbPendingOrders.length > 0) {
-      // Show dialog for RB orders
-      setSelectedOrdersForSupply(rbPendingOrders);
-    }
-  };
-
-  const handleCloseDialog = () => {
-    setSelectedOrdersForSupply([]);
+    setRbOrdersForSupply(selectedOrders);
   };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading orders...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-muted-foreground">Loading orders...</div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by order number or design..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         <div className="flex gap-2">
           <Button
-            variant={orderTypeFilter === "All" ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter("All")}
+            variant={selectedOrderType === "all" ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType("all")}
+            className={
+              selectedOrderType === "all"
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             All
           </Button>
           <Button
-            variant={orderTypeFilter === OrderType.CO ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.CO)}
+            variant={selectedOrderType === OrderType.SO ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType(OrderType.SO)}
+            className={
+              selectedOrderType === OrderType.SO
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
+          >
+            SO
+          </Button>
+          <Button
+            variant={selectedOrderType === OrderType.CO ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedOrderType(OrderType.CO)}
+            className={
+              selectedOrderType === OrderType.CO
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             CO
           </Button>
           <Button
-            variant={orderTypeFilter === OrderType.RB ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.RB)}
+            variant={selectedOrderType === OrderType.RB ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType(OrderType.RB)}
+            className={
+              selectedOrderType === OrderType.RB
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             RB
           </Button>
-          <Button
-            variant={orderTypeFilter === OrderType.SO ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.SO)}
-            size="sm"
-          >
-            SO
-          </Button>
         </div>
-        <Select value={karigarFilter} onValueChange={setKarigarFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
+        <Select value={selectedKarigar} onValueChange={setSelectedKarigar}>
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Filter by Karigar" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">All Karigars</SelectItem>
-            {uniqueKarigarList.map((karigar) => (
+            <SelectItem value="all">All Karigars</SelectItem>
+            {uniqueKarigars.map((karigar) => (
               <SelectItem key={karigar} value={karigar}>
                 {karigar}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by Order Number..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
       </div>
+
       <OrderTable 
         orders={filteredOrders} 
-        enableBulkActions 
+        enableBulkActions={true}
         onMarkAsReady={handleMarkAsReady}
       />
 
-      {selectedOrdersForSupply.length > 0 && (
+      {rbOrdersForSupply.length > 0 && (
         <SuppliedQtyDialog
-          orders={selectedOrdersForSupply}
-          onClose={handleCloseDialog}
+          orders={rbOrdersForSupply}
+          onClose={() => setRbOrdersForSupply([])}
         />
       )}
     </div>

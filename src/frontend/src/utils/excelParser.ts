@@ -15,7 +15,7 @@ export interface ParseResult<T> {
  * Normalize design code by trimming whitespace and converting to uppercase
  * This ensures consistent matching between order Excel and Master Design Excel
  */
-function normalizeDesignCode(code: string): string {
+export function normalizeDesignCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
@@ -220,22 +220,18 @@ export async function parseMasterDesignExcel(file: File): Promise<
           }
           
           // Yield to browser to prevent freezing
-          if (endRow < totalRows) {
+          if (startRow + CHUNK_SIZE <= totalRows) {
             await new Promise(resolve => setTimeout(resolve, 0));
           }
         }
 
-        console.log(`✅ Parsing complete: ${mappings.length} valid mappings, ${errors.length} errors`);
-        if (mappings.length > 0) {
-          console.log('Sample mappings:', mappings.slice(0, 3));
-        }
+        console.log(`✅ Parsed ${mappings.length} valid mappings from Master Design Excel`);
         if (errors.length > 0) {
-          console.log('First 5 errors:', errors.slice(0, 5));
+          console.warn(`⚠️ Found ${errors.length} validation errors`);
         }
 
         resolve({ data: mappings, errors });
       } catch (error) {
-        console.error('❌ Excel parsing error:', error);
         reject(error);
       }
     };
@@ -245,26 +241,16 @@ export async function parseMasterDesignExcel(file: File): Promise<
   });
 }
 
-// Alias for backward compatibility
-export const parseKarigarMappingExcel = parseMasterDesignExcel;
-
-// Parse orders Excel - returns orders with orderId generated
-export async function parseOrdersExcel(file: File): Promise<Array<{
-  orderNo: string;
-  orderType: OrderType;
-  product: string;
-  design: string;
-  weight: number;
-  size: number;
-  quantity: bigint;
-  remarks: string;
-  orderId: string;
-}>> {
+export async function parseOrdersExcel(file: File): Promise<any[]> {
   const result = await parseExcelFile(file);
   
-  return result.data.map((order) => ({
+  if (result.errors.length > 0) {
+    console.warn('Parsing errors:', result.errors);
+  }
+  
+  return result.data.map((order, index) => ({
     ...order,
+    orderId: `${order.orderNo}-${Date.now()}-${index}`,
     quantity: BigInt(order.quantity),
-    orderId: `${order.orderNo}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   }));
 }

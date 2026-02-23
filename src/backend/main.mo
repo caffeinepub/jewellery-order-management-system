@@ -4,10 +4,11 @@ import Text "mo:core/Text";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
+import Migration "migration";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Migration "migration";
 
+// Specify migration in with-clause
 (with migration = Migration.run)
 actor {
   include MixinStorage();
@@ -109,24 +110,29 @@ actor {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
       case (?originalOrder) {
-        if (suppliedQuantity >= originalOrder.quantity) {
-          Runtime.trap("Cannot supply full or more than original quantity in one go. Use supplyAndReturnOrder instead");
+        if (suppliedQuantity > originalOrder.quantity) {
+          Runtime.trap("Supplied quantity cannot be greater than original order quantity");
         };
 
-        let pendingOrder : Order = {
-          originalOrder with
-          quantity = originalOrder.quantity - suppliedQuantity;
-          updatedAt = Time.now();
+        if (suppliedQuantity > 0) {
+          let readyOrder : Order = {
+            originalOrder with
+            quantity = suppliedQuantity;
+            status = #Ready;
+            updatedAt = Time.now();
+          };
+          orders.add(orderId, readyOrder);
         };
-        orders.add(orderId, pendingOrder);
 
-        let readyOrder : Order = {
-          originalOrder with
-          quantity = suppliedQuantity;
-          status = #Ready;
-          updatedAt = Time.now();
+        let remainingQuantity = originalOrder.quantity - suppliedQuantity;
+        if (remainingQuantity > 0) {
+          let pendingOrder : Order = {
+            originalOrder with
+            quantity = remainingQuantity;
+            updatedAt = Time.now();
+          };
+          orders.add(orderId, pendingOrder);
         };
-        orders.add(orderId, readyOrder);
       };
     };
   };
@@ -305,15 +311,9 @@ actor {
   };
 
   public query ({ caller }) func getReadyOrders() : async [Order] {
-    let filteredOrders = List.empty<Order>();
-
-    for ((_, order) in orders.entries()) {
-      if (order.status == #Ready) {
-        filteredOrders.add(order);
-      };
-    };
-
-    filteredOrders.toArray();
+    orders.values().toArray().filter(
+      func(order) { order.status == #Ready }
+    );
   };
 
   public shared ({ caller }) func batchSaveDesignMappings(mappings : [(Text, DesignMapping)]) : async () {
@@ -376,12 +376,22 @@ actor {
     };
   };
 
-  public shared ({ caller }) func updateOrdersStatusToReady(orderIds : [Text]) : async () {
+  public shared ({ caller }) func markOrdersAsReady(orderIds : [Text]) : async () {
     for (orderId in orderIds.values()) {
       switch (orders.get(orderId)) {
-        case (null) { Runtime.trap("Order with id " # orderId # " not found") };
-        case (?_order) {
-          Runtime.trap("This function is not used for RB " # orderId # " now");
+        case (null) {
+          Runtime.trap("Order with id " # orderId # " not found");
+        };
+        case (?order) {
+          if (order.status != #Pending) {
+            Runtime.trap("Order must be in Pending state to be marked as Ready");
+          };
+          let updatedOrder : Order = {
+            order with
+            status = #Ready;
+            updatedAt = Time.now();
+          };
+          orders.add(orderId, updatedOrder);
         };
       };
     };
@@ -421,13 +431,32 @@ actor {
     designMappings.add(designCode, updatedMapping);
   };
 
-  // Data Reset: Remove all orders with Pending or ReturnFromHallmark status (active orders).
+  // Data Reset: Remove all orders with Pending, Ready, or ReturnFromHallmark status (active orders).
   public shared ({ caller }) func resetActiveOrders() : async () {
     let remainingOrders = orders.filter(
       func(_orderId, order) {
-        order.status != #Pending and order.status != #ReturnFromHallmark
+        order.status != #Pending and
+        order.status != #Ready and
+        order.status != #ReturnFromHallmark
       }
     );
     orders := remainingOrders;
+  };
+
+  // New function to allow deleting "Ready" orders and moving them back to "Pending".
+  public shared ({ caller }) func deleteReadyOrder(orderId : Text) : async () {
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order not found") };
+      case (?order) {
+        if (order.status == #Ready) {
+          let pendingOrder : Order = {
+            order with status = #Pending;
+          };
+          orders.add(orderId, pendingOrder);
+        } else {
+          Runtime.trap("Only 'Ready' orders can be moved back to 'Pending' status");
+        };
+      };
+    };
   };
 };

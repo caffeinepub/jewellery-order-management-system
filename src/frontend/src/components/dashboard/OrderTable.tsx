@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import { Order, OrderType, OrderStatus } from "@/backend";
 import DesignImageModal from "./DesignImageModal";
 import { exportToExcel, exportToPDF, exportToJPEG } from "@/utils/exportUtils";
@@ -38,13 +38,15 @@ interface OrderTableProps {
   showDateFilter?: boolean;
   enableBulkActions?: boolean;
   onMarkAsReady?: (selectedOrders: Order[]) => void;
+  onDelete?: (orderId: string) => void;
 }
 
 export default function OrderTable({ 
   orders, 
   showDateFilter = false, 
   enableBulkActions = false,
-  onMarkAsReady 
+  onMarkAsReady,
+  onDelete
 }: OrderTableProps) {
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -114,30 +116,16 @@ export default function OrderTable({
         (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
       );
       
-      // Update each order to Ready status
-      for (const order of soCoOrders) {
-        const updatedOrder: Order = {
-          ...order,
-          status: OrderStatus.Ready,
-          updatedAt: BigInt(Date.now()) * BigInt(1000000), // Convert to nanoseconds
-        };
-        
-        // Call backend to update the order
-        await actor.saveOrder(
-          updatedOrder.orderNo,
-          updatedOrder.orderType,
-          updatedOrder.product,
-          updatedOrder.design,
-          updatedOrder.weight,
-          updatedOrder.size,
-          updatedOrder.quantity,
-          updatedOrder.remarks,
-          updatedOrder.orderId
-        );
-      }
+      const orderIds = soCoOrders.map(order => order.orderId);
       
-      // Invalidate queries to refresh data
+      // Call the backend method to mark orders as ready
+      await actor.markOrdersAsReady(orderIds);
+      
+      // Invalidate all order-related queries to refresh data across all tabs
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+      await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
+      await queryClient.invalidateQueries({ queryKey: ["ready-orders"] });
       
       toast.success(`${soCoOrders.length} order(s) marked as Ready`);
       setSelectedRows(new Set());
@@ -243,22 +231,23 @@ export default function OrderTable({
                   />
                 </TableHead>
               )}
-              <TableHead>Order No</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Design</TableHead>
               <TableHead>Generic Name</TableHead>
               <TableHead>Karigar</TableHead>
+              <TableHead>Design</TableHead>
               <TableHead>Weight (g)</TableHead>
               <TableHead>Size</TableHead>
               <TableHead>Qty</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Remarks</TableHead>
               <TableHead>Status</TableHead>
+              {onDelete && <TableHead className="w-12"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={enableBulkActions ? 10 : 9}
+                  colSpan={onDelete ? 11 : 10}
                   className="text-center py-8 text-muted-foreground"
                 >
                   No orders found
@@ -271,7 +260,7 @@ export default function OrderTable({
                     key={order.orderId}
                     onClick={() => handleRowClick(order.orderId)}
                     className={`cursor-pointer ${
-                      selectedRows.has(order.orderId) ? "bg-gold/10" : ""
+                      selectedRows.has(order.orderId) ? "bg-red-100 dark:bg-red-950/30" : ""
                     }`}
                   >
                     {enableBulkActions && (
@@ -283,12 +272,8 @@ export default function OrderTable({
                         />
                       </TableCell>
                     )}
-                    <TableCell className="font-medium">{order.orderNo}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
-                        {order.orderType}
-                      </span>
-                    </TableCell>
+                    <TableCell>{order.genericName || "-"}</TableCell>
+                    <TableCell>{order.karigarName || "-"}</TableCell>
                     <TableCell>
                       {index === 0 ? (
                         <button
@@ -301,11 +286,15 @@ export default function OrderTable({
                         <span className="text-muted-foreground">↳</span>
                       )}
                     </TableCell>
-                    <TableCell>{order.genericName || "-"}</TableCell>
-                    <TableCell>{order.karigarName || "-"}</TableCell>
                     <TableCell>{order.weight.toFixed(3)}</TableCell>
                     <TableCell>{order.size}</TableCell>
                     <TableCell>{Number(order.quantity)}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-muted">
+                        {order.orderType}
+                      </span>
+                    </TableCell>
+                    <TableCell>{order.remarks || "-"}</TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
@@ -321,6 +310,21 @@ export default function OrderTable({
                         {order.status}
                       </span>
                     </TableCell>
+                    {onDelete && (
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(order.orderId);
+                          }}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )

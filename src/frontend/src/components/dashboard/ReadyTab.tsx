@@ -1,13 +1,10 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useGetReadyOrders, useDeleteReadyOrder } from "@/hooks/useQueries";
 import OrderTable from "./OrderTable";
-import { useGetOrders, useGetUniqueKarigarsFromMappings } from "@/hooks/useQueries";
-import { OrderStatus, OrderType } from "@/backend";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Search } from "lucide-react";
-import { format, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { Search } from "lucide-react";
+import { OrderType } from "@/backend";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -15,162 +12,259 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 export default function ReadyTab() {
-  const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | "All">("All");
-  const [searchText, setSearchText] = useState("");
-  const [karigarFilter, setKarigarFilter] = useState<string>("All");
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: startOfDay(new Date()),
-    to: endOfDay(new Date()),
-  });
+  const { data: readyOrders = [], isLoading } = useGetReadyOrders();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOrderType, setSelectedOrderType] = useState<string>("all");
+  const [selectedKarigar, setSelectedKarigar] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const deleteReadyOrderMutation = useDeleteReadyOrder();
 
-  const { data: allOrders = [], isLoading } = useGetOrders();
-  const { data: uniqueKarigars = [] } = useGetUniqueKarigarsFromMappings();
-
-  // Deduplicate karigar names
-  const uniqueKarigarList = useMemo(() => {
-    const karigarSet = new Set(uniqueKarigars);
-    return Array.from(karigarSet).sort();
-  }, [uniqueKarigars]);
-
-  const filteredOrders = useMemo(() => {
-    // First filter by status = Ready
-    let result = allOrders.filter((order) => order.status === OrderStatus.Ready);
-
-    // Deduplicate orders by orderId - keep only the first occurrence
-    const seenOrderIds = new Set<string>();
-    result = result.filter((order) => {
-      if (seenOrderIds.has(order.orderId)) {
+  // Deduplicate orders by orderId (keep the first occurrence)
+  const deduplicatedOrders = useMemo(() => {
+    const seen = new Set<string>();
+    return readyOrders.filter((order) => {
+      if (seen.has(order.orderId)) {
         return false;
       }
-      seenOrderIds.add(order.orderId);
+      seen.add(order.orderId);
       return true;
     });
+  }, [readyOrders]);
 
-    // Filter by order type
-    if (orderTypeFilter !== "All") {
-      result = result.filter((order) => order.orderType === orderTypeFilter);
-    }
+  const filteredOrders = useMemo(() => {
+    return deduplicatedOrders.filter((order) => {
+      const searchMatch =
+        searchQuery === "" ||
+        order.orderNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.design.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Filter by karigar name
-    if (karigarFilter !== "All") {
-      result = result.filter((order) => order.karigarName === karigarFilter);
-    }
+      const typeMatch =
+        selectedOrderType === "all" || order.orderType === selectedOrderType;
 
-    // Filter by order number (search)
-    if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      result = result.filter((order) =>
-        order.orderNo.toLowerCase().includes(search)
-      );
-    }
+      const karigarMatch =
+        selectedKarigar === "all" || order.karigarName === selectedKarigar;
 
-    // Filter by date range using updatedAt (when order was marked Ready)
-    if (dateRange.from && dateRange.to) {
-      result = result.filter((order) => {
-        // Use updatedAt instead of createdAt to check when order was marked Ready
+      let dateMatch = true;
+      if (dateRange.from || dateRange.to) {
         const orderDate = new Date(Number(order.updatedAt) / 1000000);
-        return isWithinInterval(orderDate, { start: dateRange.from, end: dateRange.to });
-      });
-    }
+        if (dateRange.from && dateRange.to) {
+          dateMatch = isWithinInterval(orderDate, {
+            start: startOfDay(dateRange.from),
+            end: endOfDay(dateRange.to),
+          });
+        } else if (dateRange.from) {
+          dateMatch = orderDate >= startOfDay(dateRange.from);
+        } else if (dateRange.to) {
+          dateMatch = orderDate <= endOfDay(dateRange.to);
+        }
+      }
 
-    return result;
-  }, [allOrders, orderTypeFilter, karigarFilter, searchText, dateRange]);
+      return searchMatch && typeMatch && karigarMatch && dateMatch;
+    });
+  }, [deduplicatedOrders, searchQuery, selectedOrderType, selectedKarigar, dateRange]);
+
+  const uniqueKarigars = useMemo(() => {
+    const karigars = new Set<string>();
+    deduplicatedOrders.forEach((order) => {
+      if (order.karigarName) {
+        karigars.add(order.karigarName);
+      }
+    });
+    return Array.from(karigars).sort();
+  }, [deduplicatedOrders]);
+
+  const handleDelete = (orderId: string) => {
+    setOrderToDelete(orderId);
+  };
+
+  const confirmDelete = async () => {
+    if (!orderToDelete) return;
+
+    try {
+      await deleteReadyOrderMutation.mutateAsync(orderToDelete);
+      toast.success("Order moved back to Total Orders");
+      setOrderToDelete(null);
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to delete order";
+      toast.error(errorMessage);
+      console.error("Error deleting order:", error);
+    }
+  };
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading orders...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-muted-foreground">Loading ready orders...</div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by order number or design..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         <div className="flex gap-2">
           <Button
-            variant={orderTypeFilter === "All" ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter("All")}
+            variant={selectedOrderType === "all" ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType("all")}
+            className={
+              selectedOrderType === "all" ? "bg-gold hover:bg-gold-hover" : ""
+            }
           >
             All
           </Button>
           <Button
-            variant={orderTypeFilter === OrderType.CO ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.CO)}
+            variant={selectedOrderType === OrderType.SO ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType(OrderType.SO)}
+            className={
+              selectedOrderType === OrderType.SO
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
+          >
+            SO
+          </Button>
+          <Button
+            variant={selectedOrderType === OrderType.CO ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedOrderType(OrderType.CO)}
+            className={
+              selectedOrderType === OrderType.CO
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             CO
           </Button>
           <Button
-            variant={orderTypeFilter === OrderType.RB ? "default" : "outline"}
-            onClick={() => setOrderTypeFilter(OrderType.RB)}
+            variant={selectedOrderType === OrderType.RB ? "default" : "outline"}
             size="sm"
+            onClick={() => setSelectedOrderType(OrderType.RB)}
+            className={
+              selectedOrderType === OrderType.RB
+                ? "bg-gold hover:bg-gold-hover"
+                : ""
+            }
           >
             RB
           </Button>
         </div>
-        <Select value={karigarFilter} onValueChange={setKarigarFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
+        <Select value={selectedKarigar} onValueChange={setSelectedKarigar}>
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Filter by Karigar" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="All">All Karigars</SelectItem>
-            {uniqueKarigarList.map((karigar) => (
+            <SelectItem value="all">All Karigars</SelectItem>
+            {uniqueKarigars.map((karigar) => (
               <SelectItem key={karigar} value={karigar}>
                 {karigar}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by Order Number..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="w-[200px]">
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateRange.from && dateRange.to
-                ? `${format(dateRange.from, "MMM d")} - ${format(dateRange.to, "MMM d, yyyy")}`
-                : "Select date range"}
+              {dateRange.from ? (
+                dateRange.to ? (
+                  <>
+                    {format(dateRange.from, "MMM dd")} -{" "}
+                    {format(dateRange.to, "MMM dd")}
+                  </>
+                ) : (
+                  format(dateRange.from, "MMM dd, yyyy")
+                )
+              ) : (
+                "Pick a date"
+              )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
-            <div className="p-3 space-y-2">
-              <div className="text-sm font-medium">From Date</div>
-              <Calendar
-                mode="single"
-                selected={dateRange.from}
-                onSelect={(date) => date && setDateRange((prev) => ({ ...prev, from: startOfDay(date) }))}
-              />
-              <div className="text-sm font-medium">To Date</div>
-              <Calendar
-                mode="single"
-                selected={dateRange.to}
-                onSelect={(date) => date && setDateRange((prev) => ({ ...prev, to: endOfDay(date) }))}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() =>
-                  setDateRange({
-                    from: startOfDay(new Date()),
-                    to: endOfDay(new Date()),
-                  })
-                }
-              >
-                Reset to Today
-              </Button>
-            </div>
+            <Calendar
+              mode="range"
+              selected={{
+                from: dateRange.from,
+                to: dateRange.to,
+              }}
+              onSelect={(range) => {
+                setDateRange({
+                  from: range?.from,
+                  to: range?.to,
+                });
+              }}
+              numberOfMonths={2}
+            />
+            {(dateRange.from || dateRange.to) && (
+              <div className="p-3 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDateRange({})}
+                  className="w-full"
+                >
+                  Clear dates
+                </Button>
+              </div>
+            )}
           </PopoverContent>
         </Popover>
       </div>
-      <OrderTable orders={filteredOrders} />
+
+      <OrderTable orders={filteredOrders} onDelete={handleDelete} />
+
+      <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move Order Back to Total Orders?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will change the order status from Ready to Pending and move it back to the Total Orders tab.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteReadyOrderMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteReadyOrderMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteReadyOrderMutation.isPending ? "Moving..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

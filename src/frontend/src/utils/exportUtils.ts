@@ -10,13 +10,11 @@ export async function exportToExcel(orders: Order[]) {
       Design: order.design,
       "Generic Name": order.genericName || "-",
       Karigar: order.karigarName || "-",
-      Weight: order.weight,
+      "Weight (g)": order.weight,
       Size: order.size,
       Quantity: Number(order.quantity),
       Remarks: order.remarks || "-",
-      "Order No": order.orderNo,
-      Type: order.orderType,
-      Product: order.product,
+      Status: order.status,
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -172,11 +170,12 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
       <thead>
         <tr>
           <th>Generic Name</th>
+          <th>Karigar</th>
           <th>Weight</th>
-          <th>Qty</th>
           <th>Size</th>
+          <th>Qty</th>
           <th>Remarks</th>
-          <th>Order No</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>`;
@@ -184,11 +183,12 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<string>
     designOrders.forEach((order) => {
       html += `<tr>
         <td>${order.genericName || "-"}</td>
+        <td>${order.karigarName || "-"}</td>
         <td>${order.weight.toFixed(3)}</td>
-        <td>${order.quantity}</td>
         <td>${order.size.toFixed(2)}</td>
+        <td>${order.quantity}</td>
         <td>${order.remarks || "-"}</td>
-        <td>${order.orderNo}</td>
+        <td>${order.status}</td>
       </tr>`;
     });
 
@@ -313,7 +313,7 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
           <th>Size</th>
           <th>Qty</th>
           <th>Remarks</th>
-          <th>Order No</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>`;
@@ -326,7 +326,7 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
         <td>${order.size.toFixed(2)}</td>
         <td>${order.quantity}</td>
         <td>${order.remarks || "-"}</td>
-        <td>${order.orderNo}</td>
+        <td>${order.status}</td>
       </tr>`;
     });
 
@@ -445,12 +445,12 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
       <thead>
         <tr>
           <th>Generic Name</th>
+          <th>Karigar</th>
           <th>Weight</th>
-          <th>Qty</th>
           <th>Size</th>
+          <th>Qty</th>
           <th>Remarks</th>
-          <th>Design</th>
-          <th>Order No</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>`;
@@ -458,12 +458,12 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
     designOrders.forEach((order) => {
       html += `<tr>
         <td>${order.genericName || "-"}</td>
+        <td>${order.karigarName || "-"}</td>
         <td>${order.weight.toFixed(3)}</td>
-        <td>${order.quantity}</td>
         <td>${order.size.toFixed(2)}</td>
+        <td>${order.quantity}</td>
         <td>${order.remarks || "-"}</td>
-        <td>${order.design}</td>
-        <td>${order.orderNo}</td>
+        <td>${order.status}</td>
       </tr>`;
     });
 

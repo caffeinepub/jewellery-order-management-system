@@ -92,6 +92,7 @@ export interface _SERVICE {
     undefined
   >,
   'deleteOrder' : ActorMethod<[string], undefined>,
+  'deleteReadyOrder' : ActorMethod<[string], undefined>,
   'getAllMasterDesignMappings' : ActorMethod<
     [],
     Array<[string, DesignMapping]>
@@ -110,6 +111,7 @@ export interface _SERVICE {
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
+  'markOrdersAsReady' : ActorMethod<[Array<string>], undefined>,
   'reassignDesign' : ActorMethod<[string, string], undefined>,
   'resetActiveOrders' : ActorMethod<[], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
@@ -121,7 +123,6 @@ export interface _SERVICE {
   'supplyOrder' : ActorMethod<[string, bigint], undefined>,
   'updateDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
-  'updateOrdersStatusToReady' : ActorMethod<[Array<string>], undefined>,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,
   'uploadDesignMapping' : ActorMethod<[Array<MappingRecord>], undefined>,
   'uploadMasterDesignExcel' : ActorMethod<[ExternalBlob], undefined>,

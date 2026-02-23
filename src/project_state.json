@@ -1,27 +1,70 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
-  "known_issues": [
-    "Unmapped Codes page fails to update mapping after entering generic name and Karigar",
-    "Dashboard fails to update Ready status for SO and CO order types in Totals and Karigar tabs"
+  "summary": "Order management dashboard with Karigar mapping, design viewing, status tracking, and tag printing functionality",
+  "architectural_notes": [
+    "Dashboard displays order data with columns: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status",
+    "Row selection features: design view, Karigar mapping, status changes (pending to ready)",
+    "RB type orders: full quantity update triggers auto-move from total orders to ready tab; partial updates keep pending qty in total orders",
+    "Ready tab rows can be deleted, moving orders back to total orders with pending status",
+    "Tag Printing groups READY orders by designCode with order count and comma-separated order numbers for MPN copying"
   ],
+  "known_issues": [],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-frontend-editdesignmodal-component-to-properly-handle-the-updatedesignmapping-mutation-response-and-error-states",
-      "title": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
+      "id": "feature-reorder-the-columns-in-the-dashboard-ordertable-component-to-display-in-this-exact-sequence-generic-name-karigar-name-design-wt-size-qty-type-remarks-status-preserve-all-existing-functionality-including-row-selection-design-image-viewing-karigar-mapping-and-status-change-from-pending-to-ready",
+      "title": "Reorder the columns in the dashboard OrderTable component to display in this exact sequence: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status. Preserve all existing functionality including row selection, design image viewing, karigar mapping, and status change from pending to ready.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-red-highlight-color-to-selected-rows-in-the-ordertable-component-when-a-row-is-selected-via-checkbox",
+      "title": "Add red highlight color to selected rows in the OrderTable component when a row is selected via checkbox.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-mark-as-ready-functionality-in-ordertable-component-for-so-and-co-order-types-when-accessed-from-the-totals-tab",
-      "title": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+      "id": "feature-add-search-functionality-by-both-design-code-and-order-number-in-the-totalorderstab-readytab-and-hallmarktab-components-the-search-should-filter-orders-matching-either-the-design-code-or-order-number",
+      "title": "Add search functionality by both design code and order number in the TotalOrdersTab, ReadyTab, and HallmarkTab components. The search should filter orders matching either the design code or order number.",
       "reqIds": [
         "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-rb-type-orders-supplied-quantity-validation-in-the-suppliedqtydialog-component-to-allow-entering-the-full-order-quantity-when-the-full-quantity-is-supplied-e-g-5-out-of-5-the-order-should-be-marked-as-ready-and-moved-to-the-ready-tab-if-a-partial-quantity-is-supplied-e-g-3-out-of-5-split-the-order-create-a-ready-order-with-the-supplied-quantity-and-keep-a-pending-order-with-the-remaining-quantity-in-total-orders",
+      "title": "Fix the RB type orders supplied quantity validation in the SuppliedQtyDialog component to allow entering the full order quantity. When the full quantity is supplied (e.g., 5 out of 5), the order should be marked as Ready and moved to the Ready tab. If a partial quantity is supplied (e.g., 3 out of 5), split the order: create a Ready order with the supplied quantity and keep a Pending order with the remaining quantity in Total Orders.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-delete-button-to-each-row-in-the-readytab-component-when-clicked-the-order-should-be-moved-back-to-total-orders-with-pending-status-implement-both-the-frontend-ui-control-and-backend-logic-to-handle-this-status-reversal",
+      "title": "Add a delete button to each row in the ReadyTab component. When clicked, the order should be moved back to Total Orders with Pending status. Implement both the frontend UI control and backend logic to handle this status reversal.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-remove-all-previous-tag-printing-logic-and-integrations-from-the-tagprinting-tsx-page-including-the-mpn-system-webview-modal-login-session-tracking-and-order-processing-workflows",
+      "title": "Remove all previous Tag Printing logic and integrations from the TagPrinting.tsx page, including the MPN system webview modal, login session tracking, and order processing workflows.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-redesign-the-tag-printing-page-to-display-ready-status-orders-grouped-by-designcode-for-each-design-group-show-the-design-code-total-count-of-orders-in-that-design-list-of-order-numbers-and-a-copy-for-mpn-button-when-the-button-is-clicked-copy-only-that-group-s-order-numbers-as-a-clean-comma-separated-string-using-join-format-e-g-order1-order2-order3",
+      "title": "Redesign the Tag Printing page to display READY status orders grouped by designCode. For each design group, show: the design code, total count of orders in that design, list of order numbers, and a 'Copy for MPN' button. When the button is clicked, copy only that group's order numbers as a clean comma-separated string using join(',') format (e.g., order1,order2,order3).",
+      "reqIds": [
+        "REQ-7"
       ],
       "version": 1
     }
@@ -29,30 +72,48 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix the updateDesignMapping function in backend to successfully save mappings when generic name and Karigar are provided from the Unmapped Codes page",
-      "reqIds": [
-        "REQ-1"
-      ],
+      "summary": "Reorder dashboard columns: Generic name, Karigar name, design, wt, size, Qty, type, remarks, status",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Add red highlight color when a row is selected",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Add search by design and order number in total orders, ready, and hallmark tabs",
+      "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-4",
-      "summary": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
-      "reqIds": [
-        "REQ-4"
-      ],
+      "summary": "Fix RB type orders quantity update to allow full quantity selection and auto-move completed orders to ready tab",
+      "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-5",
-      "summary": "Verify the backend markOrdersReady function properly handles SO and CO order types and persists the status change",
-      "reqIds": [
-        "REQ-5"
-      ],
+      "summary": "Add delete option in ready tab rows that moves orders back to total orders with pending status",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Remove all previous Tag Printing logic and integrations",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Redesign Tag Printing page to group READY orders by designCode with copy for MPN button",
+      "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Fix mapping update failures and Ready status transitions",
+  "projectName": "Jewellery Order Management",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }
