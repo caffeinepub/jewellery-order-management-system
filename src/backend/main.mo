@@ -15,6 +15,7 @@ actor {
   type OrderType = {
     #CO;
     #RB;
+    #SO;
   };
 
   type OrderStatus = {

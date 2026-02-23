@@ -4,24 +4,16 @@
   "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "Order 5038CO2600743-001 marked ready but not appearing in ready tab",
-    "JPEG and PDF export functionality failing"
+    "SO parsing not applied to existing uploaded order lines",
+    "Summary tabs showing incorrect value in ready tab"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-jpeg-export-functionality-in-ordertable-and-karigardetail-components-ensure-the-export-process-correctly-generates-jpeg-files-from-order-data-without-errors",
-      "title": "Fix the JPEG export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates JPEG files from order data without errors.",
+      "id": "feature-fix-the-summary-cards-to-display-the-correct-count-and-metrics-for-orders-shown-in-the-ready-tab-ensuring-the-summary-values-match-the-deduplicated-order-list",
+      "title": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
       "reqIds": [
         "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-pdf-export-functionality-in-ordertable-and-karigardetail-components-ensure-the-export-process-correctly-generates-pdf-files-from-order-data-including-design-images-when-available-without-errors",
-      "title": "Fix the PDF export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates PDF files from order data, including design images when available, without errors.",
-      "reqIds": [
-        "REQ-3"
       ],
       "version": 1
     }
@@ -29,14 +21,26 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Investigate and fix why order number 5038CO2600743-001 with Ready status is not appearing in the Ready tab dashboard. Verify the order status filtering logic in the backend query and frontend ReadyTab component to ensure all orders with Ready status are correctly retrieved and displayed.",
+      "summary": "Apply SO parsing to existing uploaded order lines",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Fix summary tabs to show correct value in ready tab",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Apply SO (Sample Order) type parsing logic to all existing uploaded order lines that are already stored in the backend, ensuring any orders that should be classified as SO type are correctly updated",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Fix Ready tab order visibility and export functionality",
+  "projectName": "Apply SO parsing to existing orders and fix Ready tab summary",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

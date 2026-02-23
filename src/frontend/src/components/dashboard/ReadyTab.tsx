@@ -38,6 +38,16 @@ export default function ReadyTab() {
     // First filter by status = Ready
     let result = allOrders.filter((order) => order.status === OrderStatus.Ready);
 
+    // Deduplicate orders by orderId - keep only the first occurrence
+    const seenOrderIds = new Set<string>();
+    result = result.filter((order) => {
+      if (seenOrderIds.has(order.orderId)) {
+        return false;
+      }
+      seenOrderIds.add(order.orderId);
+      return true;
+    });
+
     // Filter by order type
     if (orderTypeFilter !== "All") {
       result = result.filter((order) => order.orderType === orderTypeFilter);

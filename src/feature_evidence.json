@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-jpeg-export-functionality-in-ordertable-and-karigardetail-components-ensure-the-export-process-correctly-generates-jpeg-files-from-order-data-without-errors",
-      "featureTitle": "Fix the JPEG export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates JPEG files from order data without errors.",
+      "featureId": "feature-fix-the-summary-cards-to-display-the-correct-count-and-metrics-for-orders-shown-in-the-ready-tab-ensuring-the-summary-values-match-the-deduplicated-order-list",
+      "featureTitle": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
       "files": [
-        "frontend/src/utils/exportUtils.ts"
+        "frontend/src/components/dashboard/SummaryCards.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -19,27 +19,6 @@
       ],
       "testIds": [
         "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-pdf-export-functionality-in-ordertable-and-karigardetail-components-ensure-the-export-process-correctly-generates-pdf-files-from-order-data-including-design-images-when-available-without-errors",
-      "featureTitle": "Fix the PDF export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates PDF files from order data, including design images when available, without errors.",
-      "files": [
-        "frontend/src/utils/exportUtils.ts"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-3"
       ],
       "confidence": "high"
     }

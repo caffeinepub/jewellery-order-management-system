@@ -1,25 +1,17 @@
 import Map "mo:core/Map";
-import Nat "mo:core/Nat";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
-import Storage "blob-storage/Storage";
-import Principal "mo:core/Principal";
 
 module {
-  type OrderType = {
+  type OldOrderType = {
     #CO;
     #RB;
+    #SO;
   };
 
-  type OrderStatus = {
-    #Pending;
-    #Ready;
-    #Hallmark;
-    #ReturnFromHallmark;
-  };
-
-  type Order = {
+  type OldOrder = {
     orderNo : Text;
-    orderType : OrderType;
+    orderType : OldOrderType;
     product : Text;
     design : Text;
     weight : Float;
@@ -28,94 +20,40 @@ module {
     remarks : Text;
     genericName : ?Text;
     karigarName : ?Text;
-    status : OrderStatus;
+    status : {
+      #Pending;
+      #Ready;
+      #Hallmark;
+      #ReturnFromHallmark;
+    };
     orderId : Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
   };
 
-  type OldDesignMapping = {
-    designCode : Text;
-    genericName : Text;
-    karigarName : Text;
-    createdBy : Principal;
-    updatedBy : ?Principal;
-    createdAt : Time.Time;
-    updatedAt : Time.Time;
+  type Actor = {
+    orders : Map.Map<Text, OldOrder>;
   };
 
-  type NewDesignMapping = {
-    designCode : Text;
-    genericName : Text;
-    karigarName : Text;
-    createdBy : Text;
-    updatedBy : ?Text;
-    createdAt : Time.Time;
-    updatedAt : Time.Time;
-  };
-
-  type OldKarigar = {
-    name : Text;
-    createdBy : Principal;
-    createdAt : Time.Time;
-  };
-
-  type NewKarigar = {
-    name : Text;
-    createdBy : Text;
-    createdAt : Time.Time;
-  };
-
-  type OldActor = {
-    orders : Map.Map<Text, Order>;
-    readyOrders : Map.Map<Text, Order>;
-    designMappings : Map.Map<Text, OldDesignMapping>;
-    designImages : Map.Map<Text, Storage.ExternalBlob>;
-    masterDesignMappings : Map.Map<Text, OldDesignMapping>;
-    karigars : Map.Map<Text, OldKarigar>;
-    masterDesignKarigars : Map.Map<Text, Nat>;
-    masterDesignExcel : ?Storage.ExternalBlob;
-    activeKarigar : ?Text;
-  };
-
-  type NewActor = {
-    orders : Map.Map<Text, Order>;
-    designMappings : Map.Map<Text, NewDesignMapping>;
-    designImages : Map.Map<Text, Storage.ExternalBlob>;
-    karigars : Map.Map<Text, NewKarigar>;
-    masterDesignKarigars : Map.Map<Text, Nat>;
-    masterDesignExcel : ?Storage.ExternalBlob;
-    activeKarigar : ?Text;
-  };
-
-  public func run(old : OldActor) : NewActor {
-    let newDesignMappings = old.designMappings.map<Text, OldDesignMapping, NewDesignMapping>(
-      func(_designCode, mapping) {
-        {
-          mapping with
-          createdBy = mapping.createdBy.toText();
-          updatedBy = mapping.updatedBy.map(func(principal) { principal.toText() });
+  public func run(old : Actor) : Actor {
+    let transformedOrders = old.orders.map<Text, OldOrder, OldOrder>(
+      func(_id, order) {
+        if (needsSOType(order) and order.orderType != #SO) {
+          { order with orderType = #SO };
+        } else {
+          order;
         };
       }
     );
+    { orders = transformedOrders };
+  };
 
-    let newKarigars = old.karigars.map<Text, OldKarigar, NewKarigar>(
-      func(_name, karigar) {
-        {
-          karigar with
-          createdBy = karigar.createdBy.toText();
-        };
-      }
-    );
+  func needsSOType(order : OldOrder) : Bool {
+    let inRange = order.weight >= 10 and order.weight <= 500;
+    let hasGenericName = order.genericName.isNull();
+    let hasKarigarName = order.karigarName.isNull();
+    let product = order.product;
 
-    {
-      orders = old.orders;
-      designMappings = newDesignMappings;
-      designImages = old.designImages;
-      karigars = newKarigars;
-      masterDesignKarigars = old.masterDesignKarigars;
-      masterDesignExcel = old.masterDesignExcel;
-      activeKarigar = old.activeKarigar;
-    };
+    inRange and hasGenericName and hasKarigarName and Text.equal(product, "BARS")
   };
 };

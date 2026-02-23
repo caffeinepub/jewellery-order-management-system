@@ -144,7 +144,8 @@ export enum OrderStatus {
 }
 export enum OrderType {
     CO = "CO",
-    RB = "RB"
+    RB = "RB",
+    SO = "SO"
 }
 export interface backendInterface {
     _caffeineStorageBlobIsLive(hash: Uint8Array): Promise<boolean>;
@@ -770,8 +771,10 @@ function from_candid_variant_n26(_uploadFile: (file: ExternalBlob) => Promise<Ui
     CO: null;
 } | {
     RB: null;
+} | {
+    SO: null;
 }): OrderType {
-    return "CO" in value ? OrderType.CO : "RB" in value ? OrderType.RB : value;
+    return "CO" in value ? OrderType.CO : "RB" in value ? OrderType.RB : "SO" in value ? OrderType.SO : value;
 }
 function from_candid_vec_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[string, _DesignMapping]>): Array<[string, DesignMapping]> {
     return value.map((x)=>from_candid_tuple_n16(_uploadFile, _downloadFile, x));
@@ -877,11 +880,15 @@ function to_candid_variant_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint
     CO: null;
 } | {
     RB: null;
+} | {
+    SO: null;
 } {
     return value == OrderType.CO ? {
         CO: null
     } : value == OrderType.RB ? {
         RB: null
+    } : value == OrderType.SO ? {
+        SO: null
     } : value;
 }
 async function to_candid_vec_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[string, ExternalBlob]>): Promise<Array<[string, _ExternalBlob]>> {

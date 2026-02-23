@@ -1,13 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix Ready tab order visibility issue and restore JPEG/PDF export functionality.
+**Goal:** Apply SO parsing to existing orders and fix Ready tab summary calculations.
 
 **Planned changes:**
-- Investigate and fix why order 5038CO2600743-001 with Ready status is not appearing in the Ready tab
-- Verify backend query logic correctly filters and returns all orders with Ready status
-- Verify frontend ReadyTab component correctly renders all Ready orders
-- Fix JPEG export functionality in OrderTable and KarigarDetail components
-- Fix PDF export functionality in OrderTable and KarigarDetail components to include design images
+- Scan and re-evaluate all existing uploaded orders in storage to apply SO type classification logic
+- Update orders matching SO criteria to have orderType set to SO
+- Fix summary card calculations in Ready tab to match the deduplicated order list
+- Ensure total weight and quantity metrics accurately reflect displayed orders
 
-**User-visible outcome:** All Ready status orders display correctly in the Ready tab dashboard, and users can successfully export order data as JPEG and PDF files without errors.
+**User-visible outcome:** Existing orders are correctly classified as SO type where applicable, and the Ready tab summary cards display accurate counts and metrics matching the orders shown in the table.

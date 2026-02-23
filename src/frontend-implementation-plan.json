@@ -1,81 +1,26 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Ready tab order visibility and export functionality",
+  "title": "Fix Ready tab summary cards to display correct deduplicated order metrics",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Fix Ready tab to display all orders with Ready status including order 5038CO2600743-001",
+      "id": "REQ-2",
+      "summary": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
       "acceptanceCriteria": [
-        "Order 5038CO2600743-001 appears in the Ready tab when it has Ready status",
-        "All other orders with Ready status continue to display correctly",
-        "Backend query correctly filters and returns all Ready status orders",
-        "Frontend ReadyTab correctly renders all Ready orders from the query"
+        "Summary card values in the Ready tab accurately reflect the deduplicated order count",
+        "Total weight and quantity metrics match the orders displayed in the Ready tab table",
+        "Summary calculations account for the same deduplication logic used in ReadyTab.tsx"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Review and fix the order filtering logic in ReadyTab component. Ensure the component correctly fetches orders with Ready status using the appropriate backend query hook. Verify that all filters (order type, karigar name, search, date range) work correctly with Ready status orders and don't inadvertently exclude valid orders. Check that the OrderTable component receives and displays all filtered Ready orders without data loss."
+          "description": "Update the component to pass the deduplicated orders array to SummaryCards instead of the raw filtered orders. Ensure the deduplication logic (using orderId) is applied before passing orders to both the OrderTable and SummaryCards components, so that summary metrics accurately reflect the displayed orders."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
           "operation": "modify",
-          "description": "Examine the query hooks used by ReadyTab to fetch Ready status orders. Verify the getReadyOrders or getOrders backend method is called with correct parameters (OrderStatus.Ready). Ensure the query hook properly handles the response data and doesn't apply incorrect client-side filtering that could exclude valid orders. Add error handling and logging to identify any data retrieval issues."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Fix JPEG export functionality in OrderTable and KarigarDetail components",
-      "acceptanceCriteria": [
-        "JPEG export completes successfully without errors",
-        "Generated JPEG files contain correct order information",
-        "Export works from both OrderTable component and KarigarDetail page",
-        "Loading states and error messages display appropriately during export"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/utils/exportUtils.ts",
-          "operation": "modify",
-          "description": "Fix the JPEG export utility function to correctly generate JPEG files from order data. Review the current implementation for errors such as incorrect canvas rendering, data formatting issues, or missing error handling. Ensure the function properly converts order table data to a JPEG image format, handles design images if available, and returns a downloadable file. Add proper error handling with descriptive error messages and loading state support."
-        },
-        {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "Fix the JPEG export functionality triggered from OrderTable component. Ensure the export button correctly calls the fixed exportUtils JPEG function with proper order data. Add loading state display during export process and error message handling for export failures. Verify the exported JPEG file is downloaded with an appropriate filename."
-        },
-        {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
-          "operation": "modify",
-          "description": "Fix the JPEG export functionality in KarigarDetail page. Ensure the export action correctly passes karigar-specific order data to the JPEG export utility. Add loading indicators and error messages for the export process. Verify the exported file includes the correct karigar name in the filename and contains all filtered orders for that karigar."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Fix PDF export functionality in OrderTable and KarigarDetail components with design image support",
-      "acceptanceCriteria": [
-        "PDF export completes successfully without errors",
-        "Generated PDF files contain correct order information and design images",
-        "Export works from both OrderTable component and KarigarDetail page",
-        "PDF formatting displays order data clearly with proper grouping by design code"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/utils/exportUtils.ts",
-          "operation": "modify",
-          "description": "Fix the PDF export utility function to correctly generate PDF files with order data and embedded design images. Review the current implementation for issues such as image loading failures, incorrect PDF formatting, data grouping errors, or library loading problems. Ensure design images are fetched using getDirectURL() from ExternalBlob for proper streaming and caching. Verify orders are grouped by design code with numeric sorting, images are embedded correctly, and the PDF is properly formatted and downloadable. Add comprehensive error handling and progress tracking."
-        },
-        {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "Fix the PDF export functionality in OrderTable component. Ensure the export button correctly invokes the fixed PDF export utility with complete order data including design codes for image fetching. Add loading state during PDF generation and error messages for failures. Verify that design images are passed to the export function or fetched within the export process using the backend interface."
-        },
-        {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
-          "operation": "modify",
-          "description": "Fix the PDF export functionality in KarigarDetail page for karigar-specific orders. Ensure the PDF export includes design images by passing design codes or fetching images during export. Add proper loading indicators and error handling. Verify the exported PDF filename includes the karigar name and the document is properly formatted with grouped orders and embedded images."
+          "description": "Update the SummaryCards component to accept an optional pre-filtered orders array prop when rendering in the Ready tab context. When this prop is provided, use it directly for calculations instead of filtering from allOrders. This ensures summary calculations use the same deduplicated order set that is displayed in the table."
         }
       ]
     }

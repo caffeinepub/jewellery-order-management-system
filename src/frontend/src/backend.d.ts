@@ -58,7 +58,8 @@ export enum OrderStatus {
 }
 export enum OrderType {
     CO = "CO",
-    RB = "RB"
+    RB = "RB",
+    SO = "SO"
 }
 export interface backendInterface {
     addKarigar(name: string): Promise<void>;

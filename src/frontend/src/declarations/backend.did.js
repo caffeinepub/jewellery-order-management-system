@@ -41,7 +41,11 @@ export const OrderStatus = IDL.Variant({
   'ReturnFromHallmark' : IDL.Null,
   'Pending' : IDL.Null,
 });
-export const OrderType = IDL.Variant({ 'CO' : IDL.Null, 'RB' : IDL.Null });
+export const OrderType = IDL.Variant({
+  'CO' : IDL.Null,
+  'RB' : IDL.Null,
+  'SO' : IDL.Null,
+});
 export const Order = IDL.Record({
   'weight' : IDL.Float64,
   'status' : OrderStatus,
@@ -193,7 +197,11 @@ export const idlFactory = ({ IDL }) => {
     'ReturnFromHallmark' : IDL.Null,
     'Pending' : IDL.Null,
   });
-  const OrderType = IDL.Variant({ 'CO' : IDL.Null, 'RB' : IDL.Null });
+  const OrderType = IDL.Variant({
+    'CO' : IDL.Null,
+    'RB' : IDL.Null,
+    'SO' : IDL.Null,
+  });
   const Order = IDL.Record({
     'weight' : IDL.Float64,
     'status' : OrderStatus,

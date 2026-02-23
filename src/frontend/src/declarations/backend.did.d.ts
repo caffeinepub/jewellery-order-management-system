@@ -51,7 +51,8 @@ export type OrderStatus = { 'Ready' : null } |
   { 'ReturnFromHallmark' : null } |
   { 'Pending' : null };
 export type OrderType = { 'CO' : null } |
-  { 'RB' : null };
+  { 'RB' : null } |
+  { 'SO' : null };
 export type Time = bigint;
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,

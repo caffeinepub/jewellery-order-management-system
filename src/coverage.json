@@ -1,49 +1,32 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-23T04:44:47.315Z",
+  "generatedAt": "2026-02-23T07:12:20.907Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 2,
+    "total": 2,
+    "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Investigate and fix why order number 5038CO2600743-001 with Ready status is not appearing in the Ready tab dashboard. Verify the order status filtering logic in the backend query and frontend ReadyTab component to ensure all orders with Ready status are correctly retrieved and displayed.",
-        "status": "missing",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/hooks/useQueries.ts"
-        ],
+        "summary": "Apply SO (Sample Order) type parsing logic to all existing uploaded order lines that are already stored in the backend, ensuring any orders that should be classified as SO type are correctly updated",
+        "status": "unknown",
+        "plannedFiles": [],
         "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the JPEG export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates JPEG files from order data without errors.",
+        "summary": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/pages/KarigarDetail.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts"
-        ]
-      },
-      {
-        "id": "REQ-3",
-        "summary": "Fix the PDF export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates PDF files from order data, including design images when available, without errors.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/pages/KarigarDetail.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts"
+          "frontend/src/components/dashboard/SummaryCards.tsx"
         ]
       }
     ]
@@ -55,11 +38,7 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
-    "frontend/src/utils/exportUtils.ts",
+    "frontend/src/components/dashboard/SummaryCards.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

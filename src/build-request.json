@@ -1,75 +1,52 @@
 {
   "kind": "build_request",
-  "title": "Fix Ready tab order visibility and export functionality",
-  "priority": "high",
+  "title": "Apply SO parsing to existing orders and fix Ready tab summary",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Investigate and fix why order number 5038CO2600743-001 with Ready status is not appearing in the Ready tab dashboard. Verify the order status filtering logic in the backend query and frontend ReadyTab component to ensure all orders with Ready status are correctly retrieved and displayed.",
-      "target": "both",
+      "text": "Apply SO (Sample Order) type parsing logic to all existing uploaded order lines that are already stored in the backend, ensuring any orders that should be classified as SO type are correctly updated",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-6"
+          "msg-latest"
         ],
         "quotes": [
-          "One order number 5038CO2600743-001 was marked ready but it's not being shown under the ready tab in dashboard."
+          "SO parsing should be done for existing uploaded order lines too"
         ]
       },
       "acceptanceCriteria": [
-        "Order 5038CO2600743-001 appears in the Ready tab when it has Ready status",
-        "All other orders with Ready status continue to display correctly",
-        "Backend query correctly filters and returns all Ready status orders",
-        "Frontend ReadyTab correctly renders all Ready orders from the query"
+        "Existing orders in storage are scanned and re-evaluated for SO type classification",
+        "Orders matching SO criteria are updated to have orderType set to SO",
+        "The parsing logic from the order ingestion process is consistently applied to historical data"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the JPEG export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates JPEG files from order data without errors.",
+      "text": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-6"
+          "msg-latest"
         ],
         "quotes": [
-          "Failed to export JPEG's and pdf pls fix it."
+          "Summary tabs don't show correct value in ready tab"
         ]
       },
       "acceptanceCriteria": [
-        "JPEG export completes successfully without errors",
-        "Generated JPEG files contain correct order information",
-        "Export works from both OrderTable component and KarigarDetail page",
-        "Loading states and error messages display appropriately during export"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "text": "Fix the PDF export functionality in OrderTable and KarigarDetail components. Ensure the export process correctly generates PDF files from order data, including design images when available, without errors.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-6"
-        ],
-        "quotes": [
-          "Failed to export JPEG's and pdf pls fix it."
-        ]
-      },
-      "acceptanceCriteria": [
-        "PDF export completes successfully without errors",
-        "Generated PDF files contain correct order information and design images",
-        "Export works from both OrderTable component and KarigarDetail page",
-        "PDF formatting displays order data clearly with proper grouping by design code"
+        "Summary card values in the Ready tab accurately reflect the deduplicated order count",
+        "Total weight and quantity metrics match the orders displayed in the Ready tab table",
+        "Summary calculations account for the same deduplication logic used in ReadyTab.tsx"
       ]
     }
   ],
   "constraints": [
-    "Do not modify the backend order data structure or existing status values",
-    "Preserve existing export utility functions in frontend/src/utils/exportUtils.ts",
-    "Maintain compatibility with current OrderTable component usage across all dashboard tabs"
+    "Preserve existing order data and deduplication logic in ReadyTab.tsx",
+    "Maintain backward compatibility with existing order type definitions (CO/RB/SO)"
   ],
   "nonGoals": [
-    "Redesigning the export UI or adding new export formats",
-    "Modifying order status workflow or mark-as-ready functionality",
-    "Changes to other dashboard tabs beyond fixing the Ready tab visibility issue"
+    "Changing the UI layout or styling of summary cards",
+    "Modifying order type parsing rules or criteria for new uploads"
   ],
   "imageRequirements": {
     "required": [],

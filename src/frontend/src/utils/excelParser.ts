@@ -70,8 +70,8 @@ export async function parseExcelFile(file: File): Promise<
             if (!orderNo) {
               errors.push({ row: rowNumber, field: 'Order No', message: 'Order No is required' });
             }
-            if (!orderTypeRaw || (orderTypeRaw !== 'CO' && orderTypeRaw !== 'RB')) {
-              errors.push({ row: rowNumber, field: 'Order Type', message: 'Order Type must be CO or RB' });
+            if (!orderTypeRaw || (orderTypeRaw !== 'CO' && orderTypeRaw !== 'RB' && orderTypeRaw !== 'SO')) {
+              errors.push({ row: rowNumber, field: 'Order Type', message: 'Order Type must be CO, RB, or SO' });
             }
             if (!product) {
               errors.push({ row: rowNumber, field: 'Product', message: 'Product is required' });
@@ -81,9 +81,22 @@ export async function parseExcelFile(file: File): Promise<
             }
 
             if (orderNo) {
+              // Map order type correctly including SO
+              let orderType: OrderType;
+              if (orderTypeRaw === 'CO') {
+                orderType = OrderType.CO;
+              } else if (orderTypeRaw === 'RB') {
+                orderType = OrderType.RB;
+              } else if (orderTypeRaw === 'SO') {
+                orderType = OrderType.SO;
+              } else {
+                // Default to RB for backward compatibility
+                orderType = OrderType.RB;
+              }
+
               orders.push({
                 orderNo,
-                orderType: orderTypeRaw === 'CO' ? OrderType.CO : OrderType.RB,
+                orderType,
                 product,
                 design, // Already normalized
                 weight,

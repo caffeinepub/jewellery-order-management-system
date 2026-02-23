@@ -1,15 +1,89 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGetAllOrders } from '@/hooks/useQueries';
 import { Package, Weight, Hash, Users } from 'lucide-react';
-import { OrderType } from '@/backend';
+import { OrderType, OrderStatus } from '@/backend';
 
-export default function SummaryCards() {
+type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
+
+interface SummaryCardsProps {
+  activeTab?: ActiveTab;
+}
+
+export default function SummaryCards({ activeTab }: SummaryCardsProps) {
   const { data: orders = [], isLoading } = useGetAllOrders();
 
-  const totalOrders = orders.length;
-  const totalWeight = orders.reduce((sum, order) => sum + order.weight, 0);
-  const totalQuantity = orders.reduce((sum, order) => sum + Number(order.quantity), 0);
-  const customerOrders = orders.filter((order) => order.orderType === OrderType.CO).length;
+  // Safely filter orders based on active tab using useMemo
+  const filteredOrders = useMemo(() => {
+    // Return empty array if orders is undefined or null
+    if (!orders || !Array.isArray(orders)) {
+      return [];
+    }
+
+    // If no active tab or karigars tab, show all orders
+    if (!activeTab || activeTab === "karigars") {
+      return orders;
+    }
+
+    // Filter based on active tab
+    let result = orders;
+    
+    switch (activeTab) {
+      case "total":
+        // Total orders tab: Pending and ReturnFromHallmark orders
+        result = orders.filter(
+          (order) =>
+            order?.status === OrderStatus.Pending ||
+            order?.status === OrderStatus.ReturnFromHallmark
+        );
+        break;
+
+      case "ready":
+        // Ready tab: orders with Ready status
+        result = orders.filter((order) => order?.status === OrderStatus.Ready);
+        
+        // Deduplicate orders by orderId - keep only the first occurrence
+        // This matches the deduplication logic in ReadyTab.tsx
+        const seenOrderIds = new Set<string>();
+        result = result.filter((order) => {
+          if (seenOrderIds.has(order.orderId)) {
+            return false;
+          }
+          seenOrderIds.add(order.orderId);
+          return true;
+        });
+        break;
+
+      case "hallmark":
+        // Hallmark tab: Hallmark and ReturnFromHallmark orders
+        result = orders.filter(
+          (order) =>
+            order?.status === OrderStatus.Hallmark ||
+            order?.status === OrderStatus.ReturnFromHallmark
+        );
+        break;
+
+      case "customer":
+        // Customer orders tab: CO type orders with Pending status
+        result = orders.filter(
+          (order) =>
+            order?.orderType === OrderType.CO &&
+            order?.status === OrderStatus.Pending
+        );
+        break;
+
+      default:
+        result = orders;
+    }
+    
+    return result;
+  }, [orders, activeTab]);
+
+  // Calculate metrics with safe fallbacks using optional chaining
+  const totalOrders = filteredOrders?.length ?? 0;
+  const totalWeight = filteredOrders?.reduce((sum, order) => sum + (order?.weight ?? 0), 0) ?? 0;
+  const totalQuantity = filteredOrders?.reduce((sum, order) => sum + Number(order?.quantity ?? 0), 0) ?? 0;
+  const customerOrders = filteredOrders?.filter((order) => order?.orderType === OrderType.CO)?.length ?? 0;
 
   const cards = [
     {

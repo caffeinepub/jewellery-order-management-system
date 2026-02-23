@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import TotalOrdersTab from "@/components/dashboard/TotalOrdersTab";
@@ -7,7 +8,11 @@ import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
 import KarigarsTab from "@/components/dashboard/KarigarsTab";
 import UnmappedSection from "@/components/dashboard/UnmappedSection";
 
+type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
+
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("total");
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div>
@@ -19,9 +24,9 @@ export default function Dashboard() {
 
       <UnmappedSection />
 
-      <SummaryCards />
+      <SummaryCards activeTab={activeTab} />
 
-      <Tabs defaultValue="total" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ActiveTab)} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="total">Total Orders</TabsTrigger>
           <TabsTrigger value="ready">Ready</TabsTrigger>
