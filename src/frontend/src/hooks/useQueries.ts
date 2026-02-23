@@ -17,8 +17,31 @@ export function useGetOrders(
       const pendingOrders = await actor.getOrders(statusFilter || null, typeFilter || null, searchText || null);
       const readyOrders = await actor.getReadyOrders();
       
+      // Get all design mappings to enrich orders
+      const mappingsArray = await actor.getAllMasterDesignMappings();
+      const mappingsMap = new Map(mappingsArray.map(([code, mapping]) => [code, mapping]));
+      
+      // Enrich orders with mapping data if they're missing names
+      const enrichOrder = (order: Order): Order => {
+        if (order.genericName && order.karigarName) {
+          return order;
+        }
+        const mapping = mappingsMap.get(order.design);
+        if (mapping) {
+          return {
+            ...order,
+            genericName: order.genericName || mapping.genericName,
+            karigarName: order.karigarName || mapping.karigarName,
+          };
+        }
+        return order;
+      };
+      
+      const enrichedPendingOrders = pendingOrders.map(enrichOrder);
+      const enrichedReadyOrders = readyOrders.map(enrichOrder);
+      
       // Combine both order sources
-      return [...pendingOrders, ...readyOrders];
+      return [...enrichedPendingOrders, ...enrichedReadyOrders];
     },
     enabled: !!actor && !isFetching,
   });
@@ -45,7 +68,28 @@ export function useGetHallmarkOrders() {
       if (!actor) return [];
       const pendingOrders = await actor.getOrders(null, null, null);
       const readyOrders = await actor.getReadyOrders();
-      const allOrders = [...pendingOrders, ...readyOrders];
+      
+      // Get all design mappings to enrich orders
+      const mappingsArray = await actor.getAllMasterDesignMappings();
+      const mappingsMap = new Map(mappingsArray.map(([code, mapping]) => [code, mapping]));
+      
+      // Enrich orders with mapping data if they're missing names
+      const enrichOrder = (order: Order): Order => {
+        if (order.genericName && order.karigarName) {
+          return order;
+        }
+        const mapping = mappingsMap.get(order.design);
+        if (mapping) {
+          return {
+            ...order,
+            genericName: order.genericName || mapping.genericName,
+            karigarName: order.karigarName || mapping.karigarName,
+          };
+        }
+        return order;
+      };
+      
+      const allOrders = [...pendingOrders.map(enrichOrder), ...readyOrders.map(enrichOrder)];
       return allOrders.filter(
         (order) =>
           order.status === OrderStatus.Hallmark ||
@@ -65,7 +109,28 @@ export function useGetOrdersByKarigar(karigarName: string) {
       if (!actor) return [];
       const pendingOrders = await actor.getOrders(null, null, null);
       const readyOrders = await actor.getReadyOrders();
-      const allOrders = [...pendingOrders, ...readyOrders];
+      
+      // Get all design mappings to enrich orders
+      const mappingsArray = await actor.getAllMasterDesignMappings();
+      const mappingsMap = new Map(mappingsArray.map(([code, mapping]) => [code, mapping]));
+      
+      // Enrich orders with mapping data if they're missing names
+      const enrichOrder = (order: Order): Order => {
+        if (order.genericName && order.karigarName) {
+          return order;
+        }
+        const mapping = mappingsMap.get(order.design);
+        if (mapping) {
+          return {
+            ...order,
+            genericName: order.genericName || mapping.genericName,
+            karigarName: order.karigarName || mapping.karigarName,
+          };
+        }
+        return order;
+      };
+      
+      const allOrders = [...pendingOrders.map(enrichOrder), ...readyOrders.map(enrichOrder)];
       return allOrders.filter((order) => order.karigarName === karigarName);
     },
     enabled: !!actor && !isFetching,
@@ -183,7 +248,28 @@ export function useGetDesignMappings() {
       if (!actor) return [];
       const pendingOrders = await actor.getOrders(null, null, null);
       const readyOrders = await actor.getReadyOrders();
-      const orders = [...pendingOrders, ...readyOrders];
+      
+      // Get all design mappings to enrich orders
+      const mappingsArray = await actor.getAllMasterDesignMappings();
+      const mappingsMap = new Map(mappingsArray.map(([code, mapping]) => [code, mapping]));
+      
+      // Enrich orders with mapping data
+      const enrichOrder = (order: Order): Order => {
+        if (order.genericName && order.karigarName) {
+          return order;
+        }
+        const mapping = mappingsMap.get(order.design);
+        if (mapping) {
+          return {
+            ...order,
+            genericName: order.genericName || mapping.genericName,
+            karigarName: order.karigarName || mapping.karigarName,
+          };
+        }
+        return order;
+      };
+      
+      const orders = [...pendingOrders.map(enrichOrder), ...readyOrders.map(enrichOrder)];
       const mappings = new Map<string, { designCode: string; genericName: string; karigarName: string }>();
       
       orders.forEach((order) => {
@@ -408,7 +494,28 @@ export function useGetUnmappedOrders() {
       if (!actor) return [];
       const pendingOrders = await actor.getOrders(null, null, null);
       const readyOrders = await actor.getReadyOrders();
-      const orders = [...pendingOrders, ...readyOrders];
+      
+      // Get all design mappings to enrich orders
+      const mappingsArray = await actor.getAllMasterDesignMappings();
+      const mappingsMap = new Map(mappingsArray.map(([code, mapping]) => [code, mapping]));
+      
+      // Enrich orders with mapping data
+      const enrichOrder = (order: Order): Order => {
+        if (order.genericName && order.karigarName) {
+          return order;
+        }
+        const mapping = mappingsMap.get(order.design);
+        if (mapping) {
+          return {
+            ...order,
+            genericName: order.genericName || mapping.genericName,
+            karigarName: order.karigarName || mapping.karigarName,
+          };
+        }
+        return order;
+      };
+      
+      const orders = [...pendingOrders.map(enrichOrder), ...readyOrders.map(enrichOrder)];
       const unmappedOrders = orders.filter(
         (order) => !order.genericName || !order.karigarName
       );
@@ -481,14 +588,29 @@ export function useGetDesignImage(designCode: string) {
       // Get design mapping for additional details
       const pendingOrders = await actor.getOrders(null, null, null);
       const readyOrders = await actor.getReadyOrders();
+      
+      // Get all design mappings to enrich orders
+      const mappingsArray = await actor.getAllMasterDesignMappings();
+      const mappingsMap = new Map(mappingsArray.map(([code, mapping]) => [code, mapping]));
+      
       const orders = [...pendingOrders, ...readyOrders];
       const order = orders.find((o) => o.design === designCode);
+      
+      // Use order data if available, otherwise fall back to master mappings
+      let genericName = order?.genericName;
+      let karigarName = order?.karigarName;
+      
+      if ((!genericName || !karigarName) && mappingsMap.has(designCode)) {
+        const mapping = mappingsMap.get(designCode)!;
+        genericName = genericName || mapping.genericName;
+        karigarName = karigarName || mapping.karigarName;
+      }
 
       return {
         imageUrl: blob.getDirectURL(),
         designCode,
-        genericName: order?.genericName,
-        karigarName: order?.karigarName,
+        genericName,
+        karigarName,
       };
     },
     enabled: !!actor && !isFetching && !!designCode,

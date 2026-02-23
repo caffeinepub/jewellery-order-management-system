@@ -1,100 +1,101 @@
 {
   "kind": "build_request",
-  "title": "Fix Ready Tab Display, Add RB Order Splitting, and Enhance PDF/JPEG Exports",
-  "priority": "normal",
+  "title": "Fix Karigar and generic name display in dashboard",
+  "projectName": "Jewellery Order Management",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the Ready tab to only display orders with status 'Ready'. Orders with status 'StatusChangedToReady' should not appear in the Ready tab.",
+      "text": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs (Total Orders, Ready Orders, Hallmark Orders, Customer Orders) when rendering order rows in OrderTable component",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-8"
+          "msg-recent-6",
+          "msg-recent-8",
+          "msg-recent-11"
         ],
         "quotes": [
-          "Status changed to ready has been showing under ready tab."
+          "the app is not able to display exact Karigar names and generic names across the orders in the dashboard",
+          "Version 35: ✅ Names displaying correctly",
+          "Version 41: ❌ Names not displaying correctly"
         ]
       },
       "acceptanceCriteria": [
-        "Ready tab displays only orders with exact status 'Ready'",
-        "Orders with status 'StatusChangedToReady' do not appear in Ready tab",
-        "All existing filters (order type, karigar, search, date range) continue to work correctly"
+        "Karigar names appear in all order rows across all dashboard tabs",
+        "Karigar names match the values stored in the order records",
+        "No null or undefined values appear where Karigar names should display"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "For RB orders being marked as ready, prompt the user to enter a supplied quantity. Split the original order line into two separate entries: one with the pending quantity (original qty minus supplied qty) displayed in Total Orders tab, and one with the supplied quantity displayed in Ready Orders tab.",
-      "target": "both",
+      "text": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-8"
+          "msg-recent-6",
+          "msg-recent-8",
+          "msg-recent-11"
         ],
         "quotes": [
-          "For RB orders, ask for supplied qty: and split it as two lines, the order line with pending qty will be shown in total orders and supplied qty and the order line in ready orders."
+          "the app is not able to display exact Karigar names and generic names across the orders in the dashboard"
         ]
       },
       "acceptanceCriteria": [
-        "When marking an RB order as ready, a dialog prompts for supplied quantity",
-        "Supplied quantity must be validated (cannot exceed original order quantity, must be greater than 0)",
-        "After submission, the original order line is split into two entries with unique identifiers",
-        "Pending quantity line (original qty - supplied qty) appears in Total Orders tab with status 'Pending'",
-        "Supplied quantity line appears in Ready Orders tab with status 'Ready'",
-        "Both split lines retain all other order properties (design code, karigar, order number, etc.)",
-        "If supplied quantity equals original quantity, only the Ready line is created"
+        "Generic names appear in all order rows across all dashboard tabs",
+        "Generic names match the values stored in the order records",
+        "No null or undefined values appear where generic names should display"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Fix PDF export functionality to work correctly on iPhone devices. Investigate and resolve current PDF generation failures specific to iOS Safari/mobile browsers.",
+      "text": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-8"
+          "msg-recent-7",
+          "msg-recent-9"
         ],
         "quotes": [
-          "PDF export fails and doesn't really work in iPhone."
+          "Version 41 added logic to filter orders by status",
+          "The filtering/splitting logic may be removing name fields accidentally"
         ]
       },
       "acceptanceCriteria": [
-        "PDF export successfully generates and downloads on iPhone Safari",
-        "PDF export works on iPhone Chrome and other iOS browsers",
-        "Exported PDFs maintain proper formatting and data integrity on mobile devices",
-        "Error handling provides clear feedback if PDF generation fails on any platform"
+        "Filtered order arrays contain complete order objects with all name fields",
+        "No data transformation during filtering removes or nullifies karigarName or genericName",
+        "Orders displayed after applying filters show correct names"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "In the Karigar detail page, when exporting orders to PDF or JPEG, automatically include the associated design images in the exported files. Each order's design code should have its corresponding design image embedded in the export.",
-      "target": "frontend",
+      "text": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-8"
+          "msg-recent-7",
+          "msg-recent-9"
         ],
         "quotes": [
-          "From Karigar tab page whenever export is done through jpeg and pdf attach the design image in the PDF and jpeg when exported."
+          "Split RB orders based on supplied quantity",
+          "This filtering/splitting logic likely affected how order data flows to the dashboard components that display Karigar and generic names"
         ]
       },
       "acceptanceCriteria": [
-        "PDF exports from Karigar detail page include design images for each order",
-        "JPEG exports from Karigar detail page include design images for each order",
-        "Design images are properly fetched and embedded based on order design codes",
-        "Exports gracefully handle missing design images (display placeholder or skip)",
-        "Image quality is maintained in exported files",
-        "Export file size remains reasonable with embedded images"
+        "When an RB order is split, both the updated original order and any new order records retain karigarName values",
+        "When an RB order is split, both the updated original order and any new order records retain genericName values",
+        "Split orders display names correctly in the dashboard after the split operation"
       ]
     }
   ],
   "constraints": [
-    "Maintain the single-actor backend architecture",
-    "Do not modify the Internet Identity authentication hooks",
-    "Preserve existing order filtering and tab functionality",
-    "Ensure backward compatibility with existing order data"
+    "Do not modify backend data structures or migration logic",
+    "Preserve existing order filtering and status update functionality",
+    "Do not change RB order splitting behavior except to fix name field preservation"
   ],
   "nonGoals": [
-    "Changing the overall UI design or layout",
-    "Modifying authentication or user management",
-    "Adding new order types beyond CO and RB",
-    "Implementing real-time synchronization or notifications"
+    "Adding new name fields or changing name field data types",
+    "Modifying how names are initially populated during order ingestion",
+    "Changing dashboard layout or visual design"
   ],
   "imageRequirements": {
     "required": [],

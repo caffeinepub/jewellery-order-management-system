@@ -1,68 +1,64 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-22T20:51:04.131Z",
+  "generatedAt": "2026-02-23T04:32:06.629Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
     "total": 4,
-    "implemented": 3,
+    "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix the Ready tab to only display orders with status 'Ready'. Orders with status 'StatusChangedToReady' should not appear in the Ready tab.",
+        "summary": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs (Total Orders, Ready Orders, Hallmark Orders, Customer Orders) when rendering order rows in OrderTable component",
         "status": "missing",
         "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
         ],
         "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "For RB orders being marked as ready, prompt the user to enter a supplied quantity. Split the original order line into two separate entries: one with the pending quantity (original qty minus supplied qty) displayed in Total Orders tab, and one with the supplied quantity displayed in Ready Orders tab.",
-        "status": "implemented",
+        "summary": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
+        "status": "missing",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/hooks/useQueries.ts",
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/pages/KarigarDetail.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
         ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/pages/KarigarDetail.tsx"
-        ]
+        "matchedFiles": []
       },
       {
         "id": "REQ-3",
-        "summary": "Fix PDF export functionality to work correctly on iPhone devices. Investigate and resolve current PDF generation failures specific to iOS Safari/mobile browsers.",
-        "status": "implemented",
+        "summary": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
+        "status": "missing",
         "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/pages/KarigarDetail.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/CustomerOrdersTab.tsx"
         ],
-        "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/pages/KarigarDetail.tsx"
-        ]
+        "matchedFiles": []
       },
       {
         "id": "REQ-4",
-        "summary": "In the Karigar detail page, when exporting orders to PDF or JPEG, automatically include the associated design images in the exported files. Each order's design code should have its corresponding design image embedded in the export.",
+        "summary": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/pages/KarigarDetail.tsx",
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx",
           "frontend/src/hooks/useQueries.ts"
         ],
         "matchedFiles": [
-          "frontend/src/utils/exportUtils.ts",
-          "frontend/src/pages/KarigarDetail.tsx",
           "frontend/src/hooks/useQueries.ts"
         ]
       }
@@ -70,19 +66,11 @@
   },
   "changedFiles": [
     "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/components/dashboard/OrderTable.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/KarigarDetail.tsx",
-    "frontend/src/utils/exportUtils.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

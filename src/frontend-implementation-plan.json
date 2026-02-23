@@ -1,117 +1,139 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Ready Tab Display, Add RB Order Splitting, and Enhance PDF/JPEG Exports",
+  "title": "Fix Karigar and generic name display in dashboard",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix the Ready tab to only display orders with exact status 'Ready', excluding 'StatusChangedToReady' orders",
+      "summary": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
       "acceptanceCriteria": [
-        "Ready tab displays only orders with exact status 'Ready'",
-        "Orders with status 'StatusChangedToReady' do not appear in Ready tab",
-        "All existing filters (order type, karigar, search, date range) continue to work correctly"
+        "Karigar names appear in all order rows across all dashboard tabs",
+        "Karigar names match the values stored in the order records",
+        "No null or undefined values appear where Karigar names should display"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Review and fix how karigarName field is accessed and displayed in table cells. Ensure the column definition properly reads order.karigarName from each order object and handles undefined/null values with fallback display text. Add defensive checks to prevent display of undefined/null as string literals."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review any data transformations or filtering logic to ensure karigarName is preserved when orders are filtered by status or type."
+        },
+        {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Update the order filtering logic to strictly match status 'Ready' only. Review the current filtering implementation in useGetOrders hook call or local filtering logic, and ensure orders with status 'StatusChangedToReady' are explicitly excluded. Verify all existing filters (order type CO/RB, karigar name, search by order number, date range) continue to function correctly with the updated status filter."
+          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review filtering logic for ready orders to ensure karigarName is preserved in filtered results."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review filtering logic (by order type, karigar name, order number, date range) to ensure karigarName is preserved throughout all filter operations."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Verify that orders passed to OrderTable component include complete order objects with karigarName field intact. Review filtering logic for CO-type pending orders to ensure karigarName is preserved when applying status and type filters."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "For RB orders being marked as ready, prompt for supplied quantity and split the order into pending and ready lines",
+      "summary": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
       "acceptanceCriteria": [
-        "When marking an RB order as ready, a dialog prompts for supplied quantity",
-        "Supplied quantity must be validated (cannot exceed original order quantity, must be greater than 0)",
-        "After submission, the original order line is split into two entries with unique identifiers",
-        "Pending quantity line (original qty - supplied qty) appears in Total Orders tab with status 'Pending'",
-        "Supplied quantity line appears in Ready Orders tab with status 'Ready'",
-        "Both split lines retain all other order properties (design code, karigar, order number, etc.)",
-        "If supplied quantity equals original quantity, only the Ready line is created"
+        "Generic names appear in all order rows across all dashboard tabs",
+        "Generic names match the values stored in the order records",
+        "No null or undefined values appear where generic names should display"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "operation": "modify",
-          "description": "Update the supplied quantity dialog to handle RB order splitting logic. Add validation to ensure supplied quantity is greater than 0 and does not exceed the original order quantity. Update the dialog's submit handler to call the backend supplyOrder method which handles the order splitting. Ensure the dialog displays clear error messages for invalid quantities and provides user feedback during the submission process."
-        },
-        {
           "path": "frontend/src/components/dashboard/OrderTable.tsx",
           "operation": "modify",
-          "description": "Update the mark-as-ready functionality to open the SuppliedQtyDialog for RB orders before marking them as ready. Ensure the dialog is properly triggered when RB orders are selected for status update. After the dialog submission completes, refresh the order lists to reflect the split orders. Verify that the splitting logic works correctly for both single and bulk RB order selections."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Review and update the mutation hooks related to order status updates. Ensure the supplyOrder backend method is properly called with orderId and suppliedQuantity parameters. Add proper cache invalidation after the supply operation completes to refresh both Total Orders and Ready Orders tabs. Verify that the mutation properly handles success and error states with appropriate user feedback."
+          "description": "Review and fix how genericName field is accessed and displayed in table cells. Ensure the column definition properly reads order.genericName from each order object and handles undefined/null values with fallback display text. Add defensive checks to prevent display of undefined/null as string literals."
         },
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Verify that the Total Orders tab correctly displays pending quantity lines after RB order splitting. Ensure the tab's filtering logic includes orders with 'Pending' status that result from the split operation. Test that all existing filters (order type, karigar, search) work correctly with split orders."
+          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review any data transformations or filtering logic to ensure genericName is preserved when orders are filtered."
         },
         {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Update the karigar detail page to handle RB order splitting when marking orders as ready from this view. Ensure the SuppliedQtyDialog is triggered for RB orders and that the page refreshes to show updated order lists after splitting. Verify that statistics (total weight, quantity) are recalculated correctly after order splits."
+          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review filtering logic to ensure genericName is preserved in filtered results."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review all filtering logic to ensure genericName is preserved throughout filter operations."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Verify that orders passed to OrderTable component include complete order objects with genericName field intact. Review filtering logic to ensure genericName is preserved."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Fix PDF export functionality to work correctly on iPhone devices and iOS browsers",
+      "summary": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
       "acceptanceCriteria": [
-        "PDF export successfully generates and downloads on iPhone Safari",
-        "PDF export works on iPhone Chrome and other iOS browsers",
-        "Exported PDFs maintain proper formatting and data integrity on mobile devices",
-        "Error handling provides clear feedback if PDF generation fails on any platform"
+        "Filtered order arrays contain complete order objects with all name fields",
+        "No data transformation during filtering removes or nullifies karigarName or genericName",
+        "Orders displayed after applying filters show correct names"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/exportUtils.ts",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Investigate and fix PDF generation issues specific to iOS Safari and mobile browsers. Review the current PDF rendering implementation (likely using html2canvas and jsPDF or similar libraries). Implement iOS-specific workarounds such as: handling canvas size limitations on iOS, adjusting viewport meta tags for rendering, using proper MIME types and blob URLs for iOS compatibility, implementing fallback download mechanisms for iOS (e.g., opening PDF in new window if direct download fails). Add comprehensive error handling with user-friendly messages for PDF generation failures. Test and verify PDF formatting remains consistent across desktop and mobile platforms."
+          "description": "Review useMemo hooks and filter operations that process orders array. Ensure all filter operations use array methods that preserve complete order objects (e.g., .filter() without destructuring or field omission). Verify that no intermediate transformations accidentally strip out karigarName or genericName fields. Add console logging during development to verify filtered orders retain all fields."
         },
         {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Update the PDF export button handler to include better error handling and user feedback for iOS devices. Add loading indicators during PDF generation. Implement fallback mechanisms if direct download fails on iOS (e.g., display PDF in modal or new tab). Provide clear error messages if PDF generation fails on any platform."
+          "description": "Review useMemo hooks and filter operations that process orders array. Ensure all filter operations use array methods that preserve complete order objects. Verify that filtering by order type, karigar name, order number, and date range all maintain karigarName and genericName fields in the filtered results."
         },
         {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
           "operation": "modify",
-          "description": "Update the PDF export functionality in the karigar detail page to use the fixed exportUtils implementation. Ensure iOS compatibility for PDF exports from this page. Add proper loading states and error handling for mobile devices."
+          "description": "Review useMemo hooks and filter operations that process orders array. Ensure all filter operations preserve complete order objects with all name fields intact across multiple filter criteria."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Review useMemo hooks and filter operations that process orders array. Ensure filtering logic preserves complete order objects with karigarName and genericName fields."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Include design images in PDF and JPEG exports from Karigar detail page",
+      "summary": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
       "acceptanceCriteria": [
-        "PDF exports from Karigar detail page include design images for each order",
-        "JPEG exports from Karigar detail page include design images for each order",
-        "Design images are properly fetched and embedded based on order design codes",
-        "Exports gracefully handle missing design images (display placeholder or skip)",
-        "Image quality is maintained in exported files",
-        "Export file size remains reasonable with embedded images"
+        "When an RB order is split, both the updated original order and any new order records retain karigarName values",
+        "When an RB order is split, both the updated original order and any new order records retain genericName values",
+        "Split orders display names correctly in the dashboard after the split operation"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/exportUtils.ts",
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "operation": "modify",
-          "description": "Update the PDF and JPEG export functions to accept an optional includeImages parameter. Modify the export logic to fetch design images using the getDesignImage backend method for each unique design code in the orders. Convert fetched ExternalBlob images to base64 format for embedding in PDF/JPEG. Implement image fetching with proper error handling for missing images (use placeholder or skip). Optimize image dimensions and quality to balance visual clarity with file size. Update the HTML template generation to include image elements positioned appropriately with each order's design information. Ensure images are properly cached during the export process to avoid redundant fetches for duplicate design codes."
+          "description": "Review the logic that handles RB order splitting when supplied quantity is less than total quantity. Ensure that when creating data for the supplyOrder backend call, the frontend passes or expects the backend to preserve karigarName and genericName fields. If the frontend constructs any new order objects locally before syncing, explicitly copy karigarName and genericName from the original order to any split order representation. Add validation to verify these fields are present before submitting."
         },
         {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Update the PDF and JPEG export button handlers to call the enhanced exportUtils functions with includeImages parameter set to true. Add loading indicators during image fetching and export generation. Provide user feedback about the export progress, especially when fetching multiple design images. Implement proper error handling if image fetching or export generation fails, with clear user messaging."
+          "description": "Review the flow when SuppliedQtyDialog is triggered for RB orders. Ensure that after the supply operation completes and queries are invalidated, the refetched orders include karigarName and genericName. Verify that no local state transformations strip these fields between backend response and component display."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Review the markAsReady flow that triggers SuppliedQtyDialog for RB orders. Ensure that after the supply mutation succeeds and orders are refetched, the table re-renders with complete order objects including karigarName and genericName. Add defensive checks in the rendering logic to handle cases where these fields might be temporarily undefined during refetch."
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Review and verify that the useGetDesignImage hook properly supports bulk fetching of design images for export purposes. Ensure the hook can handle multiple concurrent image fetch requests efficiently. Add proper error handling and retry logic for failed image fetches during export operations."
+          "description": "Review the supplyOrder mutation hook to ensure it properly invalidates order queries after RB order splitting. Verify that when queries are invalidated and refetched, the backend interface correctly maps karigarName and genericName fields from the backend Order type to the frontend. Ensure no type transformations or mapping logic accidentally omits these optional fields."
         }
       ]
     }

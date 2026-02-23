@@ -1,38 +1,21 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Inventory management system with RB orders, status tracking, and export functionality",
+  "summary": "Business dashboard app with RB order splitting and status filtering. Current focus: fixing Karigar/generic name display issue introduced in Version 41",
   "architectural_notes": [
-    "System tracks order status transitions (ready state)",
-    "RB orders support partial fulfillment with quantity splitting",
-    "Export functionality includes PDF and JPEG formats with embedded images"
+    "Dashboard displays orders with Karigar names and generic names across different tabs",
+    "Version 41 introduced RB order splitting by supplied quantity and status-based filtering (Ready tab)",
+    "Orders are filtered and displayed in Total Orders and Ready Orders tabs with quantity-based logic"
   ],
   "known_issues": [
-    "Status changed to ready incorrectly appearing in ready tab",
-    "PDF export not working on iPhone",
-    "Design images not included in Karigar tab exports"
+    "Karigar names and generic names not displaying correctly in Version 41 dashboard (worked in Version 35)",
+    "Issue likely caused by order filtering/splitting logic in V41 not preserving name fields"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-for-rb-orders-being-marked-as-ready-prompt-the-user-to-enter-a-supplied-quantity-split-the-original-order-line-into-two-separate-entries-one-with-the-pending-quantity-original-qty-minus-supplied-qty-displayed-in-total-orders-tab-and-one-with-the-supplied-quantity-displayed-in-ready-orders-tab",
-      "title": "For RB orders being marked as ready, prompt the user to enter a supplied quantity. Split the original order line into two separate entries: one with the pending quantity (original qty minus supplied qty) displayed in Total Orders tab, and one with the supplied quantity displayed in Ready Orders tab.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-pdf-export-functionality-to-work-correctly-on-iphone-devices-investigate-and-resolve-current-pdf-generation-failures-specific-to-ios-safari-mobile-browsers",
-      "title": "Fix PDF export functionality to work correctly on iPhone devices. Investigate and resolve current PDF generation failures specific to iOS Safari/mobile browsers.",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-in-the-karigar-detail-page-when-exporting-orders-to-pdf-or-jpeg-automatically-include-the-associated-design-images-in-the-exported-files-each-order-s-design-code-should-have-its-corresponding-design-image-embedded-in-the-export",
-      "title": "In the Karigar detail page, when exporting orders to PDF or JPEG, automatically include the associated design images in the exported files. Each order's design code should have its corresponding design image embedded in the export.",
+      "id": "feature-verify-that-rb-order-splitting-logic-when-marking-orders-as-ready-with-supplied-quantities-preserves-karigarname-and-genericname-in-both-original-and-newly-created-order-records",
+      "title": "Verify that RB order splitting logic (when marking orders as ready with supplied quantities) preserves karigarName and genericName in both original and newly created order records",
       "reqIds": [
         "REQ-4"
       ],
@@ -42,38 +25,30 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix: Status changed to ready incorrectly showing in ready tab",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "RB orders: Ask for supplied qty and split order lines (pending qty in total orders, supplied qty in ready orders)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Fix: PDF export failing on iPhone",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Karigar tab: Attach design image to PDF and JPEG exports",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Fix the Ready tab to only display orders with status 'Ready'. Orders with status 'StatusChangedToReady' should not appear in the Ready tab.",
+      "summary": "Ensure Karigar names (karigarName field) display correctly in all dashboard tabs (Total Orders, Ready Orders, Hallmark Orders, Customer Orders) when rendering order rows in OrderTable component",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Ensure generic names (genericName field) display correctly in all dashboard tabs when rendering order rows in OrderTable component",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Verify that order filtering logic in TotalOrdersTab and ReadyTab preserves karigarName and genericName fields when filtering by status, order type, or karigar selection",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "status": "pending"
     }
   ],
-  "projectName": "Fix Ready Tab Display, Add RB Order Splitting, and Enhance PDF/JPEG Exports",
+  "projectName": "Jewellery Order Management",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }
