@@ -111,12 +111,15 @@ export interface _SERVICE {
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'reassignDesign' : ActorMethod<[string, string], undefined>,
+  'resetActiveOrders' : ActorMethod<[], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'saveOrder' : ActorMethod<
     [string, OrderType, string, string, number, number, bigint, string, string],
     undefined
   >,
+  'supplyAndReturnOrder' : ActorMethod<[string, bigint], undefined>,
   'supplyOrder' : ActorMethod<[string, bigint], undefined>,
+  'updateDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
   'updateOrdersStatusToReady' : ActorMethod<[Array<string>], undefined>,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,

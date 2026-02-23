@@ -1,52 +1,111 @@
 {
   "kind": "build_request",
-  "title": "Apply SO parsing to existing orders and fix Ready tab summary",
-  "priority": "normal",
+  "title": "Fix mapping update failures and Ready status transitions",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Apply SO (Sample Order) type parsing logic to all existing uploaded order lines that are already stored in the backend, ensuring any orders that should be classified as SO type are correctly updated",
+      "text": "Fix the updateDesignMapping function in backend to successfully save mappings when generic name and Karigar are provided from the Unmapped Codes page",
       "target": "backend",
       "source": {
         "messageIds": [
           "msg-latest"
         ],
         "quotes": [
-          "SO parsing should be done for existing uploaded order lines too"
+          "From Unmapped Codes page, after entering generic name and Karigar and clicked on tick it says failed to update mapping"
         ]
       },
       "acceptanceCriteria": [
-        "Existing orders in storage are scanned and re-evaluated for SO type classification",
-        "Orders matching SO criteria are updated to have orderType set to SO",
-        "The parsing logic from the order ingestion process is consistently applied to historical data"
+        "Clicking the tick button on Unmapped Codes page successfully saves the mapping",
+        "Success toast displays after saving mapping",
+        "The design code is removed from the unmapped list after successful save"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
+      "text": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-latest"
         ],
         "quotes": [
-          "Summary tabs don't show correct value in ready tab"
+          "From Unmapped Codes page, after entering generic name and Karigar and clicked on tick it says failed to update mapping"
         ]
       },
       "acceptanceCriteria": [
-        "Summary card values in the Ready tab accurately reflect the deduplicated order count",
-        "Total weight and quantity metrics match the orders displayed in the Ready tab table",
-        "Summary calculations account for the same deduplication logic used in ReadyTab.tsx"
+        "Error messages from backend are properly displayed to the user",
+        "Success state properly triggers toast and modal close",
+        "Loading state is shown during the mutation"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "In dashboard, in totals and Karigar tab, when order type *SO* and *CO* are selected and marked as *Ready* it fails to update"
+        ]
+      },
+      "acceptanceCriteria": [
+        "SO orders can be marked as Ready from the Totals tab",
+        "CO orders can be marked as Ready from the Totals tab",
+        "Success toast displays after marking orders as Ready",
+        "Orders immediately appear in the Ready tab after being marked Ready"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "In dashboard, in totals and Karigar tab, when order type *SO* and *CO* are selected and marked as *Ready* it fails to update"
+        ]
+      },
+      "acceptanceCriteria": [
+        "SO orders can be marked as Ready from the Karigar detail page",
+        "CO orders can be marked as Ready from the Karigar detail page",
+        "Orders are removed from the karigar's pending list after being marked Ready",
+        "Success confirmation is shown to the user"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Verify the backend markOrdersReady function properly handles SO and CO order types and persists the status change",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "In dashboard, in totals and Karigar tab, when order type *SO* and *CO* are selected and marked as *Ready* it fails to update"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend successfully updates SO orders to Ready status",
+        "Backend successfully updates CO orders to Ready status",
+        "Updated orders include the current timestamp in updatedAt field",
+        "Changes are persisted and queryable immediately after update"
       ]
     }
   ],
   "constraints": [
-    "Preserve existing order data and deduplication logic in ReadyTab.tsx",
-    "Maintain backward compatibility with existing order type definitions (CO/RB/SO)"
+    "Do not modify the existing order data structure or schema",
+    "Maintain compatibility with the existing Ready tab filtering logic",
+    "Preserve the current authentication and authorization flow"
   ],
   "nonGoals": [
-    "Changing the UI layout or styling of summary cards",
-    "Modifying order type parsing rules or criteria for new uploads"
+    "Changing the UI/UX of the Unmapped Codes page beyond fixing the save functionality",
+    "Modifying the RB order type Ready status workflow",
+    "Adding new order statuses or types"
   ],
   "imageRequirements": {
     "required": [],

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -5,8 +6,26 @@ import { useNavigate } from '@tanstack/react-router';
 import { useGetUnmappedOrders } from '@/hooks/useQueries';
 
 export default function UnmappedSection() {
-  const { data: unmappedDesignCodes = [], isLoading } = useGetUnmappedOrders();
+  const { data: unmappedOrders = [], isLoading } = useGetUnmappedOrders();
   const navigate = useNavigate();
+
+  // Group unmapped orders by design code
+  const unmappedDesignCodes = useMemo(() => {
+    const grouped = unmappedOrders.reduce((acc, order) => {
+      if (!acc[order.design]) {
+        acc[order.design] = {
+          designCode: order.design,
+          count: 0,
+          missingGenericName: !order.genericName,
+          missingKarigarName: !order.karigarName,
+        };
+      }
+      acc[order.design].count++;
+      return acc;
+    }, {} as Record<string, { designCode: string; count: number; missingGenericName: boolean; missingKarigarName: boolean }>);
+
+    return Object.values(grouped);
+  }, [unmappedOrders]);
 
   if (isLoading) {
     return null;

@@ -29,9 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useUpdateOrdersStatusToReady } from "@/hooks/useQueries";
 import { useActor } from "@/hooks/useActor";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface OrderTableProps {
   orders: Order[];
@@ -50,8 +50,9 @@ export default function OrderTable({
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const updateStatusMutation = useUpdateOrdersStatusToReady();
+  const [isUpdating, setIsUpdating] = useState(false);
   const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   const handleDesignClick = (design: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,31 +84,70 @@ export default function OrderTable({
   const handleMarkAsReady = () => {
     const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
     
-    // Check if any selected orders are RB type with Pending status
-    const rbPendingOrders = selectedOrders.filter(
-      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
+    // Separate orders by type
+    const rbOrders = selectedOrders.filter((order) => order.orderType === OrderType.RB);
+    const soCoOrders = selectedOrders.filter(
+      (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
     );
 
-    if (rbPendingOrders.length > 0 && onMarkAsReady) {
-      // Pass RB orders to parent for supply dialog
-      onMarkAsReady(rbPendingOrders);
+    // If there are RB orders, handle them via the supply dialog
+    if (rbOrders.length > 0 && onMarkAsReady) {
+      onMarkAsReady(rbOrders);
       // Clear selection after handling
       setSelectedRows(new Set());
-    } else {
-      // For non-RB orders, show confirmation dialog
+    } else if (soCoOrders.length > 0) {
+      // For SO/CO orders, show confirmation dialog
       setShowConfirmDialog(true);
     }
   };
 
   const confirmMarkAsReady = async () => {
+    if (!actor) {
+      toast.error("Actor not initialized");
+      return;
+    }
+
+    setIsUpdating(true);
     try {
-      await updateStatusMutation.mutateAsync(Array.from(selectedRows));
-      toast.success(`${selectedRows.size} order(s) marked as Ready`);
+      const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
+      const soCoOrders = selectedOrders.filter(
+        (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
+      );
+      
+      // Update each order to Ready status
+      for (const order of soCoOrders) {
+        const updatedOrder: Order = {
+          ...order,
+          status: OrderStatus.Ready,
+          updatedAt: BigInt(Date.now()) * BigInt(1000000), // Convert to nanoseconds
+        };
+        
+        // Call backend to update the order
+        await actor.saveOrder(
+          updatedOrder.orderNo,
+          updatedOrder.orderType,
+          updatedOrder.product,
+          updatedOrder.design,
+          updatedOrder.weight,
+          updatedOrder.size,
+          updatedOrder.quantity,
+          updatedOrder.remarks,
+          updatedOrder.orderId
+        );
+      }
+      
+      // Invalidate queries to refresh data
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      
+      toast.success(`${soCoOrders.length} order(s) marked as Ready`);
       setSelectedRows(new Set());
       setShowConfirmDialog(false);
-    } catch (error) {
-      toast.error("Failed to update orders");
-      console.error(error);
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to update orders";
+      toast.error(errorMessage);
+      console.error("Error updating orders:", error);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -130,7 +170,7 @@ export default function OrderTable({
         toast.success(`Exported to ${format.toUpperCase()}`);
       }
     } catch (error) {
-      toast.error(`Failed to export to ${format.toUpperCase()}`);
+      toast.error(`Failed to export ${format.toUpperCase()}`);
       console.error(error);
     } finally {
       setIsExporting(false);
@@ -151,145 +191,139 @@ export default function OrderTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {enableBulkActions && selectedRows.size > 0 && (
-            <Button onClick={handleMarkAsReady} disabled={updateStatusMutation.isPending}>
-              Mark {selectedRows.size} as Ready
-            </Button>
-          )}
+      {enableBulkActions && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {selectedRows.size > 0 && `${selectedRows.size} order(s) selected`}
+          </div>
+          <div className="flex gap-2">
+            {selectedRows.size > 0 && (
+              <Button
+                onClick={handleMarkAsReady}
+                size="sm"
+                className="bg-gold hover:bg-gold-hover"
+              >
+                Mark as Ready
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={isExporting}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {isExporting ? "Exporting..." : "Export"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleExport("excel")}>
+                  Export to Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                  Export to PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("jpeg")}>
+                  Export to JPEG
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={isExporting}>
-              <Download className="mr-2 h-4 w-4" />
-              {isExporting ? "Exporting..." : "Export"}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => handleExport("excel")}>
-              Export to Excel
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("pdf")}>
-              Export to PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("jpeg")}>
-              Export to JPEG
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      )}
 
-      <div className="rounded-md border">
+      <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               {enableBulkActions && (
                 <TableHead className="w-12">
                   <Checkbox
-                    checked={allSelected || someSelected}
+                    checked={allSelected}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all"
+                    className={someSelected ? "data-[state=checked]:bg-gold" : ""}
                   />
                 </TableHead>
               )}
+              <TableHead>Order No</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Design</TableHead>
               <TableHead>Generic Name</TableHead>
-              <TableHead>Karigar Name</TableHead>
-              <TableHead>Design Code</TableHead>
-              <TableHead>Weight</TableHead>
+              <TableHead>Karigar</TableHead>
+              <TableHead>Weight (g)</TableHead>
               <TableHead>Size</TableHead>
               <TableHead>Qty</TableHead>
-              <TableHead>Remarks</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Order Number</TableHead>
-              <TableHead>Product</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={enableBulkActions ? 12 : 11}
+                  colSpan={enableBulkActions ? 10 : 9}
                   className="text-center py-8 text-muted-foreground"
                 >
                   No orders found
                 </TableCell>
               </TableRow>
             ) : (
-              Object.entries(groupedOrders).map(([designCode, designOrders], groupIndex) => (
-                <>
-                  {groupIndex > 0 && (
-                    <TableRow key={`separator-${designCode}`} className="bg-muted/30">
-                      <TableCell colSpan={enableBulkActions ? 12 : 11} className="h-2 p-0" />
-                    </TableRow>
-                  )}
-                  {designOrders.map((order) => {
-                    const isSelected = selectedRows.has(order.orderId);
-                    return (
-                      <TableRow
-                        key={order.orderId}
-                        className={`cursor-pointer hover:bg-muted/50 ${
-                          isSelected ? "bg-muted" : ""
+              Object.entries(groupedOrders).map(([design, designOrders]) =>
+                designOrders.map((order, index) => (
+                  <TableRow
+                    key={order.orderId}
+                    onClick={() => handleRowClick(order.orderId)}
+                    className={`cursor-pointer ${
+                      selectedRows.has(order.orderId) ? "bg-gold/10" : ""
+                    }`}
+                  >
+                    {enableBulkActions && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedRows.has(order.orderId)}
+                          onCheckedChange={() => handleRowClick(order.orderId)}
+                          aria-label={`Select order ${order.orderNo}`}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell className="font-medium">{order.orderNo}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+                        {order.orderType}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {index === 0 ? (
+                        <button
+                          onClick={(e) => handleDesignClick(design, e)}
+                          className="text-gold hover:text-gold-hover underline font-medium"
+                        >
+                          {design}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">↳</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{order.genericName || "-"}</TableCell>
+                    <TableCell>{order.karigarName || "-"}</TableCell>
+                    <TableCell>{order.weight.toFixed(3)}</TableCell>
+                    <TableCell>{order.size}</TableCell>
+                    <TableCell>{Number(order.quantity)}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
+                          order.status === OrderStatus.Ready
+                            ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
+                            : order.status === OrderStatus.Pending
+                            ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
+                            : order.status === OrderStatus.Hallmark
+                            ? "bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300"
+                            : "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
                         }`}
-                        onClick={() => handleRowClick(order.orderId)}
                       >
-                        {enableBulkActions && (
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => handleRowClick(order.orderId)}
-                              aria-label={`Select order ${order.orderId}`}
-                            />
-                          </TableCell>
-                        )}
-                        <TableCell>{order.genericName || "-"}</TableCell>
-                        <TableCell>{order.karigarName || "-"}</TableCell>
-                        <TableCell>
-                          <button
-                            onClick={(e) => handleDesignClick(order.design, e)}
-                            className="text-primary hover:underline"
-                          >
-                            {order.design}
-                          </button>
-                        </TableCell>
-                        <TableCell>{order.weight.toFixed(3)}</TableCell>
-                        <TableCell>{order.size.toFixed(2)}</TableCell>
-                        <TableCell>{Number(order.quantity)}</TableCell>
-                        <TableCell>{order.remarks || "-"}</TableCell>
-                        <TableCell>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                              order.status === OrderStatus.Ready
-                                ? "bg-green-100 text-green-700"
-                                : order.status === OrderStatus.Pending
-                                ? "bg-yellow-100 text-yellow-700"
-                                : order.status === OrderStatus.Hallmark
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-purple-100 text-purple-700"
-                            }`}
-                          >
-                            {order.status}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                              order.orderType === OrderType.CO
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-orange-100 text-orange-700"
-                            }`}
-                          >
-                            {order.orderType}
-                          </span>
-                        </TableCell>
-                        <TableCell>{order.orderNo}</TableCell>
-                        <TableCell>{order.product}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </>
-              ))
+                        {order.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )
             )}
           </TableBody>
         </Table>
@@ -306,15 +340,19 @@ export default function OrderTable({
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Status Update</AlertDialogTitle>
+            <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark {selectedRows.size} order(s) as Ready?
+              Are you sure you want to mark {selectedRows.size} order(s) as Ready? This action will update the order status.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmMarkAsReady}>
-              Confirm
+            <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmMarkAsReady}
+              disabled={isUpdating}
+              className="bg-gold hover:bg-gold-hover"
+            >
+              {isUpdating ? "Updating..." : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGetOrders, useUpdateUnmappedOrder } from '@/hooks/useQueries';
+import { useGetOrders, useSaveDesignMapping, useReassignDesign } from '@/hooks/useQueries';
 import {
   Table,
   TableBody,
@@ -15,7 +15,8 @@ import { toast } from 'sonner';
 
 export default function UnmappedCodes() {
   const { data: allOrders = [], isLoading } = useGetOrders();
-  const updateMutation = useUpdateUnmappedOrder();
+  const saveMappingMutation = useSaveDesignMapping();
+  const reassignMutation = useReassignDesign();
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{
     genericName: string;
@@ -60,16 +61,25 @@ export default function UnmappedCodes() {
     }
 
     try {
-      await updateMutation.mutateAsync({
+      // Save the design mapping
+      await saveMappingMutation.mutateAsync({
         designCode,
         genericName: editValues.genericName.trim(),
         karigarName: editValues.karigarName.trim(),
       });
+      
+      // Reassign pending orders to the new karigar
+      await reassignMutation.mutateAsync({
+        designCode,
+        newKarigar: editValues.karigarName.trim(),
+      });
+      
       toast.success('Mapping updated successfully');
       setEditingRow(null);
-    } catch (error) {
-      toast.error('Failed to update mapping');
-      console.error(error);
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Failed to update mapping';
+      toast.error(errorMessage);
+      console.error("Error updating mapping:", error);
     }
   };
 
@@ -159,7 +169,7 @@ export default function UnmappedCodes() {
                           size="icon"
                           variant="ghost"
                           onClick={() => handleSave(group.designCode)}
-                          disabled={updateMutation.isPending}
+                          disabled={saveMappingMutation.isPending || reassignMutation.isPending}
                           className="h-8 w-8"
                         >
                           <Check className="h-4 w-4" />
@@ -168,7 +178,7 @@ export default function UnmappedCodes() {
                           size="icon"
                           variant="ghost"
                           onClick={handleCancel}
-                          disabled={updateMutation.isPending}
+                          disabled={saveMappingMutation.isPending || reassignMutation.isPending}
                           className="h-8 w-8"
                         >
                           <X className="h-4 w-4" />

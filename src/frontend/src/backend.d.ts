@@ -80,9 +80,12 @@ export interface backendInterface {
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
+    resetActiveOrders(): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
+    updateDesignMapping(designCode: string, newGenericName: string, newKarigarName: string): Promise<void>;
     updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
     updateOrdersStatusToReady(orderIds: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;

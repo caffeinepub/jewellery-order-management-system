@@ -4,16 +4,24 @@
   "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "SO parsing not applied to existing uploaded order lines",
-    "Summary tabs showing incorrect value in ready tab"
+    "Unmapped Codes page fails to update mapping after entering generic name and Karigar",
+    "Dashboard fails to update Ready status for SO and CO order types in Totals and Karigar tabs"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-summary-cards-to-display-the-correct-count-and-metrics-for-orders-shown-in-the-ready-tab-ensuring-the-summary-values-match-the-deduplicated-order-list",
-      "title": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
+      "id": "feature-fix-the-frontend-editdesignmodal-component-to-properly-handle-the-updatedesignmapping-mutation-response-and-error-states",
+      "title": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
       "reqIds": [
         "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-mark-as-ready-functionality-in-ordertable-component-for-so-and-co-order-types-when-accessed-from-the-totals-tab",
+      "title": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+      "reqIds": [
+        "REQ-3"
       ],
       "version": 1
     }
@@ -21,26 +29,30 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Apply SO parsing to existing uploaded order lines",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Fix summary tabs to show correct value in ready tab",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Apply SO (Sample Order) type parsing logic to all existing uploaded order lines that are already stored in the backend, ensuring any orders that should be classified as SO type are correctly updated",
+      "summary": "Fix the updateDesignMapping function in backend to successfully save mappings when generic name and Karigar are provided from the Unmapped Codes page",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Verify the backend markOrdersReady function properly handles SO and CO order types and persists the status change",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "status": "pending"
     }
   ],
-  "projectName": "Apply SO parsing to existing orders and fix Ready tab summary",
+  "projectName": "Fix mapping update failures and Ready status transitions",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

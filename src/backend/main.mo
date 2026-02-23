@@ -109,16 +109,16 @@ actor {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
       case (?originalOrder) {
-        if (suppliedQuantity > originalOrder.quantity) {
-          Runtime.trap("Supplied quantity cannot be greater than the original order quantity");
+        if (suppliedQuantity >= originalOrder.quantity) {
+          Runtime.trap("Cannot supply full or more than original quantity in one go. Use supplyAndReturnOrder instead");
         };
 
-        let updatedOrder : Order = {
+        let pendingOrder : Order = {
           originalOrder with
           quantity = originalOrder.quantity - suppliedQuantity;
           updatedAt = Time.now();
         };
-        orders.add(orderId, updatedOrder);
+        orders.add(orderId, pendingOrder);
 
         let readyOrder : Order = {
           originalOrder with
@@ -127,6 +127,28 @@ actor {
           updatedAt = Time.now();
         };
         orders.add(orderId, readyOrder);
+      };
+    };
+  };
+
+  public shared ({ caller }) func supplyAndReturnOrder(
+    orderId : Text,
+    suppliedQuantity : Nat,
+  ) : async () {
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order not found") };
+      case (?originalOrder) {
+        if (suppliedQuantity != originalOrder.quantity) {
+          Runtime.trap("Supplied and returned quantity must match the original order quantity");
+        };
+
+        let updatedOrder : Order = {
+          originalOrder with
+          quantity = suppliedQuantity;
+          status = #ReturnFromHallmark;
+          updatedAt = Time.now();
+        };
+        orders.add(orderId, updatedOrder);
       };
     };
   };
@@ -379,5 +401,33 @@ actor {
   public query ({ caller }) func getOrdersWithMappings() : async [Order] {
     let persistentOrders = orders.values().toArray();
     persistentOrders;
+  };
+
+  public shared ({ caller }) func updateDesignMapping(
+    designCode : Text,
+    newGenericName : Text,
+    newKarigarName : Text,
+  ) : async () {
+    let timestamp = Time.now();
+    let updatedMapping : DesignMapping = {
+      designCode;
+      genericName = newGenericName;
+      karigarName = newKarigarName;
+      createdBy = "backend_update";
+      updatedBy = ?("updated_by_backend");
+      createdAt = timestamp;
+      updatedAt = timestamp;
+    };
+    designMappings.add(designCode, updatedMapping);
+  };
+
+  // Data Reset: Remove all orders with Pending or ReturnFromHallmark status (active orders).
+  public shared ({ caller }) func resetActiveOrders() : async () {
+    let remainingOrders = orders.filter(
+      func(_orderId, order) {
+        order.status != #Pending and order.status != #ReturnFromHallmark
+      }
+    );
+    orders := remainingOrders;
   };
 };

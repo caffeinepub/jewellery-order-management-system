@@ -1,26 +1,65 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Ready tab summary cards to display correct deduplicated order metrics",
+  "title": "Fix mapping update failures and Ready status transitions",
   "requirements": [
     {
       "id": "REQ-2",
-      "summary": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
+      "summary": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
       "acceptanceCriteria": [
-        "Summary card values in the Ready tab accurately reflect the deduplicated order count",
-        "Total weight and quantity metrics match the orders displayed in the Ready tab table",
-        "Summary calculations account for the same deduplication logic used in ReadyTab.tsx"
+        "Error messages from backend are properly displayed to the user",
+        "Success state properly triggers toast and modal close",
+        "Loading state is shown during the mutation"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "path": "frontend/src/components/dashboard/EditDesignModal.tsx",
           "operation": "modify",
-          "description": "Update the component to pass the deduplicated orders array to SummaryCards instead of the raw filtered orders. Ensure the deduplication logic (using orderId) is applied before passing orders to both the OrderTable and SummaryCards components, so that summary metrics accurately reflect the displayed orders."
+          "description": "Fix the mutation error handling in the handleSave function to properly catch and display backend errors. Ensure the mutation's onError callback extracts the error message correctly and shows it via toast. Verify that onSuccess callback properly closes the modal and shows success toast. Add proper loading state disable logic to the save button."
         },
         {
-          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "path": "frontend/src/pages/UnmappedCodes.tsx",
           "operation": "modify",
-          "description": "Update the SummaryCards component to accept an optional pre-filtered orders array prop when rendering in the Ready tab context. When this prop is provided, use it directly for calculations instead of filtering from allOrders. This ensures summary calculations use the same deduplicated order set that is displayed in the table."
+          "description": "Fix the inline edit save functionality for unmapped design codes. Update the handleSaveMapping function to properly handle the updateDesignMapping mutation response, display error messages from the backend via toast, and remove the design code from the unmapped list on successful save. Ensure loading states are properly managed during the mutation."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+      "acceptanceCriteria": [
+        "SO orders can be marked as Ready from the Totals tab",
+        "CO orders can be marked as Ready from the Totals tab",
+        "Success toast displays after marking orders as Ready",
+        "Orders immediately appear in the Ready tab after being marked Ready"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Fix the handleMarkAsReady function to properly handle SO and CO order types. Ensure the mutation calls updateOrdersStatusToReady with the correct order IDs and properly invalidates queries after success. Verify that the confirmation dialog logic correctly filters SO and CO orders for the mark-as-ready action. Add proper error handling and success toast notifications."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Verify that the OrderTable component receives the correct props to enable mark-as-ready functionality for SO and CO orders. Ensure the showActions prop is properly passed and that the order data includes all required fields for the ready status transition."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
+      "acceptanceCriteria": [
+        "SO orders can be marked as Ready from the Karigar detail page",
+        "CO orders can be marked as Ready from the Karigar detail page",
+        "Orders are removed from the karigar's pending list after being marked Ready",
+        "Success confirmation is shown to the user"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Fix the mark-as-ready functionality for SO and CO orders displayed on the karigar detail page. Ensure the OrderTable component properly handles the mutation for these order types and that query invalidation updates the karigar's pending order list. Verify that success notifications are shown to the user after marking orders as ready."
         }
       ]
     }

@@ -137,6 +137,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'reassignDesign' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'resetActiveOrders' : IDL.Func([], [], []),
   'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'saveOrder' : IDL.Func(
       [
@@ -153,7 +154,9 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'supplyAndReturnOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
   'supplyOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
+  'updateDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
   'updateOrdersStatusToReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
   'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
@@ -293,6 +296,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'reassignDesign' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'resetActiveOrders' : IDL.Func([], [], []),
     'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'saveOrder' : IDL.Func(
         [
@@ -309,7 +313,9 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'supplyAndReturnOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
     'supplyOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
+    'updateDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
     'updateOrdersStatusToReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
     'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),

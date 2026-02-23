@@ -1,12 +1,13 @@
 # Specification
 
 ## Summary
-**Goal:** Apply SO parsing to existing orders and fix Ready tab summary calculations.
+**Goal:** Fix mapping update failures on Unmapped Codes page and resolve Ready status transition issues for SO and CO order types.
 
 **Planned changes:**
-- Scan and re-evaluate all existing uploaded orders in storage to apply SO type classification logic
-- Update orders matching SO criteria to have orderType set to SO
-- Fix summary card calculations in Ready tab to match the deduplicated order list
-- Ensure total weight and quantity metrics accurately reflect displayed orders
+- Fix updateDesignMapping function in backend to successfully save mappings with generic name and Karigar
+- Update EditDesignModal component to properly handle mutation responses and error states
+- Fix mark as Ready functionality for SO and CO orders in the Totals tab
+- Fix mark as Ready functionality for SO and CO orders in the Karigar detail pages
+- Verify backend markOrdersReady function correctly handles SO and CO order types
 
-**User-visible outcome:** Existing orders are correctly classified as SO type where applicable, and the Ready tab summary cards display accurate counts and metrics matching the orders shown in the table.
+**User-visible outcome:** Users can successfully save design mappings from the Unmapped Codes page and mark SO/CO orders as Ready from both the Totals and Karigar tabs, with proper success/error feedback.

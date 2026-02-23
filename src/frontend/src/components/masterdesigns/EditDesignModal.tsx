@@ -64,9 +64,10 @@ export function EditDesignModal({
       await onSave(designCode, genericName, selectedKarigar);
       toast.success("Design mapping updated successfully. Pending orders have been reassigned.");
       onOpenChange(false);
-    } catch (error) {
-      toast.error("Failed to update design mapping");
-      console.error(error);
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to update design mapping";
+      toast.error(errorMessage);
+      console.error("Error updating design mapping:", error);
     } finally {
       setIsSaving(false);
     }
@@ -85,9 +86,10 @@ export function EditDesignModal({
       setIsAddingNew(false);
       setNewKarigarName("");
       toast.success("New karigar added successfully");
-    } catch (error) {
-      toast.error("Failed to add new karigar");
-      console.error(error);
+    } catch (error: any) {
+      const errorMessage = error?.message || "Failed to add new karigar";
+      toast.error(errorMessage);
+      console.error("Error adding karigar:", error);
     } finally {
       setIsSaving(false);
     }

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Sidebar,
@@ -19,7 +20,9 @@ import {
   Image,
   Printer,
   ScanLine,
+  Trash2,
 } from 'lucide-react';
+import DataResetDialog from './DataResetDialog';
 
 const menuItems = [
   { title: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -34,59 +37,73 @@ const menuItems = [
 export default function AppSidebar() {
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+  const [showDataResetDialog, setShowDataResetDialog] = useState(false);
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gold text-gold-foreground">
-            <LayoutDashboard className="h-5 w-5" />
+    <>
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gold text-gold-foreground">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <div className="group-data-[collapsible=icon]:hidden">
+              <h2 className="text-base font-semibold">Jewellery OMS</h2>
+              <p className="text-xs text-muted-foreground">Order Management</p>
+            </div>
           </div>
-          <div className="group-data-[collapsible=icon]:hidden">
-            <h2 className="text-base font-semibold">Jewellery OMS</h2>
-            <p className="text-xs text-muted-foreground">Order Management</p>
-          </div>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
-            Navigation
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild isActive={currentPath === item.path}>
-                    <Link to={item.path}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
+              Navigation
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {menuItems.map((item) => (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton asChild isActive={currentPath === item.path}>
+                      <Link to={item.path}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => setShowDataResetDialog(true)}>
+                    <Trash2 className="h-4 w-4" />
+                    <span>Data Reset</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <p className="text-xs text-muted-foreground text-center group-data-[collapsible=icon]:hidden">
-          Built with love using{' '}
-          <a
-            href={`https://caffeine.ai/?utm_source=Caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(
-              window.location.hostname
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-foreground hover:underline font-medium"
-          >
-            caffeine.ai
-          </a>
-        </p>
-        <p className="text-xs text-muted-foreground text-center mt-1 group-data-[collapsible=icon]:hidden">
-          © {new Date().getFullYear()}
-        </p>
-      </SidebarFooter>
-    </Sidebar>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border p-4">
+          <p className="text-xs text-muted-foreground text-center group-data-[collapsible=icon]:hidden">
+            Built with love using{' '}
+            <a
+              href={`https://caffeine.ai/?utm_source=Caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(
+                window.location.hostname
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:underline font-medium"
+            >
+              caffeine.ai
+            </a>
+          </p>
+          <p className="text-xs text-muted-foreground text-center mt-1 group-data-[collapsible=icon]:hidden">
+            © {new Date().getFullYear()}
+          </p>
+        </SidebarFooter>
+      </Sidebar>
+
+      <DataResetDialog
+        open={showDataResetDialog}
+        onOpenChange={setShowDataResetDialog}
+      />
+    </>
   );
 }

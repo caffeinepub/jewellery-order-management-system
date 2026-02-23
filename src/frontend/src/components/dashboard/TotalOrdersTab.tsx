@@ -102,6 +102,13 @@ export default function TotalOrdersTab() {
           >
             RB
           </Button>
+          <Button
+            variant={orderTypeFilter === OrderType.SO ? "default" : "outline"}
+            onClick={() => setOrderTypeFilter(OrderType.SO)}
+            size="sm"
+          >
+            SO
+          </Button>
         </div>
         <Select value={karigarFilter} onValueChange={setKarigarFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">

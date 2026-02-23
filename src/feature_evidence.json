@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-summary-cards-to-display-the-correct-count-and-metrics-for-orders-shown-in-the-ready-tab-ensuring-the-summary-values-match-the-deduplicated-order-list",
-      "featureTitle": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
+      "featureId": "feature-fix-the-frontend-editdesignmodal-component-to-properly-handle-the-updatedesignmapping-mutation-response-and-error-states",
+      "featureTitle": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
       "files": [
-        "frontend/src/components/dashboard/SummaryCards.tsx"
+        "frontend/src/pages/UnmappedCodes.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -19,6 +19,28 @@
       ],
       "testIds": [
         "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-mark-as-ready-functionality-in-ordertable-component-for-so-and-co-order-types-when-accessed-from-the-totals-tab",
+      "featureTitle": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+      "files": [
+        "frontend/src/components/dashboard/OrderTable.tsx",
+        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
       ],
       "confidence": "high"
     }

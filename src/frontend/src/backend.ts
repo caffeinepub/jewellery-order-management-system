@@ -172,9 +172,12 @@ export interface backendInterface {
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
+    resetActiveOrders(): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
+    updateDesignMapping(designCode: string, newGenericName: string, newKarigarName: string): Promise<void>;
     updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
     updateOrdersStatusToReady(orderIds: Array<string>): Promise<void>;
     uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;
@@ -520,6 +523,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async resetActiveOrders(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.resetActiveOrders();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.resetActiveOrders();
+            return result;
+        }
+    }
     async saveDesignMapping(arg0: string, arg1: string, arg2: string): Promise<void> {
         if (this.processError) {
             try {
@@ -548,6 +565,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async supplyAndReturnOrder(arg0: string, arg1: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.supplyAndReturnOrder(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.supplyAndReturnOrder(arg0, arg1);
+            return result;
+        }
+    }
     async supplyOrder(arg0: string, arg1: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -559,6 +590,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.supplyOrder(arg0, arg1);
+            return result;
+        }
+    }
+    async updateDesignMapping(arg0: string, arg1: string, arg2: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateDesignMapping(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateDesignMapping(arg0, arg1, arg2);
             return result;
         }
     }

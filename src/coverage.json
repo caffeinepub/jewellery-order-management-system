@@ -1,33 +1,62 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-23T07:12:20.907Z",
+  "generatedAt": "2026-02-23T10:32:44.476Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 2,
-    "implemented": 1,
+    "total": 5,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Apply SO (Sample Order) type parsing logic to all existing uploaded order lines that are already stored in the backend, ensuring any orders that should be classified as SO type are correctly updated",
+        "summary": "Fix the updateDesignMapping function in backend to successfully save mappings when generic name and Karigar are provided from the Unmapped Codes page",
         "status": "unknown",
         "plannedFiles": [],
         "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the summary cards to display the correct count and metrics for orders shown in the Ready tab, ensuring the summary values match the deduplicated order list",
+        "summary": "Fix the frontend EditDesignModal component to properly handle the updateDesignMapping mutation response and error states",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
+          "frontend/src/components/dashboard/EditDesignModal.tsx",
+          "frontend/src/pages/UnmappedCodes.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx"
+          "frontend/src/pages/UnmappedCodes.tsx"
         ]
+      },
+      {
+        "id": "REQ-3",
+        "summary": "Fix the mark as Ready functionality in OrderTable component for SO and CO order types when accessed from the Totals tab",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Fix the mark as Ready functionality for SO and CO order types when accessed from the Karigars tab individual karigar detail page",
+        "status": "missing",
+        "plannedFiles": [
+          "frontend/src/pages/KarigarDetail.tsx"
+        ],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-5",
+        "summary": "Verify the backend markOrdersReady function properly handles SO and CO order types and persists the status change",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       }
     ]
   },
@@ -38,7 +67,14 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/components/dashboard/SummaryCards.tsx",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/components/dashboard/OrderTable.tsx",
+    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+    "frontend/src/components/masterdesigns/EditDesignModal.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
+    "frontend/src/pages/UnmappedCodes.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

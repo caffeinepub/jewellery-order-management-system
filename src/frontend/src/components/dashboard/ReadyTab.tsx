@@ -66,10 +66,11 @@ export default function ReadyTab() {
       );
     }
 
-    // Filter by date range
+    // Filter by date range using updatedAt (when order was marked Ready)
     if (dateRange.from && dateRange.to) {
       result = result.filter((order) => {
-        const orderDate = new Date(Number(order.createdAt) / 1000000);
+        // Use updatedAt instead of createdAt to check when order was marked Ready
+        const orderDate = new Date(Number(order.updatedAt) / 1000000);
         return isWithinInterval(orderDate, { start: dateRange.from, end: dateRange.to });
       });
     }
