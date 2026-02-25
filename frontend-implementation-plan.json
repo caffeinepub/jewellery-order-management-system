@@ -1,0 +1,23 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Fix Return to Pending for RB Orders in Ready Tab",
+  "requirements": [
+    {
+      "id": "REQ-2",
+      "summary": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display success/error toasts",
+      "acceptanceCriteria": [
+        "Clicking 'Return N Orders to Pending' in the Ready tab successfully calls the backend and shows a success toast",
+        "On failure, the toast displays the specific error message returned by the backend",
+        "After a successful return, the returned orders disappear from the Ready tab list"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Update the return-to-pending click handler to call the backend batchReturnOrdersToPending mutation with the selected order IDs and their quantities. On success, display a success toast message (e.g., 'N orders returned to pending successfully') and clear the selection. On error, extract the error message from the mutation result and display it in an error toast. Ensure the orders disappear from the Ready tab list after a successful return by relying on the React Query cache invalidation from the mutation hook."
+        }
+      ]
+    }
+  ]
+}

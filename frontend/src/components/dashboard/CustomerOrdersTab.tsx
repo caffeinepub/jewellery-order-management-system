@@ -1,0 +1,50 @@
+import { useState, useMemo } from "react";
+import OrderTable from "./OrderTable";
+import { useGetAllOrders } from "@/hooks/useQueries";
+import { OrderType, OrderStatus } from "@/backend";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+
+export default function CustomerOrdersTab() {
+  const [searchText, setSearchText] = useState("");
+  const { data: orders = [], isLoading } = useGetAllOrders();
+
+  const filteredOrders = useMemo(() => {
+    // Filter for CO type orders with Pending status only
+    let result = orders.filter(
+      (order) => order.orderType === OrderType.CO && order.status === OrderStatus.Pending
+    );
+
+    // Filter by search text (order number, design code, or generic name)
+    if (searchText.trim()) {
+      const search = searchText.toLowerCase();
+      result = result.filter(
+        (order) =>
+          order.orderNo.toLowerCase().includes(search) ||
+          order.design.toLowerCase().includes(search) ||
+          (order.genericName && order.genericName.toLowerCase().includes(search))
+      );
+    }
+
+    return result;
+  }, [orders, searchText]);
+
+  if (isLoading) {
+    return <div className="text-center py-8">Loading orders...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by Order Number, Design Code, or Generic Name..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+      <OrderTable orders={filteredOrders} />
+    </div>
+  );
+}

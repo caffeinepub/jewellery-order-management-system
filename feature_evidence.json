@@ -1,0 +1,26 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-update-the-frontend-readytab-tsx-return-to-pending-flow-to-correctly-call-the-fixed-backend-return-function-and-display-a-success-toast-on-completion-and-an-error-toast-with-the-specific-failure-message-if-it-fails-no-other-ui-changes-are-needed",
+      "featureTitle": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+      "files": [
+        "frontend/src/components/dashboard/ReadyTab.tsx"
+      ],
+      "components": [
+        "qr-code@1.0.0",
+        "camera@1.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "blob-storage@4.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

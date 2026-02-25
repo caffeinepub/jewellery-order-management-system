@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --radius: 0.5rem;
+        --background: 0.99 0 0;
+        --foreground: 0.15 0 0;
+        --card: 1 0 0;
+        --card-foreground: 0.15 0 0;
+        --popover: 1 0 0;
+        --popover-foreground: 0.15 0 0;
+        --primary: 0.55 0.12 50;
+        --primary-foreground: 0.98 0 0;
+        --secondary: 0.96 0.02 45;
+        --secondary-foreground: 0.15 0 0;
+        --muted: 0.96 0.01 45;
+        --muted-foreground: 0.50 0 0;
+        --accent: 0.95 0.03 45;
+        --accent-foreground: 0.15 0 0;
+        --destructive: 0.55 0.22 25;
+        --destructive-foreground: 0.98 0 0;
+        --border: 0.90 0.01 45;
+        --input: 0.90 0.01 45;
+        --ring: 0.55 0.12 50;
+        --gold: 0.65 0.14 55;
+        --gold-foreground: 0.10 0 0;
+        --gold-hover: 0.58 0.16 52;
+        --chart-1: 0.55 0.12 50;
+        --chart-2: 0.50 0.14 52;
+        --chart-3: 0.45 0.16 54;
+        --chart-4: 0.40 0.12 48;
+        --chart-5: 0.35 0.10 46;
+        --sidebar: 0.98 0.01 45;
+        --sidebar-foreground: 0.15 0 0;
+        --sidebar-primary: 0.55 0.12 50;
+        --sidebar-primary-foreground: 0.98 0 0;
+        --sidebar-accent: 0.95 0.03 45;
+        --sidebar-accent-foreground: 0.15 0 0;
+        --sidebar-border: 0.92 0.01 45;
+        --sidebar-ring: 0.55 0.12 50;
+    }
+
+    .dark {
+        --background: 0.10 0 0;
+        --foreground: 0.95 0 0;
+        --card: 0.13 0 0;
+        --card-foreground: 0.95 0 0;
+        --popover: 0.13 0 0;
+        --popover-foreground: 0.95 0 0;
+        --primary: 0.70 0.14 52;
+        --primary-foreground: 0.10 0 0;
+        --secondary: 0.18 0.02 45;
+        --secondary-foreground: 0.95 0 0;
+        --muted: 0.18 0.01 45;
+        --muted-foreground: 0.60 0 0;
+        --accent: 0.20 0.03 45;
+        --accent-foreground: 0.95 0 0;
+        --destructive: 0.50 0.25 25;
+        --destructive-foreground: 0.95 0 0;
+        --border: 0.22 0.01 45;
+        --input: 0.22 0.01 45;
+        --ring: 0.70 0.14 52;
+        --gold: 0.72 0.16 56;
+        --gold-foreground: 0.10 0 0;
+        --gold-hover: 0.78 0.18 58;
+        --chart-1: 0.65 0.14 52;
+        --chart-2: 0.60 0.16 54;
+        --chart-3: 0.55 0.18 56;
+        --chart-4: 0.50 0.14 50;
+        --chart-5: 0.45 0.12 48;
+        --sidebar: 0.13 0 0;
+        --sidebar-foreground: 0.95 0 0;
+        --sidebar-primary: 0.70 0.14 52;
+        --sidebar-primary-foreground: 0.10 0 0;
+        --sidebar-accent: 0.18 0.02 45;
+        --sidebar-accent-foreground: 0.95 0 0;
+        --sidebar-border: 0.22 0.01 45;
+        --sidebar-ring: 0.70 0.14 52;
+    }
+
+    * {
+        border-color: oklch(var(--border));
+    }
+    
+    body {
+        background-color: oklch(var(--background));
+        color: oklch(var(--foreground));
+    }
+
+    /* Smooth transitions for interactive elements */
+    button, a, [role="button"] {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 200ms;
+    }
+
+    /* Gold accent for active states */
+    [data-state="active"], [data-active="true"] {
+        border-color: oklch(var(--gold));
+        color: oklch(var(--gold));
+    }
+
+    /* Enhanced hover states */
+    button:hover:not(:disabled), 
+    a:hover:not(:disabled),
+    [role="button"]:hover:not(:disabled) {
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        transform: scale(1.02);
+    }
+
+    /* Focus states */
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+        outline: 2px solid oklch(var(--gold));
+        outline-offset: 2px;
+    }
+
+    /* Disabled states */
+    button:disabled,
+    input:disabled,
+    textarea:disabled,
+    select:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}

@@ -1,0 +1,27 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-25T17:11:47.427Z",
+  "summary": "The diff shows frontend changes to ReadyTab.tsx (using useBatchReturnReadyOrders with correct [orderNo, bigint] tuples, success/error toasts) and backend/main.mo changes. However, the backend truncation makes it impossible to fully verify the core REQ-1 logic. The frontend ReadyTab.tsx changes appear to implement REQ-2 correctly. The backend diff is truncated before the returnOrdersToPending/batchReturnOrdersToPending function body is visible, so REQ-1 cannot be fully confirmed from the diff alone.",
+  "missing_requirements": [
+    {
+      "id": "REQ-1",
+      "requirement": "Fix backend returnOrdersToPending to implement fully-fulfilled case (create new Pending order line) and partially-fulfilled case (find existing line by base order number and add supplied qty back), without requiring original order lookup, and ensure all Total Orders have Pending status.",
+      "reason": "The backend/main.mo diff is truncated before the returnOrdersToPending or batchReturnOrdersToPending function implementation is shown. The supplyOrder function is visible but the return logic cannot be confirmed. There is no evidence in the visible diff that the new branching logic (fully vs partially fulfilled) was implemented.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    }
+  ],
+  "hallucinated_features": [],
+  "confidence": 0.45,
+  "changed_files": [
+    "backend/main.mo",
+    "frontend-file-summaries.txt",
+    "frontend/src/components/dashboard/HallmarkTab.tsx",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/MasterDesigns.tsx",
+    "project_state.json"
+  ]
+}
