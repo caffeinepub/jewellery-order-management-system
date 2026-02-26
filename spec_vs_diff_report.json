@@ -1,14 +1,15 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T15:54:32.952Z",
-  "summary": "The diff implements REQ-1 correctly in TotalOrdersTab.tsx. A `getOverdueDays` helper function is added that calculates elapsed days from `orderDate` (nanoseconds), returning `-Infinity` for null/missing dates. After filtering, orders are grouped by design code, each group is sorted by overdue days descending (most overdue first, no-date orders at the bottom), then flattened back preserving group order. All existing filtering features (search, order type, karigar) are unchanged.",
+  "generatedAt": "2026-02-26T19:30:26.340Z",
+  "summary": "All four requirements appear to be implemented in the diff. REQ-1 is addressed in excelParser.ts with a DD/MM/YYYY parser and corrected serial number conversion. REQ-2, REQ-3, and REQ-4 are addressed in TotalOrdersTab.tsx with search filtering, full-row click selection, per-group Mark Ready buttons, and a top-level bulk Mark Ready button. The file summary descriptions align with all acceptance criteria.",
   "missing_requirements": [],
   "hallucinated_features": [],
-  "confidence": 0.97,
+  "confidence": 0.82,
   "changed_files": [
     "frontend-file-summaries.txt",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+    "frontend/src/utils/excelParser.ts",
     "project_state.json"
   ]
 }

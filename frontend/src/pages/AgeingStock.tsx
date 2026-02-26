@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Clock, CheckCircle2, ChevronDown, ChevronRight, Loader2, CalendarX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,7 +21,7 @@ function nanoToMs(nano: bigint): number {
 /** Compute age in whole days from a timestamp (ms) to today */
 function daysAgo(epochMs: number): number {
   const diff = Date.now() - epochMs;
-  if (diff < 0) return 0; // future date — treat as 0 days
+  if (diff < 0) return 0;
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -34,18 +34,19 @@ function getAgeBand(days: number | null): AgeBand {
   return 'red';
 }
 
-const ageBandClasses: Record<AgeBand, string> = {
-  green: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
-  yellow: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
-  red: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
-  none: 'bg-muted text-muted-foreground border-border',
+// Use explicit Tailwind color classes (not CSS variables) for reliable rendering
+const ageBandBadgeClasses: Record<AgeBand, string> = {
+  green: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700',
+  yellow: 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700',
+  red: 'bg-red-100 text-red-800 border border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700',
+  none: 'bg-gray-100 text-gray-600 border border-gray-300 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600',
 };
 
-const ageBandRowClasses: Record<AgeBand, string> = {
-  green: 'border-l-4 border-l-emerald-400',
-  yellow: 'border-l-4 border-l-amber-400',
-  red: 'border-l-4 border-l-red-400',
-  none: 'border-l-4 border-l-muted',
+const ageBandLeftBorderClasses: Record<AgeBand, string> = {
+  green: 'border-l-4 border-l-emerald-500',
+  yellow: 'border-l-4 border-l-amber-500',
+  red: 'border-l-4 border-l-red-500',
+  none: 'border-l-4 border-l-gray-300 dark:border-l-gray-600',
 };
 
 interface EnrichedOrder extends Order {
@@ -67,10 +68,8 @@ interface DesignGroup {
 function safeOrderDateMs(order: Order): number | null {
   try {
     const od = order.orderDate;
-    // undefined or null → no date
     if (od == null) return null;
     const ms = nanoToMs(od);
-    // Guard against NaN or unreasonable values (before year 2000 or after year 2100)
     if (isNaN(ms) || ms < 946684800000 || ms > 4102444800000) return null;
     return ms;
   } catch {
@@ -81,7 +80,7 @@ function safeOrderDateMs(order: Order): number | null {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AgeingStock() {
-  const { data: allOrders = [], isLoading } = useGetAllOrders();
+  const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
   const markReadyMutation = useMarkOrdersAsReady();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -92,14 +91,12 @@ export default function AgeingStock() {
   const groups = useMemo<DesignGroup[]>(() => {
     const pending = allOrders.filter(o => o.status === OrderStatus.Pending);
 
-    // Enrich with age — all date operations are guarded
     const enriched: EnrichedOrder[] = pending.map(o => {
       const ageMs = safeOrderDateMs(o);
       const ageDays = ageMs !== null ? daysAgo(ageMs) : null;
       return { ...o, ageMs, ageDays, ageBand: getAgeBand(ageDays) };
     });
 
-    // Group by design code
     const groupMap = new Map<string, EnrichedOrder[]>();
     for (const order of enriched) {
       const key = order.design || 'UNKNOWN';
@@ -107,14 +104,13 @@ export default function AgeingStock() {
       groupMap.get(key)!.push(order);
     }
 
-    // Sort within each group: oldest first (null dates go to bottom)
     const result: DesignGroup[] = [];
     for (const [designCode, orders] of groupMap.entries()) {
       orders.sort((a, b) => {
         if (a.ageMs === null && b.ageMs === null) return 0;
-        if (a.ageMs === null) return 1;  // nulls to bottom
+        if (a.ageMs === null) return 1;
         if (b.ageMs === null) return -1;
-        return a.ageMs - b.ageMs; // oldest (smallest ms = furthest in past) first
+        return a.ageMs - b.ageMs;
       });
 
       const totalQty = orders.reduce((s, o) => s + Number(o.quantity), 0);
@@ -131,14 +127,13 @@ export default function AgeingStock() {
       });
     }
 
-    // Sort groups by oldest order date across the group (oldest group first, no-date groups last)
     result.sort((a, b) => {
       const aOldest = a.orders.find(o => o.ageMs !== null)?.ageMs ?? null;
       const bOldest = b.orders.find(o => o.ageMs !== null)?.ageMs ?? null;
       if (aOldest === null && bOldest === null) return a.designCode.localeCompare(b.designCode);
       if (aOldest === null) return 1;
       if (bOldest === null) return -1;
-      return aOldest - bOldest; // oldest (smallest ms) first
+      return aOldest - bOldest;
     });
 
     return result;
@@ -194,7 +189,6 @@ export default function AgeingStock() {
     const rbOrders = selectedOrders.filter(o => o.orderType === OrderType.RB);
     const nonRbOrders = selectedOrders.filter(o => o.orderType !== OrderType.RB);
 
-    // Process non-RB orders immediately
     if (nonRbOrders.length > 0) {
       try {
         await markReadyMutation.mutateAsync(nonRbOrders.map(o => o.orderId));
@@ -209,7 +203,6 @@ export default function AgeingStock() {
       }
     }
 
-    // Route RB orders through SuppliedQtyDialog
     if (rbOrders.length > 0) {
       setRbOrdersForDialog(rbOrders);
     }
@@ -220,7 +213,7 @@ export default function AgeingStock() {
     setSelectedIds(new Set());
   };
 
-  // ── Derived counts (only orders with valid dates count toward age bands) ──
+  // ── Derived counts ────────────────────────────────────────────────────────
   const allPendingOrders = groups.flatMap(g => g.orders);
   const totalPending = allPendingOrders.length;
   const ordersWithDate = allPendingOrders.filter(o => o.ageDays !== null);
@@ -247,13 +240,24 @@ export default function AgeingStock() {
     );
   }
 
+  // ── Error state ───────────────────────────────────────────────────────────
+  if (isError) {
+    return (
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950 dark:border-red-800 p-6 text-center">
+          <p className="text-red-700 dark:text-red-300 font-medium">Failed to load orders. Please refresh the page.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Clock className="h-7 w-7 text-gold" />
+          <h1 className="text-3xl font-bold flex items-center gap-2 text-foreground">
+            <Clock className="h-7 w-7 text-amber-500" />
             Ageing Stock
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -276,7 +280,7 @@ export default function AgeingStock() {
               size="sm"
               onClick={handleMarkReady}
               disabled={markReadyMutation.isPending}
-              className="bg-gold hover:bg-gold-hover text-gold-foreground"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
             >
               {markReadyMutation.isPending ? (
                 <>
@@ -296,36 +300,36 @@ export default function AgeingStock() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-card border">
           <CardContent className="pt-5 pb-4">
             <p className="text-sm text-muted-foreground">Total Pending</p>
-            <p className="text-3xl font-bold mt-1">{totalPending}</p>
+            <p className="text-3xl font-bold mt-1 text-foreground">{totalPending}</p>
             <p className="text-xs text-muted-foreground mt-1">{groups.length} design groups</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-card border">
           <CardContent className="pt-5 pb-4">
             <p className="text-sm text-muted-foreground">🟢 Fresh (0–7 days)</p>
-            <p className="text-3xl font-bold mt-1 text-emerald-600">{freshCount}</p>
+            <p className="text-3xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{freshCount}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-card border">
           <CardContent className="pt-5 pb-4">
             <p className="text-sm text-muted-foreground">🟡 Ageing (8–15 days)</p>
-            <p className="text-3xl font-bold mt-1 text-amber-600">{ageingCount}</p>
+            <p className="text-3xl font-bold mt-1 text-amber-600 dark:text-amber-400">{ageingCount}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-card border">
           <CardContent className="pt-5 pb-4">
             <p className="text-sm text-muted-foreground">🔴 Overdue (16+ days)</p>
-            <p className="text-3xl font-bold mt-1 text-red-600">{overdueCount}</p>
+            <p className="text-3xl font-bold mt-1 text-red-600 dark:text-red-400">{overdueCount}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* No-date notice */}
       {ordersWithoutDate.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           <CalendarX className="h-4 w-4 flex-shrink-0" />
           <span>
             <strong>{ordersWithoutDate.length}</strong> order{ordersWithoutDate.length > 1 ? 's' : ''} have no order date and are excluded from age-band counts.
@@ -353,10 +357,10 @@ export default function AgeingStock() {
 
       {/* Empty state */}
       {totalPending === 0 && (
-        <Card>
+        <Card className="bg-card">
           <CardContent className="py-16 text-center">
             <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold">No Pending Orders</h3>
+            <h3 className="text-lg font-semibold text-foreground">No Pending Orders</h3>
             <p className="text-muted-foreground mt-1">All orders have been processed. Great work!</p>
           </CardContent>
         </Card>
@@ -368,11 +372,10 @@ export default function AgeingStock() {
           const isExpanded = expandedGroups.has(group.designCode);
           const allGroupSelected = group.orders.every(o => selectedIds.has(o.orderId));
           const someGroupSelected = group.orders.some(o => selectedIds.has(o.orderId));
-          // Oldest order's age band drives the group indicator
           const groupBand = group.orders[0]?.ageBand ?? 'none';
 
           return (
-            <Card key={group.designCode} className={`overflow-hidden ${ageBandRowClasses[groupBand]}`}>
+            <Card key={group.designCode} className={`overflow-hidden bg-card ${ageBandLeftBorderClasses[groupBand]}`}>
               {/* Group header */}
               <CardHeader className="py-3 px-4 cursor-pointer select-none" onClick={() => toggleExpanded(group.designCode)}>
                 <div className="flex items-center gap-3">
@@ -394,7 +397,7 @@ export default function AgeingStock() {
                   {/* Design info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-sm">{group.designCode}</span>
+                      <span className="font-semibold text-sm text-foreground">{group.designCode}</span>
                       {group.genericName && (
                         <span className="text-xs text-muted-foreground truncate">{group.genericName}</span>
                       )}
@@ -424,7 +427,7 @@ export default function AgeingStock() {
                       return (
                         <div
                           key={order.orderId}
-                          className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 ${isSelected ? 'bg-muted/60' : ''}`}
+                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${isSelected ? 'bg-muted/50' : 'hover:bg-muted/30'}`}
                         >
                           {/* FIFO rank */}
                           <span className="text-xs text-muted-foreground w-5 text-center flex-shrink-0">
@@ -441,31 +444,37 @@ export default function AgeingStock() {
                           <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-sm">
                             <div>
                               <span className="text-xs text-muted-foreground block">Order No</span>
-                              <span className="font-medium truncate">{order.orderNo}</span>
+                              <span className="font-medium truncate text-foreground">{order.orderNo}</span>
                             </div>
                             <div>
                               <span className="text-xs text-muted-foreground block">Product</span>
-                              <span className="truncate">{order.product || '—'}</span>
+                              <span className="truncate text-foreground">{order.product || '—'}</span>
                             </div>
                             <div>
                               <span className="text-xs text-muted-foreground block">Wt / Size / Qty</span>
-                              <span>{order.weight}g / {order.size || '—'} / {String(order.quantity)}</span>
+                              <span className="text-foreground">{order.weight}g / {order.size || '—'} / {String(order.quantity)}</span>
                             </div>
                             <div>
-                              <span className="text-xs text-muted-foreground block">Type</span>
-                              <Badge variant="outline" className="text-xs h-5">{order.orderType}</Badge>
+                              <span className="text-xs text-muted-foreground block">Order Date</span>
+                              {order.ageMs !== null ? (
+                                <span className="text-foreground">
+                                  {new Date(order.ageMs).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground italic text-xs">No date</span>
+                              )}
                             </div>
                           </div>
 
                           {/* Age badge */}
                           <div className="flex-shrink-0">
                             {order.ageDays !== null ? (
-                              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ageBandClasses[band]}`}>
-                                {order.ageDays === 0 ? 'Today' : `${order.ageDays}d ago`}
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ageBandBadgeClasses[band]}`}>
+                                {order.ageDays}d
                               </span>
                             ) : (
-                              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ageBandClasses['none']}`}>
-                                No date
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ageBandBadgeClasses['none']}`}>
+                                —
                               </span>
                             )}
                           </div>
@@ -480,7 +489,7 @@ export default function AgeingStock() {
         })}
       </div>
 
-      {/* RB SuppliedQtyDialog */}
+      {/* RB supply dialog */}
       {rbOrdersForDialog.length > 0 && (
         <SuppliedQtyDialog
           orders={rbOrdersForDialog}

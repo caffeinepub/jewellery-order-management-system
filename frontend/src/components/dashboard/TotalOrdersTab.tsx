@@ -1,223 +1,649 @@
-import { useState, useMemo } from "react";
-import OrderTable from "./OrderTable";
-import { useGetAllOrders, useGetMasterDesigns, useMarkOrdersAsReady } from "@/hooks/useQueries";
-import { OrderType, OrderStatus, Order } from "@/backend";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import SuppliedQtyDialog from "./SuppliedQtyDialog";
-import { toast } from "sonner";
+import { useState, useMemo, useCallback } from 'react';
+import { toast } from 'sonner';
+import {
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Loader2,
+  CheckSquare,
+  Square,
+  CheckCheck,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Order, OrderStatus, OrderType } from '../../backend';
+import {
+  useGetAllOrders,
+  useMarkOrdersAsReady,
+  useDeleteOrder,
+} from '../../hooks/useQueries';
+import SuppliedQtyDialog from './SuppliedQtyDialog';
+import DesignImageModal from './DesignImageModal';
 
-/** Returns overdue days for an order (positive = overdue). Orders with no valid date return -Infinity so they sort to the bottom. */
-function getOverdueDays(order: Order): number {
-  if (!order.orderDate) return -Infinity;
-  const ms = Number(order.orderDate) / 1_000_000; // nanoseconds → milliseconds
-  if (!isFinite(ms) || ms <= 0) return -Infinity;
-  const orderDateMs = ms;
-  const nowMs = Date.now();
-  return (nowMs - orderDateMs) / (1000 * 60 * 60 * 24); // days
+/* ─── helpers ─────────────────────────────────────────────────────────────── */
+
+function formatOrderDate(ts: bigint | undefined | null): string {
+  if (!ts) return 'No date';
+  const ms = Number(ts) / 1_000_000;
+  if (!ms || ms <= 0) return 'No date';
+  return new Date(ms).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+  });
 }
 
-export default function TotalOrdersTab() {
-  const [searchText, setSearchText] = useState("");
-  const [selectedOrderType, setSelectedOrderType] = useState<OrderType | "ALL">("ALL");
-  const [selectedKarigar, setSelectedKarigar] = useState<string>("ALL");
-  const [selectedRBOrdersForSupply, setSelectedRBOrdersForSupply] = useState<Order[]>([]);
-  const { data: orders = [], isLoading } = useGetAllOrders();
-  const { data: masterDesigns } = useGetMasterDesigns();
-  const markOrdersAsReadyMutation = useMarkOrdersAsReady();
+function calcOverdueDays(ts: bigint | undefined | null): number | null {
+  if (!ts) return null;
+  const ms = Number(ts) / 1_000_000;
+  if (!ms || ms <= 0) return null;
+  const now = Date.now();
+  const diff = now - ms;
+  if (diff < 0) return 0;
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
 
-  const enrichedOrders = useMemo(() => {
-    if (!masterDesigns) return orders;
-    
-    return orders.map((order) => {
-      const normalizedDesign = order.design.toUpperCase().trim();
-      const mapping = masterDesigns.get(normalizedDesign);
-      
-      return {
-        ...order,
-        genericName: mapping?.genericName || order.genericName,
-        karigarName: mapping?.karigarName || order.karigarName,
-      };
-    });
-  }, [orders, masterDesigns]);
+function getOrderTypeLabel(type: OrderType): string {
+  switch (type) {
+    case OrderType.RB: return 'RB';
+    case OrderType.CO: return 'CO';
+    default: return 'SO';
+  }
+}
 
-  const filteredOrders = useMemo(() => {
-    // Filter for Pending and ReturnFromHallmark status orders only
-    let result = enrichedOrders.filter(
-      (order) =>
-        order.status === OrderStatus.Pending ||
-        order.status === OrderStatus.ReturnFromHallmark
+/**
+ * For an RB Pending order that has an originalOrderId (meaning it was a ready-split
+ * that got reverted), find sibling pending orders with the same orderNo and sum
+ * their quantities to show the full combined outstanding amount.
+ */
+function getDisplayQuantity(order: Order, allOrders: Order[]): number {
+  const qty = Number(order.quantity);
+
+  // Only apply special logic for RB orders in Pending status with originalOrderId
+  if (
+    order.orderType !== OrderType.RB ||
+    order.status !== OrderStatus.Pending ||
+    !order.originalOrderId
+  ) {
+    return qty;
+  }
+
+  // Find sibling pending orders with the same orderNo
+  const siblings = allOrders.filter(
+    (o) =>
+      o.orderNo === order.orderNo &&
+      o.status === OrderStatus.Pending &&
+      o.orderId !== order.orderId
+  );
+
+  if (siblings.length > 0) {
+    const siblingQty = siblings.reduce((sum, s) => sum + Number(s.quantity), 0);
+    return qty + siblingQty;
+  }
+
+  return qty;
+}
+
+function getOverdueBadge(days: number | null) {
+  if (days === null) return null;
+  if (days === 0) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+        0d
+      </span>
     );
+  }
+  if (days <= 7) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+        {days}d
+      </span>
+    );
+  }
+  if (days <= 30) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+        {days}d
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+      {days}d
+    </span>
+  );
+}
 
-    // Filter by order type
-    if (selectedOrderType !== "ALL") {
-      result = result.filter((order) => order.orderType === selectedOrderType);
+/* ─── types ───────────────────────────────────────────────────────────────── */
+
+interface DesignGroup {
+  designCode: string;
+  genericName: string;
+  karigarName: string;
+  orders: Order[];
+}
+
+/* ─── component ───────────────────────────────────────────────────────────── */
+
+export default function TotalOrdersTab() {
+  const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
+  const markReadyMutation = useMarkOrdersAsReady();
+  const deleteOrderMutation = useDeleteOrder();
+
+  const [searchText, setSearchText] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [karigarFilter, setKarigarFilter] = useState<string>('all');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [supplyDialogOrders, setSupplyDialogOrders] = useState<Order[]>([]);
+  const [imageModalDesign, setImageModalDesign] = useState<string | null>(null);
+  // Track which group-level mark-ready is pending
+  const [pendingGroupMarkReady, setPendingGroupMarkReady] = useState<string | null>(null);
+
+  /* filtered orders: Pending + ReturnFromHallmark */
+  const visibleOrders = useMemo(() => {
+    return allOrders.filter(
+      (o) =>
+        o.status === OrderStatus.Pending ||
+        o.status === OrderStatus.ReturnFromHallmark
+    );
+  }, [allOrders]);
+
+  /* karigar list for filter */
+  const karigarList = useMemo(() => {
+    const set = new Set<string>();
+    visibleOrders.forEach((o) => {
+      if (o.karigarName) set.add(o.karigarName);
+    });
+    return Array.from(set).sort();
+  }, [visibleOrders]);
+
+  /* search + filter — searches order number, generic name, and design code */
+  const filteredOrders = useMemo(() => {
+    let orders = visibleOrders;
+    if (typeFilter !== 'all') {
+      orders = orders.filter((o) => getOrderTypeLabel(o.orderType) === typeFilter);
     }
-
-    // Filter by karigar
-    if (selectedKarigar !== "ALL") {
-      result = result.filter((order) => order.karigarName === selectedKarigar);
+    if (karigarFilter !== 'all') {
+      orders = orders.filter((o) => o.karigarName === karigarFilter);
     }
-
-    // Filter by search text (order number, design code, or generic name)
     if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      result = result.filter(
-        (order) =>
-          order.orderNo.toLowerCase().includes(search) ||
-          order.design.toLowerCase().includes(search) ||
-          (order.genericName && order.genericName.toLowerCase().includes(search))
+      const q = searchText.toLowerCase();
+      orders = orders.filter(
+        (o) =>
+          o.orderNo.toLowerCase().includes(q) ||
+          o.design.toLowerCase().includes(q) ||
+          (o.genericName ?? '').toLowerCase().includes(q) ||
+          (o.karigarName ?? '').toLowerCase().includes(q)
       );
     }
+    return orders;
+  }, [visibleOrders, typeFilter, karigarFilter, searchText]);
 
-    // Sort within each design code group by overdue days descending (most overdue first).
-    // Orders with no valid orderDate go to the bottom of their group.
-    // Strategy: group → sort each group → flatten back in design-code order.
-    const groupMap = new Map<string, Order[]>();
-    for (const order of result) {
+  /* group by design code */
+  const designGroups = useMemo((): DesignGroup[] => {
+    const map = new Map<string, DesignGroup>();
+    for (const order of filteredOrders) {
       const key = order.design;
-      if (!groupMap.has(key)) groupMap.set(key, []);
-      groupMap.get(key)!.push(order);
+      if (!map.has(key)) {
+        map.set(key, {
+          designCode: order.design,
+          genericName: order.genericName ?? '',
+          karigarName: order.karigarName ?? '',
+          orders: [],
+        });
+      }
+      map.get(key)!.orders.push(order);
     }
 
-    // Sort each group by overdue days descending
-    for (const [, group] of groupMap) {
-      group.sort((a, b) => {
-        const daysA = getOverdueDays(a);
-        const daysB = getOverdueDays(b);
-        // Both have no date — preserve original order
-        if (daysA === -Infinity && daysB === -Infinity) return 0;
-        // No-date orders go to the bottom
-        if (daysA === -Infinity) return 1;
-        if (daysB === -Infinity) return -1;
-        // Most overdue (highest days) first
+    // Sort orders within each group: most overdue first, no-date last
+    for (const group of map.values()) {
+      group.orders.sort((a, b) => {
+        const daysA = calcOverdueDays(a.orderDate);
+        const daysB = calcOverdueDays(b.orderDate);
+        if (daysA === null && daysB === null) return 0;
+        if (daysA === null) return 1;
+        if (daysB === null) return -1;
         return daysB - daysA;
       });
     }
 
-    // Flatten back preserving design-code group order
-    const sorted: Order[] = [];
-    for (const [, group] of groupMap) {
-      sorted.push(...group);
+    return Array.from(map.values()).sort((a, b) =>
+      a.designCode.localeCompare(b.designCode)
+    );
+  }, [filteredOrders]);
+
+  /* selection helpers */
+  const allVisibleIds = useMemo(
+    () => new Set(filteredOrders.map((o) => o.orderId)),
+    [filteredOrders]
+  );
+
+  const isSelectAll = allVisibleIds.size > 0 && selectedIds.size === allVisibleIds.size;
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === allVisibleIds.size && allVisibleIds.size > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allVisibleIds));
     }
+  }, [selectedIds.size, allVisibleIds]);
 
-    return sorted;
-  }, [enrichedOrders, searchText, selectedOrderType, selectedKarigar]);
+  const toggleSelectGroup = useCallback(
+    (group: DesignGroup) => {
+      const groupIds = new Set(group.orders.map((o) => o.orderId));
+      const allSelected = group.orders.every((o) => selectedIds.has(o.orderId));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (allSelected) {
+          groupIds.forEach((id) => next.delete(id));
+        } else {
+          groupIds.forEach((id) => next.add(id));
+        }
+        return next;
+      });
+    },
+    [selectedIds]
+  );
 
-  // Get unique karigars for filter dropdown
-  const uniqueKarigars = useMemo(() => {
-    const karigars = new Set<string>();
-    enrichedOrders.forEach((order) => {
-      if (order.karigarName) {
-        karigars.add(order.karigarName);
-      }
+  const toggleSelectOrder = useCallback((orderId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
     });
-    return Array.from(karigars).sort();
-  }, [enrichedOrders]);
+  }, []);
 
-  const handleMarkAsReady = async (selectedOrders: Order[]) => {
-    // Separate RB orders from SO/CO orders
-    const rbPendingOrders = selectedOrders.filter(
-      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
-    );
-    const nonRbOrders = selectedOrders.filter(
-      (order) => order.orderType !== OrderType.RB
-    );
+  /* expand/collapse */
+  const toggleGroup = useCallback((designCode: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(designCode)) next.delete(designCode);
+      else next.add(designCode);
+      return next;
+    });
+  }, []);
 
-    // Process SO/CO orders immediately via markOrdersAsReady
-    if (nonRbOrders.length > 0) {
-      try {
-        const nonRbOrderIds = nonRbOrders.map((o) => o.orderId);
-        await markOrdersAsReadyMutation.mutateAsync(nonRbOrderIds);
-        toast.success(`${nonRbOrders.length} order(s) marked as Ready`);
-      } catch (error: any) {
-        const errorMessage = error?.message || "Failed to update orders";
-        toast.error(errorMessage);
-        console.error("Error updating non-RB orders:", error);
-      }
+  /* shared mark-ready logic */
+  async function executeMarkReady(orderIds: string[]) {
+    const selectedOrders = filteredOrders.filter((o) => orderIds.includes(o.orderId));
+    const rbOrders = selectedOrders.filter((o) => o.orderType === OrderType.RB);
+    const nonRbOrders = selectedOrders.filter((o) => o.orderType !== OrderType.RB);
+
+    // Handle RB orders via supply dialog
+    if (rbOrders.length > 0) {
+      setSupplyDialogOrders(rbOrders);
+      return;
     }
 
-    // If there are RB pending orders, open the supply dialog for them
-    if (rbPendingOrders.length > 0) {
-      setSelectedRBOrdersForSupply(rbPendingOrders);
+    // Handle non-RB orders directly
+    try {
+      await markReadyMutation.mutateAsync(nonRbOrders.map((o) => o.orderId));
+      toast.success(`${nonRbOrders.length} order(s) marked as Ready`);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        nonRbOrders.forEach((o) => next.delete(o.orderId));
+        return next;
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed: ${msg}`);
     }
-  };
+  }
 
-  const handleCloseDialog = () => {
-    setSelectedRBOrdersForSupply([]);
-  };
+  /* top-level mark ready (all selected) */
+  async function handleMarkReady() {
+    if (selectedIds.size === 0) {
+      toast.error('No orders selected');
+      return;
+    }
+    await executeMarkReady(Array.from(selectedIds));
+  }
+
+  /* per-group mark ready */
+  async function handleGroupMarkReady(group: DesignGroup, e: React.MouseEvent) {
+    e.stopPropagation();
+    const groupSelectedIds = group.orders
+      .map((o) => o.orderId)
+      .filter((id) => selectedIds.has(id));
+
+    if (groupSelectedIds.length === 0) {
+      toast.error('No orders selected in this group');
+      return;
+    }
+
+    setPendingGroupMarkReady(group.designCode);
+    try {
+      await executeMarkReady(groupSelectedIds);
+    } finally {
+      setPendingGroupMarkReady(null);
+    }
+  }
+
+  async function handleDelete(orderId: string) {
+    try {
+      await deleteOrderMutation.mutateAsync(orderId);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+      toast.success('Order deleted');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed: ${msg}`);
+    }
+  }
+
+  function handleSupplyDialogClose() {
+    setSupplyDialogOrders([]);
+    setSelectedIds(new Set());
+  }
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading orders...</div>;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center py-12 text-destructive">
+        Failed to load orders. Please refresh.
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by Order Number, Design Code, or Generic Name..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={selectedOrderType === "ALL" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType("ALL")}
-          >
-            All
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.CO ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.CO)}
-          >
-            CO
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.RB ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.RB)}
-          >
-            RB
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.SO ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.SO)}
-          >
-            SO
-          </Button>
-        </div>
-        <select
-          value={selectedKarigar}
-          onChange={(e) => setSelectedKarigar(e.target.value)}
-          className="px-3 py-2 border rounded-md bg-background text-sm"
-        >
-          <option value="ALL">All Karigars</option>
-          {uniqueKarigars.map((karigar) => (
-            <option key={karigar} value={karigar}>
-              {karigar}
-            </option>
-          ))}
-        </select>
-      </div>
-      <OrderTable 
-        orders={filteredOrders} 
-        enableBulkActions={true}
-        onMarkAsReady={handleMarkAsReady}
-      />
-
-      {selectedRBOrdersForSupply.length > 0 && (
+      {/* Supply dialog for RB orders */}
+      {supplyDialogOrders.length > 0 && (
         <SuppliedQtyDialog
-          orders={selectedRBOrdersForSupply}
-          onClose={handleCloseDialog}
+          orders={supplyDialogOrders}
+          onClose={handleSupplyDialogClose}
         />
+      )}
+
+      {/* Design image modal */}
+      {imageModalDesign && (
+        <DesignImageModal
+          designCode={imageModalDesign}
+          open={!!imageModalDesign}
+          onClose={() => setImageModalDesign(null)}
+        />
+      )}
+
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by order no, generic name, design code…"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-28">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="SO">SO</SelectItem>
+              <SelectItem value="RB">RB</SelectItem>
+              <SelectItem value="CO">CO</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={karigarFilter} onValueChange={setKarigarFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Karigar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Karigars</SelectItem>
+              {karigarList.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {k}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSelectAll}
+            className="text-xs"
+          >
+            {isSelectAll ? (
+              <CheckSquare className="mr-1 h-4 w-4" />
+            ) : (
+              <Square className="mr-1 h-4 w-4" />
+            )}
+            {isSelectAll ? 'Deselect All' : 'Select All'}
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
+          )}
+          {/* Top-level Mark Ready: always visible when any selection exists, prominent when Select All is active */}
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              onClick={handleMarkReady}
+              disabled={markReadyMutation.isPending}
+              className={isSelectAll ? 'bg-primary text-primary-foreground font-semibold' : ''}
+            >
+              {markReadyMutation.isPending && pendingGroupMarkReady === null && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              <CheckCheck className="mr-1 h-4 w-4" />
+              Mark Ready {isSelectAll ? '(All)' : `(${selectedIds.size})`}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Groups */}
+      {designGroups.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No pending orders found
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {designGroups.map((group) => {
+            const isExpanded = expandedGroups.has(group.designCode);
+            const groupSelected = group.orders.every((o) => selectedIds.has(o.orderId));
+            const groupPartial =
+              !groupSelected && group.orders.some((o) => selectedIds.has(o.orderId));
+            const groupSelectedCount = group.orders.filter((o) => selectedIds.has(o.orderId)).length;
+            const totalQty = group.orders.reduce(
+              (sum, o) => sum + Number(o.quantity),
+              0
+            );
+            const totalWeight = group.orders.reduce(
+              (sum, o) => sum + o.weight * Number(o.quantity),
+              0
+            );
+            const isGroupMarkReadyPending = pendingGroupMarkReady === group.designCode;
+
+            return (
+              <div key={group.designCode} className="border rounded-lg overflow-hidden">
+                {/* Group header */}
+                <div
+                  className="flex items-center gap-3 px-4 py-3 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => toggleGroup(group.designCode)}
+                >
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={groupSelected}
+                      data-state={groupPartial ? 'indeterminate' : undefined}
+                      onCheckedChange={() => toggleSelectGroup(group)}
+                      aria-label={`Select group ${group.designCode}`}
+                    />
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        className="font-semibold text-sm hover:underline font-mono"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImageModalDesign(group.designCode);
+                        }}
+                      >
+                        {group.designCode}
+                      </button>
+                      {group.genericName && (
+                        <span className="text-xs text-muted-foreground">
+                          {group.genericName}
+                        </span>
+                      )}
+                      {group.karigarName && (
+                        <Badge variant="secondary" className="text-xs">
+                          {group.karigarName}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{group.orders.length} order{group.orders.length !== 1 ? 's' : ''}</span>
+                      <span>Qty: {totalQty}</span>
+                      <span>Wt: {totalWeight.toFixed(2)}g</span>
+                    </div>
+                    {/* Per-group Mark Ready button */}
+                    {groupSelectedCount > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs px-2 ml-1"
+                        onClick={(e) => handleGroupMarkReady(group, e)}
+                        disabled={isGroupMarkReadyPending || markReadyMutation.isPending}
+                      >
+                        {isGroupMarkReadyPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <CheckCheck className="h-3 w-3 mr-1" />
+                        )}
+                        Mark Ready ({groupSelectedCount})
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order rows */}
+                {isExpanded && (
+                  <div className="divide-y">
+                    {group.orders.map((order, idx) => {
+                      const overdueDays = calcOverdueDays(order.orderDate);
+                      const displayQty = getDisplayQuantity(order, allOrders);
+                      const isSelected = selectedIds.has(order.orderId);
+
+                      return (
+                        <div
+                          key={order.orderId}
+                          className={`flex items-start gap-3 px-4 py-3 text-sm cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-primary/5 hover:bg-primary/10'
+                              : 'hover:bg-muted/20'
+                          }`}
+                          onClick={() => toggleSelectOrder(order.orderId)}
+                        >
+                          <span className="text-muted-foreground text-xs w-5 flex-shrink-0 pt-0.5">
+                            {idx + 1}
+                          </span>
+                          <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 mt-0.5">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectOrder(order.orderId)}
+                              aria-label={`Select ${order.orderNo}`}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-4 gap-y-1">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Order No</p>
+                              <p className="font-mono text-xs font-medium">{order.orderNo}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Product</p>
+                              <p className="text-xs">{order.product || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Wt / Size / Qty</p>
+                              <p className="text-xs">
+                                {order.weight.toFixed(3)}g / {order.size} /{' '}
+                                <span
+                                  className={
+                                    displayQty !== Number(order.quantity)
+                                      ? 'font-semibold text-primary'
+                                      : ''
+                                  }
+                                >
+                                  {displayQty}
+                                </span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Order Date</p>
+                              <p className={`text-xs ${!order.orderDate ? 'italic text-muted-foreground' : ''}`}>
+                                {formatOrderDate(order.orderDate)}
+                              </p>
+                            </div>
+                            {order.remarks && (
+                              <div className="col-span-2">
+                                <p className="text-xs text-muted-foreground">Remarks</p>
+                                <p className="text-xs truncate">{order.remarks}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <Badge variant="outline" className="text-xs">
+                              {getOrderTypeLabel(order.orderType)}
+                            </Badge>
+                            {getOverdueBadge(overdueDays)}
+                            <button
+                              className="text-xs text-destructive hover:text-destructive/80 mt-1 p-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(order.orderId);
+                              }}
+                              aria-label="Delete order"
+                              disabled={deleteOrderMutation.isPending}
+                            >
+                              {deleteOrderMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <span className="text-xs">✕</span>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

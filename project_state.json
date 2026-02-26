@@ -1,24 +1,42 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management app with karigar tracking, ageing stock reporting, and RB order handling. Active fixes: (1) ageing stock order date parsing from Excel column C + search bar, (2) total orders sorted by overdue days within each design code group, (3) RB return validation fix, (4) summary bracket for partial RB orders, (5) merge-back logic for returned RB ready rows.",
-  "architectural_notes": [
-    "Ageing stock page must read from the same live orders store as the dashboard (no separate snapshot).",
-    "RB partial orders create split rows; each split row is independent for return validation purposes.",
-    "Summary card counts unique order numbers with pending splits to display (Y pending) bracket."
-  ],
+  "summary": "Dashboard management app with order tracking. Fixing date format to DD/MM/YYYY and adding dashboard enhancements: search by order number/generic name/design code, full-row click selection, and per-group + bulk Mark Ready functionality.",
+  "architectural_notes": [],
   "known_issues": [
-    "Ageing stock shows 'no date' because Excel column C (order date) is not being parsed and stored during ingest.",
-    "RB return fails with qty mismatch error because validation compares row qty against original full order qty.",
-    "Returning a ready RB split row creates a new pending row instead of merging with existing pending row."
+    "Date stored/displayed as MM/DD/YYYY instead of DD/MM/YYYY"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-in-the-total-orders-tab-totalorderstab-tsx-after-grouping-pending-returnfromhallmark-orders-by-design-code-sort-the-orders-within-each-design-code-group-by-overdue-days-in-descending-order-most-overdue-oldest-order-date-first-overdue-days-should-be-calculated-as-the-number-of-days-elapsed-since-the-order-s-orderdate-orders-with-a-null-or-missing-orderdate-should-be-placed-at-the-bottom-of-each-group",
-      "title": "In the Total Orders tab (TotalOrdersTab.tsx), after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each design code group by overdue days in descending order (most overdue / oldest order date first). Overdue days should be calculated as the number of days elapsed since the order's orderDate. Orders with a null or missing orderDate should be placed at the bottom of each group.",
+      "id": "feature-fix-date-parsing-in-frontend-src-utils-excelparser-ts-so-that-order-date-is-always-interpreted-and-stored-as-dd-mm-yyyy-the-parser-must-not-swap-day-and-month-no-mm-dd-yyyy-treatment-it-must-correctly-handle-dates-from-any-year-including-2025-and-2026-both-string-format-dates-e-g-19-02-2026-and-excel-serial-numbers-must-resolve-to-the-correct-dd-mm-yyyy-value-dates-currently-showing-as-no-date-on-the-dashboard-because-of-failed-parsing-e-g-dates-like-13-02-2026-16-02-2026-shown-in-the-uploaded-screenshots-must-be-displayed-correctly-after-the-fix",
+      "title": "Fix date parsing in `frontend/src/utils/excelParser.ts` so that Order Date is always interpreted and stored as DD/MM/YYYY. The parser must not swap day and month (no MM/DD/YYYY treatment). It must correctly handle dates from any year, including 2025 and 2026. Both string-format dates (e.g. '19/02/2026') and Excel serial numbers must resolve to the correct DD/MM/YYYY value. Dates currently showing as 'No date' on the dashboard because of failed parsing (e.g. dates like 13/02/2026, 16/02/2026 shown in the uploaded screenshots) must be displayed correctly after the fix.",
       "reqIds": [
         "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-in-the-total-orders-tab-frontend-src-components-dashboard-totalorderstab-tsx-add-or-extend-the-search-bar-so-that-it-filters-orders-by-order-number-generic-name-and-design-code-the-search-must-be-case-insensitive-and-filter-across-all-design-groups-simultaneously-showing-only-matching-rows-and-their-parent-design-group-header-if-at-least-one-row-matches",
+      "title": "In the Total Orders tab (`frontend/src/components/dashboard/TotalOrdersTab.tsx`), add or extend the search bar so that it filters orders by Order Number, Generic Name, and Design Code. The search must be case-insensitive and filter across all design groups simultaneously, showing only matching rows (and their parent design group header if at least one row matches).",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-in-the-total-orders-tab-under-every-design-group-make-each-order-row-fully-clickable-clicking-anywhere-on-the-row-not-just-the-checkbox-should-toggle-the-row-s-selection-state-this-must-work-consistently-across-all-design-groups-rendered-in-the-tab",
+      "title": "In the Total Orders tab, under every design group, make each order row fully clickable — clicking anywhere on the row (not just the checkbox) should toggle the row's selection state. This must work consistently across all design groups rendered in the tab.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-in-the-total-orders-tab-add-a-mark-ready-button-inside-each-design-group-header-footer-clicking-it-marks-all-currently-selected-rows-within-that-design-group-as-ready-additionally-when-the-top-level-select-all-checkbox-is-checked-a-bulk-mark-ready-button-must-appear-at-the-top-of-the-tab-to-mark-all-selected-orders-across-all-design-groups-as-ready-at-once",
+      "title": "In the Total Orders tab, add a 'Mark Ready' button inside each design group header/footer. Clicking it marks all currently selected rows within that design group as Ready. Additionally, when the top-level 'Select All' checkbox is checked, a bulk 'Mark Ready' button must appear at the top of the tab to mark all selected orders (across all design groups) as Ready at once.",
+      "reqIds": [
+        "REQ-4"
       ],
       "version": 1
     }
@@ -26,37 +44,31 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Ageing stock: parse order date from Excel column C, display overdue days, add design code search bar",
+      "summary": "Fix date format from MM/DD/YYYY to DD/MM/YYYY (supporting any year including 2025/2026)",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Total Orders dashboard: sort orders by overdue days within each design code group (most overdue first)",
+      "summary": "Search bar in Total Orders tab to search by order number, generic name, and design code",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-3",
-      "summary": "Fix RB return validation to compare against row qty not full order qty",
+      "summary": "Enable full-row click selection under every design group",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-4",
-      "summary": "Summary card: show reduced count with (Y pending) bracket for partially supplied RB orders",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Return-to-pending for RB split rows: merge returned qty back into existing pending row by order number",
+      "summary": "Add Mark Ready button in each design group for individual marking, and show bulk Mark Ready on top when Select All is checked",
       "reqIds": [],
       "status": "pending"
     }
   ],
   "gameProjectType": "none",
-  "projectName": "Sort Total Orders by overdue days within each design code group",
+  "projectName": "Fix date format to DD/MM/YYYY and add Total Orders tab enhancements",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

@@ -1,39 +1,100 @@
 {
   "kind": "build_request",
-  "title": "Sort Total Orders by overdue days within each design code group",
+  "title": "Fix date format to DD/MM/YYYY and add Total Orders tab enhancements",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "In the Total Orders tab (TotalOrdersTab.tsx), after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each design code group by overdue days in descending order (most overdue / oldest order date first). Overdue days should be calculated as the number of days elapsed since the order's orderDate. Orders with a null or missing orderDate should be placed at the bottom of each group.",
+      "text": "Fix date parsing in `frontend/src/utils/excelParser.ts` so that Order Date is always interpreted and stored as DD/MM/YYYY. The parser must not swap day and month (no MM/DD/YYYY treatment). It must correctly handle dates from any year, including 2025 and 2026. Both string-format dates (e.g. '19/02/2026') and Excel serial numbers must resolve to the correct DD/MM/YYYY value. Dates currently showing as 'No date' on the dashboard because of failed parsing (e.g. dates like 13/02/2026, 16/02/2026 shown in the uploaded screenshots) must be displayed correctly after the fix.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-recent-last"
+          "msg-4"
         ],
         "quotes": [
-          "It should be sorted as per each design code group.",
-          "the data should be categorised as per overdue order from top to bottom for each design code separately"
+          "you're updating the data as MM/DD/YYYY but it should only be in standard DD/MM/YYY and it can be any year even 2025 or 2026"
         ]
       },
       "acceptanceCriteria": [
-        "In Total Orders tab, orders are grouped by design code as before.",
-        "Within each design code group, the order with the highest overdue days (oldest orderDate) appears first.",
-        "Orders with no orderDate appear at the bottom of their respective design code group.",
-        "The sorting is applied consistently across all design code groups.",
-        "No existing features (search, filter, karigar, order type) are affected."
+        "A date string '19/02/2026' in the Excel file is parsed and displayed as '19 Feb 26' (or equivalent DD/MM/YYYY display), not '02/19/2026' or 'No date'.",
+        "A date string '17/12/2025' is parsed and displayed correctly as a December 2025 date.",
+        "Excel serial number dates are converted correctly without day/month swapping.",
+        "No valid DD/MM/YYYY date from any year results in 'No date' after the fix.",
+        "All dates in the dashboard order rows display in DD/MM/YYYY (or equivalent readable) format."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "In the Total Orders tab (`frontend/src/components/dashboard/TotalOrdersTab.tsx`), add or extend the search bar so that it filters orders by Order Number, Generic Name, and Design Code. The search must be case-insensitive and filter across all design groups simultaneously, showing only matching rows (and their parent design group header if at least one row matches).",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "Search bar in total orders tab should be able to search ( Order number, generic name, design code)"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Typing a partial or full Order Number in the search bar filters the displayed rows to only those matching.",
+        "Typing a partial or full Generic Name filters rows accordingly.",
+        "Typing a partial or full Design Code filters rows accordingly.",
+        "Design group headers with no matching rows are hidden when a search term is active.",
+        "Clearing the search bar restores all groups and rows.",
+        "Search is case-insensitive."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "In the Total Orders tab, under every design group, make each order row fully clickable — clicking anywhere on the row (not just the checkbox) should toggle the row's selection state. This must work consistently across all design groups rendered in the tab.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "Under every design group, selection of rows can be done by clicking on any part of the row."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Clicking anywhere on a row (outside the checkbox itself) toggles that row's checkbox selection.",
+        "Clicking the checkbox directly also still toggles selection.",
+        "The row shows a visual selected state (e.g. highlighted background) when selected.",
+        "Multiple rows can be selected by clicking on different rows."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "In the Total Orders tab, add a 'Mark Ready' button inside each design group header/footer. Clicking it marks all currently selected rows within that design group as Ready. Additionally, when the top-level 'Select All' checkbox is checked, a bulk 'Mark Ready' button must appear at the top of the tab to mark all selected orders (across all design groups) as Ready at once.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "Give the *Mark Ready* button in each design group so that it could be marked from there itself and On the top when *select all* is checked then *mark ready* on top shows to do it in bulk for all design codes"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Each design group displays a 'Mark Ready' button within the group.",
+        "Clicking a group's 'Mark Ready' button marks only the selected rows within that group as Ready.",
+        "If no rows are selected in a group, the group-level 'Mark Ready' button is disabled or shows an appropriate state.",
+        "When the top-level 'Select All' checkbox is checked, a 'Mark Ready' button appears at the top of the Total Orders tab.",
+        "Clicking the top-level 'Mark Ready' button marks all selected orders across all design groups as Ready.",
+        "After marking as ready, the affected rows are removed from the Pending list and appear in the Ready tab."
       ]
     }
   ],
   "constraints": [
-    "Do not alter the existing grouping-by-design-code structure in TotalOrdersTab.",
-    "Do not change any other tab (Ready, Hallmark, Customer Orders, Karigars).",
-    "Do not modify backend data model or queries."
+    "Do not change the overall dashboard layout or any other tab's behaviour.",
+    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
+    "Backend data model and API must not change."
   ],
   "nonGoals": [
-    "Sorting across design code groups (only within each group).",
-    "Changes to the Ageing Stock page sorting.",
-    "Any backend changes."
+    "Changing the design or layout of any tab other than Total Orders.",
+    "Adding search functionality to tabs other than Total Orders.",
+    "Modifying the Ready, Hallmark, Customer Orders, Karigars, or Unmapped tabs.",
+    "Adding new backend endpoints or modifying the Motoko actor."
   ],
   "imageRequirements": {
     "required": [],

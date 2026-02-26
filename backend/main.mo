@@ -8,7 +8,6 @@ import Storage "blob-storage/Storage";
 import Iter "mo:core/Iter";
 
 
-// Use migration via with clause.
 
 actor {
   type OrderType = {

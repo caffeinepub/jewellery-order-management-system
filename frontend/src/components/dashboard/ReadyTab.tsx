@@ -1,20 +1,10 @@
-import { useState, useMemo } from "react";
-import { Order } from "../../backend";
-import { useGetReadyOrders, useBatchDeleteOrders, useBatchReturnReadyOrders } from "../../hooks/useQueries";
-import { useGetAllOrders } from "../../hooks/useQueries";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, RotateCcw, Search, Trash2 } from "lucide-react";
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+import { Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,206 +15,220 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
-import { useActor } from "@/hooks/useActor";
-import { useQueryClient } from "@tanstack/react-query";
-import { OrderType, OrderStatus } from "@/backend";
+} from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Order, OrderType, OrderStatus } from '../../backend';
+import {
+  useGetReadyOrders,
+  useGetAllOrders,
+  useDeleteReadyOrder,
+  useBatchReturnReadyOrders,
+} from '../../hooks/useQueries';
+import { useActor } from '../../hooks/useActor';
 
-/**
- * Groups selected orders by orderNo and sums their quantities.
- * Returns an array of [orderNo, totalQuantity] tuples for the backend.
- */
-function buildReturnRequests(orders: Order[]): Array<[string, bigint]> {
-  const grouped = new Map<string, bigint>();
-  for (const order of orders) {
-    const existing = grouped.get(order.orderNo) ?? BigInt(0);
-    grouped.set(order.orderNo, existing + order.quantity);
+function formatDate(ts: bigint | undefined | null): string {
+  if (!ts) return '—';
+  const ms = Number(ts) / 1_000_000;
+  if (!ms || ms <= 0) return '—';
+  return new Date(ms).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+  });
+}
+
+function getOrderTypeLabel(type: OrderType): string {
+  switch (type) {
+    case OrderType.RB: return 'RB';
+    case OrderType.CO: return 'CO';
+    default: return 'SO';
   }
-  return Array.from(grouped.entries());
 }
 
 export default function ReadyTab() {
-  const { data: readyOrders = [], isLoading } = useGetReadyOrders();
-  // We also need all orders to find the pending counterpart of split RB orders
-  const { data: allOrders = [] } = useGetAllOrders();
+  const { actor } = useActor();
+  const { data: readyOrders = [], isLoading, refetch: refetchReadyOrders } = useGetReadyOrders();
+  const { data: allOrders = [], refetch: refetchAllOrders } = useGetAllOrders();
+  const deleteReadyOrderMutation = useDeleteReadyOrder();
+  // useBatchReturnReadyOrders is kept for query invalidation side-effects
+  const batchReturnMutation = useBatchReturnReadyOrders();
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchText, setSearchText] = useState('');
   const [isReturning, setIsReturning] = useState(false);
 
-  const batchDeleteMutation = useBatchDeleteOrders();
-  const batchReturnMutation = useBatchReturnReadyOrders();
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
   const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return readyOrders;
-    const q = searchQuery.toLowerCase();
+    if (!searchText.trim()) return readyOrders;
+    const q = searchText.toLowerCase();
     return readyOrders.filter(
       (o) =>
         o.orderNo.toLowerCase().includes(q) ||
         o.design.toLowerCase().includes(q) ||
-        (o.genericName ?? "").toLowerCase().includes(q) ||
-        (o.karigarName ?? "").toLowerCase().includes(q)
+        (o.genericName ?? '').toLowerCase().includes(q) ||
+        (o.karigarName ?? '').toLowerCase().includes(q)
     );
-  }, [readyOrders, searchQuery]);
+  }, [readyOrders, searchText]);
 
-  const allSelected =
-    filteredOrders.length > 0 &&
-    filteredOrders.every((o) => selectedIds.has(o.orderId));
+  const selectedOrders = useMemo(
+    () => filteredOrders.filter((o) => selectedIds.has(o.orderId)),
+    [filteredOrders, selectedIds]
+  );
 
-  const toggleAll = () => {
-    if (allSelected) {
+  const isOperating = isReturning || deleteReadyOrderMutation.isPending || batchReturnMutation.isPending;
+
+  function toggleSelect(orderId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filteredOrders.length) {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(filteredOrders.map((o) => o.orderId)));
     }
-  };
-
-  const toggleOne = (orderId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(orderId)) {
-        next.delete(orderId);
-      } else {
-        next.add(orderId);
-      }
-      return next;
-    });
-  };
-
-  const selectedOrders = useMemo(
-    () => readyOrders.filter((o) => selectedIds.has(o.orderId)),
-    [readyOrders, selectedIds]
-  );
-
-  const handleDelete = () => {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) {
-      toast.error("No orders selected for deletion");
-      return;
-    }
-    batchDeleteMutation.mutate(ids, {
-      onSuccess: () => {
-        setSelectedIds(new Set());
-      },
-      onError: (error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        console.error("Delete failed:", message);
-        toast.error(`Orders failed to delete: ${message}`);
-      },
-    });
-  };
+  }
 
   /**
-   * Handle return to pending with RB partial-supply merge logic.
+   * Return selected orders to Pending.
    *
-   * For RB orders that were partially supplied (they have originalOrderId set),
-   * we need to:
-   * 1. Find the original pending row (orderId == originalOrderId) which holds the remaining qty
-   * 2. Delete that pending row
-   * 3. Pass totalQty = pendingRemainingQty + readyQty to returnOrdersToPending
-   *    so the backend creates ONE merged pending row with the full original quantity
+   * Key fix: always refetch fresh data first, then for each selected orderNo
+   * pass the TOTAL qty of ALL ready orders for that orderNo (not just selected).
+   * The backend's returnOrdersToPending checks totalReadyQty == returnedQty,
+   * so we must match exactly what the backend sees.
    *
-   * For all other orders, use the standard return flow.
+   * For RB orders that were partially supplied (have originalOrderId), we also
+   * delete the pending remainder and add its qty to the total so the full
+   * original quantity is restored as a single pending row.
    */
-  const handleReturn = async () => {
+  async function handleReturn() {
     if (selectedOrders.length === 0) {
-      toast.error("No orders selected");
+      toast.error('No orders selected');
       return;
     }
-
     if (!actor) {
-      toast.error("Actor not initialized");
+      toast.error('Backend not ready');
       return;
     }
 
     setIsReturning(true);
     try {
-      // Separate split RB orders (have originalOrderId) from regular orders
-      const splitRBOrders = selectedOrders.filter(
-        (o) => o.orderType === OrderType.RB && o.originalOrderId
+      // Step 1: Refetch fresh data from the backend
+      const [freshReadyResult, freshAllResult] = await Promise.all([
+        refetchReadyOrders(),
+        refetchAllOrders(),
+      ]);
+
+      const freshReadyOrders: Order[] = freshReadyResult.data ?? [];
+      const freshAllOrders: Order[] = freshAllResult.data ?? [];
+
+      // Step 2: Identify which orderNos were selected
+      const freshSelectedOrders = freshReadyOrders.filter((o) =>
+        selectedIds.has(o.orderId)
       );
-      const regularOrders = selectedOrders.filter(
-        (o) => !(o.orderType === OrderType.RB && o.originalOrderId)
-      );
 
-      // Build a map of originalOrderId -> pending order for split RB orders
-      const pendingOrdersToDelete: string[] = [];
-      // Map: orderNo -> extra qty to add from the pending remainder
-      const extraQtyByOrderNo = new Map<string, bigint>();
+      if (freshSelectedOrders.length === 0) {
+        toast.error('Selected orders not found. Please refresh and try again.');
+        return;
+      }
 
-      for (const readyOrder of splitRBOrders) {
-        const originalId = readyOrder.originalOrderId!;
-        // Find the pending counterpart in allOrders
-        const pendingCounterpart = allOrders.find(
-          (o) =>
-            o.orderId === originalId &&
-            o.status === OrderStatus.Pending
-        );
+      const selectedOrderNos = new Set(freshSelectedOrders.map((o) => o.orderNo));
 
-        if (pendingCounterpart) {
-          pendingOrdersToDelete.push(pendingCounterpart.orderId);
-          const existing = extraQtyByOrderNo.get(readyOrder.orderNo) ?? BigInt(0);
-          extraQtyByOrderNo.set(
-            readyOrder.orderNo,
-            existing + pendingCounterpart.quantity
-          );
+      // Step 3: For each selected orderNo, sum ALL ready orders for that orderNo.
+      // This ensures the qty we pass matches what the backend will sum.
+      const readyQtyByOrderNo = new Map<string, bigint>();
+      for (const order of freshReadyOrders) {
+        if (selectedOrderNos.has(order.orderNo)) {
+          const current = readyQtyByOrderNo.get(order.orderNo) ?? 0n;
+          readyQtyByOrderNo.set(order.orderNo, current + order.quantity);
         }
       }
 
-      // Delete the pending remainder rows for split RB orders
-      if (pendingOrdersToDelete.length > 0) {
-        await actor.batchDeleteOrders(pendingOrdersToDelete);
+      // Step 4: For RB orders with a pending remainder (partial supply), delete
+      // the remainder and add its qty so the full quantity is restored.
+      const pendingRemainderIds: string[] = [];
+      for (const order of freshSelectedOrders) {
+        if (order.orderType === OrderType.RB) {
+          // Find the pending remainder: same orderNo, Pending, no originalOrderId,
+          // and orderId is NOT one of the ready orders we're returning
+          const readyIdsForOrderNo = new Set(
+            freshReadyOrders
+              .filter((o) => o.orderNo === order.orderNo)
+              .map((o) => o.orderId)
+          );
+          const pendingRemainder = freshAllOrders.find(
+            (o) =>
+              o.orderNo === order.orderNo &&
+              o.status === OrderStatus.Pending &&
+              !o.originalOrderId &&
+              !readyIdsForOrderNo.has(o.orderId)
+          );
+          if (pendingRemainder && !pendingRemainderIds.includes(pendingRemainder.orderId)) {
+            pendingRemainderIds.push(pendingRemainder.orderId);
+            const current = readyQtyByOrderNo.get(order.orderNo) ?? 0n;
+            readyQtyByOrderNo.set(order.orderNo, current + pendingRemainder.quantity);
+          }
+        }
       }
 
-      // Build return requests: group all selected orders by orderNo, sum quantities
-      // For split RB orders, also add the pending remainder quantity
-      const grouped = new Map<string, bigint>();
-      for (const order of selectedOrders) {
-        const existing = grouped.get(order.orderNo) ?? BigInt(0);
-        grouped.set(order.orderNo, existing + order.quantity);
-      }
-      // Add extra qty from deleted pending remainders
-      for (const [orderNo, extraQty] of extraQtyByOrderNo.entries()) {
-        const existing = grouped.get(orderNo) ?? BigInt(0);
-        grouped.set(orderNo, existing + extraQty);
+      // Step 5: Delete pending remainders first
+      if (pendingRemainderIds.length > 0) {
+        await actor.batchDeleteOrders(pendingRemainderIds);
       }
 
-      const requests = Array.from(grouped.entries());
+      // Step 6: Build and send return requests
+      const orderRequests: Array<[string, bigint]> = Array.from(readyQtyByOrderNo.entries());
 
-      await actor.batchReturnOrdersToPending(requests);
+      if (orderRequests.length === 0) {
+        toast.error('No valid orders to return');
+        return;
+      }
 
-      // Invalidate all relevant queries
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      await queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-      await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+      await actor.batchReturnOrdersToPending(orderRequests);
 
+      toast.success(`${orderRequests.length} order(s) returned to Pending`);
       setSelectedIds(new Set());
-      toast.success(
-        selectedOrders.length === 1
-          ? "Order returned to pending"
-          : `${selectedOrders.length} orders returned to pending`
-      );
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("Return failed:", message);
-      toast.error(`Failed to return orders: ${message}`);
+
+      // Step 7: Refresh data
+      await Promise.all([refetchReadyOrders(), refetchAllOrders()]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to return orders: ${msg}`);
     } finally {
       setIsReturning(false);
     }
-  };
+  }
 
-  const isOperating =
-    batchDeleteMutation.isPending || batchReturnMutation.isPending || isReturning;
+  async function handleDelete(orderId: string) {
+    try {
+      await deleteReadyOrderMutation.mutateAsync(orderId);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
+      toast.success('Order moved back to Pending');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed: ${msg}`);
+    }
+  }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-gold" />
-        <span className="ml-2 text-muted-foreground">Loading ready orders…</span>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -233,177 +237,133 @@ export default function ReadyTab() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search orders…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2">
+        <Input
+          placeholder="Search orders…"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="max-w-xs"
+        />
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
             <span className="text-sm text-muted-foreground">
               {selectedIds.size} selected
             </span>
-
-            {/* Return to Pending */}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isOperating}
-                  className="gap-1.5"
-                >
-                  {isReturning ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RotateCcw className="h-4 w-4" />
-                  )}
-                  Return {selectedIds.size > 1 ? `${selectedIds.size} Orders` : "Order"} to Pending
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Return Orders to Pending?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will move {selectedIds.size} selected{" "}
-                    {selectedIds.size === 1 ? "order" : "orders"} back to
-                    Pending status in Total Orders. For partially-supplied RB
-                    orders, the full original pending quantity will be restored.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleReturn}>
-                    Confirm Return
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Delete */}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={isOperating}
-                  className="gap-1.5"
-                >
-                  {batchDeleteMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  Delete {selectedIds.size > 1 ? `${selectedIds.size} Orders` : "Order"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Orders?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete {selectedIds.size} selected{" "}
-                    {selectedIds.size === 1 ? "order" : "orders"}. This action
-                    cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        )}
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedIds.size === 0 || isOperating}
+              >
+                {isReturning ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                Return to Pending
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Return to Pending?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will move {selectedIds.size} selected order(s) back to Pending status.
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReturn} disabled={isReturning}>
+                  {isReturning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirm Return
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* Table */}
-      {filteredOrders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-muted-foreground">
-            {searchQuery ? "No orders match your search." : "No ready orders found."}
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
+      <div className="rounded-md border overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={
+                    filteredOrders.length > 0 &&
+                    selectedIds.size === filteredOrders.length
+                  }
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
+              <TableHead>Order No</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Design</TableHead>
+              <TableHead>Generic Name</TableHead>
+              <TableHead>Karigar</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-right">Weight</TableHead>
+              <TableHead>Ready Date</TableHead>
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredOrders.length === 0 ? (
               <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={toggleAll}
-                    disabled={isOperating}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>Order No</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Design</TableHead>
-                <TableHead>Generic Name</TableHead>
-                <TableHead>Karigar</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
-                <TableHead>Ready Date</TableHead>
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                  No ready orders found
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
+            ) : (
+              filteredOrders.map((order) => (
                 <TableRow
                   key={order.orderId}
-                  className={selectedIds.has(order.orderId) ? "bg-muted/50" : ""}
+                  className={selectedIds.has(order.orderId) ? 'bg-muted/40' : ''}
                 >
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(order.orderId)}
-                      onCheckedChange={() => toggleOne(order.orderId)}
-                      disabled={isOperating}
-                      aria-label={`Select order ${order.orderNo}`}
+                      onCheckedChange={() => toggleSelect(order.orderId)}
+                      aria-label={`Select ${order.orderNo}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{order.orderNo}</TableCell>
+                  <TableCell className="font-mono text-xs">{order.orderNo}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{order.orderType}</Badge>
+                    <Badge variant="outline">{getOrderTypeLabel(order.orderType)}</Badge>
                   </TableCell>
-                  <TableCell>{order.design}</TableCell>
-                  <TableCell>{order.genericName ?? "—"}</TableCell>
-                  <TableCell>{order.karigarName ?? "—"}</TableCell>
-                  <TableCell>{order.product}</TableCell>
-                  <TableCell className="text-right">
-                    {order.quantity.toString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {order.weight.toFixed(2)}g
-                  </TableCell>
+                  <TableCell className="font-mono text-xs">{order.design}</TableCell>
+                  <TableCell>{order.genericName ?? '—'}</TableCell>
+                  <TableCell>{order.karigarName ?? '—'}</TableCell>
+                  <TableCell className="text-right">{Number(order.quantity)}</TableCell>
+                  <TableCell className="text-right">{order.weight.toFixed(3)}g</TableCell>
+                  <TableCell>{formatDate(order.readyDate)}</TableCell>
                   <TableCell>
-                    {order.readyDate
-                      ? new Date(
-                          Number(order.readyDate) / 1_000_000
-                        ).toLocaleDateString()
-                      : "—"}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={isOperating}
+                      onClick={() => handleDelete(order.orderId)}
+                      aria-label="Move to Pending"
+                    >
+                      {deleteReadyOrderMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      )}
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <p className="text-xs text-muted-foreground">
-        {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""} shown
-        {readyOrders.length !== filteredOrders.length
-          ? ` (${readyOrders.length} total)`
-          : ""}
+        {readyOrders.length} ready order(s) total
       </p>
     </div>
   );
