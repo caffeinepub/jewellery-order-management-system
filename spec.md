@@ -1,12 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix order quantities failing to load and display on the dashboard.
+**Goal:** Fix the "Return to Pending" functionality for RB orders in the Ready tab, which currently fails with "Original order not found" error.
 
 **Planned changes:**
-- Investigate and fix the backend query in `backend/main.mo` to ensure qty fields are populated and returned correctly.
-- Fix React Query hooks in `useQueries.ts` to correctly map and expose qty data from the backend response.
-- Ensure SummaryCards, OrderTable, TotalOrdersTab, and any other components that display qty fields render correct quantity values.
-- Resolve any console errors related to undefined or null qty fields.
+- Update the backend `returnOrdersToPending` function to remove the dependency on looking up an existing original order record
+- For fully-fulfilled RB orders (supplied qty = pending qty): create a new Pending order line in Total Orders with qty equal to supplied qty and all fields copied from the Ready order, then remove from Ready
+- For partially-fulfilled RB orders (supplied qty < pending qty): find the existing Total Orders line by base order number, add supplied qty back to it and ensure status is Pending, then remove from Ready
+- Update `ReadyTab.tsx` to correctly call the fixed backend return function, show a success toast on completion, and show an error toast with the specific failure message on failure
 
-**User-visible outcome:** Quantity values are correctly displayed across all dashboard components (SummaryCards, OrderTable, TotalOrdersTab) after page load, with no missing or zero values when data exists.
+**User-visible outcome:** Users can successfully return selected RB orders from the Ready tab back to Pending without encountering the "Original order not found" error. Returned orders disappear from the Ready tab and reappear correctly in Total Orders with Pending status.

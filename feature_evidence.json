@@ -2,19 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-investigate-and-fix-the-issue-where-order-quantities-qtys-fail-to-load-on-the-dashboard-ensure-that-quantity-values-are-correctly-fetched-from-the-backend-passed-through-react-query-hooks-and-rendered-in-all-relevant-components-including-summarycards-totalorderstab-ordertable-and-any-other-components-that-display-qty-fields",
-      "featureTitle": "Investigate and fix the issue where order quantities (qtys) fail to load on the dashboard. Ensure that quantity values are correctly fetched from the backend, passed through React Query hooks, and rendered in all relevant components including SummaryCards, TotalOrdersTab, OrderTable, and any other components that display qty fields.",
+      "featureId": "feature-update-the-frontend-readytab-tsx-return-to-pending-flow-to-correctly-call-the-fixed-backend-return-function-and-display-a-success-toast-on-completion-and-an-error-toast-with-the-specific-failure-message-if-it-fails-no-other-ui-changes-are-needed",
+      "featureTitle": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
       "files": [
-        "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-        "frontend/src/components/dashboard/HallmarkTab.tsx",
-        "frontend/src/components/dashboard/OrderTable.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "frontend/src/components/dashboard/SummaryCards.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/Dashboard.tsx",
-        "frontend/src/pages/KarigarDetail.tsx",
-        "frontend/src/utils/exportUtils.ts"
+        "frontend/src/components/dashboard/ReadyTab.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -27,7 +18,7 @@
         "blob-storage@4.0.0"
       ],
       "testIds": [
-        "REQ-1"
+        "REQ-2"
       ],
       "confidence": "high"
     }

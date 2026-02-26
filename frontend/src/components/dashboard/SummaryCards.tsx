@@ -1,108 +1,135 @@
-import { Order, OrderStatus, OrderType } from "../../backend";
-import { getQuantityAsNumber } from "../../utils/orderNormalizer";
+import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useGetAllOrders } from '@/hooks/useQueries';
+import { Package, Weight, Hash, Users } from 'lucide-react';
+import { OrderType, OrderStatus } from '@/backend';
+
+type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
 interface SummaryCardsProps {
-  orders: Order[];
-  activeTab: string;
-  isLoading?: boolean;
-  isError?: boolean;
+  activeTab?: ActiveTab;
 }
 
-function StatCard({
-  label,
-  value,
-  isLoading,
-  isError,
-}: {
-  label: string;
-  value: string | number;
-  isLoading?: boolean;
-  isError?: boolean;
-}) {
-  return (
-    <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1 shadow-sm">
-      <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-        {label}
-      </span>
-      {isError ? (
-        <span className="text-2xl font-bold text-muted-foreground">—</span>
-      ) : isLoading ? (
-        <div className="h-8 w-16 bg-muted animate-pulse rounded" />
-      ) : (
-        <span className="text-2xl font-bold text-foreground">{value}</span>
-      )}
-    </div>
-  );
-}
+export default function SummaryCards({ activeTab }: SummaryCardsProps) {
+  const { data: orders = [], isLoading } = useGetAllOrders();
 
-export function SummaryCards({
-  orders,
-  activeTab,
-  isLoading,
-  isError,
-}: SummaryCardsProps) {
-  const getFilteredOrders = () => {
-    if (isError) return [];
+  // Safely filter orders based on active tab using useMemo
+  const filteredOrders = useMemo(() => {
+    // Return empty array if orders is undefined or null
+    if (!orders || !Array.isArray(orders)) {
+      return [];
+    }
+
+    // Filter based on active tab
+    let result = orders;
+    
     switch (activeTab) {
       case "total":
-        return orders.filter((o) => o.status === OrderStatus.Pending);
+        // Total orders tab: Pending and ReturnFromHallmark orders
+        result = orders.filter(
+          (order) =>
+            order?.status === OrderStatus.Pending ||
+            order?.status === OrderStatus.ReturnFromHallmark
+        );
+        break;
+
       case "ready":
-        return orders.filter((o) => o.status === OrderStatus.Ready);
+        // Ready tab: orders with Ready status
+        result = orders.filter((order) => order?.status === OrderStatus.Ready);
+        
+        // Deduplicate orders by orderId - keep only the first occurrence
+        // This matches the deduplication logic in ReadyTab.tsx
+        const seenOrderIds = new Set<string>();
+        result = result.filter((order) => {
+          if (seenOrderIds.has(order.orderId)) {
+            return false;
+          }
+          seenOrderIds.add(order.orderId);
+          return true;
+        });
+        break;
+
       case "hallmark":
-        return orders.filter(
-          (o) =>
-            o.status === OrderStatus.Hallmark ||
-            o.status === OrderStatus.ReturnFromHallmark
+        // Hallmark tab: Hallmark orders only
+        result = orders.filter(
+          (order) => order?.status === OrderStatus.Hallmark
         );
+        break;
+
       case "customer":
-        return orders.filter(
-          (o) =>
-            o.orderType === OrderType.CO && o.status === OrderStatus.Pending
+        // Customer orders tab: CO type orders with Pending status
+        result = orders.filter(
+          (order) =>
+            order?.orderType === OrderType.CO &&
+            order?.status === OrderStatus.Pending
         );
+        break;
+
+      case "karigars":
+        // Karigars tab: show same as total orders (Pending and ReturnFromHallmark)
+        result = orders.filter(
+          (order) =>
+            order?.status === OrderStatus.Pending ||
+            order?.status === OrderStatus.ReturnFromHallmark
+        );
+        break;
+
       default:
-        return orders.filter((o) => o.status === OrderStatus.Pending);
+        result = orders;
     }
-  };
+    
+    return result;
+  }, [orders, activeTab]);
 
-  const filtered = getFilteredOrders();
+  // Calculate metrics with safe fallbacks using optional chaining
+  // Total weight = sum of (weight × quantity) for all rows
+  const totalOrders = filteredOrders?.length ?? 0;
+  const totalWeight = filteredOrders?.reduce((sum, order) => sum + ((order?.weight ?? 0) * Number(order?.quantity ?? 0)), 0) ?? 0;
+  const totalQuantity = filteredOrders?.reduce((sum, order) => sum + Number(order?.quantity ?? 0), 0) ?? 0;
+  const customerOrders = filteredOrders?.filter((order) => order?.orderType === OrderType.CO)?.length ?? 0;
 
-  const totalOrders = isError ? 0 : filtered.length;
-  const totalQty = isError
-    ? 0
-    : filtered.reduce((sum, o) => sum + getQuantityAsNumber(o.quantity), 0);
-  const uniqueDesigns = isError
-    ? 0
-    : new Set(filtered.map((o) => o.design)).size;
-  const uniqueKarigars = isError
-    ? 0
-    : new Set(filtered.map((o) => o.karigarName).filter(Boolean)).size;
+  const cards = [
+    {
+      title: 'Total Orders',
+      value: totalOrders,
+      icon: Package,
+    },
+    {
+      title: 'Total Weight',
+      value: `${totalWeight.toFixed(2)}g`,
+      icon: Weight,
+    },
+    {
+      title: 'Total Quantity',
+      value: totalQuantity,
+      icon: Hash,
+    },
+    {
+      title: 'Customer Orders',
+      value: customerOrders,
+      icon: Users,
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-      <StatCard
-        label="Orders"
-        value={totalOrders}
-        isLoading={isLoading}
-        isError={isError}
-      />
-      <StatCard
-        label="Total Qty"
-        value={totalQty}
-        isLoading={isLoading}
-        isError={isError}
-      />
-      <StatCard
-        label="Designs"
-        value={uniqueDesigns}
-        isLoading={isLoading}
-        isError={isError}
-      />
-      <StatCard
-        label="Karigars"
-        value={uniqueKarigars}
-        isLoading={isLoading}
-        isError={isError}
-      />
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card) => (
+        <Card key={card.title} className="border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {card.title}
+            </CardTitle>
+            <card.icon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="h-8 w-20 animate-pulse rounded bg-muted" />
+            ) : (
+              <div className="text-2xl font-semibold">{card.value}</div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

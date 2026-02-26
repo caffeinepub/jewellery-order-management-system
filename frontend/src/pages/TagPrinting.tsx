@@ -1,244 +1,356 @@
-import { useState } from "react";
-import { useGetReadyOrdersByDateRange, useUpdateDesignGroupStatus } from "@/hooks/useQueries";
+import { useState, useMemo } from "react";
+import { useGetReadyOrders, useGetReadyOrdersByDateRange, useUpdateDesignGroupStatus } from "@/hooks/useQueries";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Printer, Search } from "lucide-react";
-import { Order } from "@/backend";
-import { normalizeOrders } from "@/utils/orderNormalizer";
-import { getQuantityAsNumber } from "@/utils/orderNormalizer";
+import { Copy, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { Order } from "@/backend";
 
-export function TagPrinting() {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [fetchedOrders, setFetchedOrders] = useState<Order[]>([]);
-  const [selectedDesignGroups, setSelectedDesignGroups] = useState<string[]>([]);
+export default function TagPrinting() {
+  const { data: readyOrders = [], isLoading } = useGetReadyOrders();
+  const getReadyOrdersByDateRangeMutation = useGetReadyOrdersByDateRange();
+  const updateDesignGroupStatusMutation = useUpdateDesignGroupStatus();
 
-  const getReadyOrdersMutation = useGetReadyOrdersByDateRange();
-  const updateDesignGroupMutation = useUpdateDesignGroupStatus();
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [selectedDesignCodes, setSelectedDesignCodes] = useState<Set<string>>(new Set());
+  const [showHallmarkDialog, setShowHallmarkDialog] = useState(false);
 
-  const handleFetchOrders = async () => {
+  const ordersToDisplay = isFiltering ? filteredOrders : readyOrders;
+
+  const sortedOrders = useMemo(() => {
+    return [...ordersToDisplay].sort((a, b) => {
+      const dateA = a.readyDate ? Number(a.readyDate) : Number(a.createdAt);
+      const dateB = b.readyDate ? Number(b.readyDate) : Number(b.createdAt);
+      return dateA - dateB;
+    });
+  }, [ordersToDisplay]);
+
+  const groupedByDesign = useMemo(() => {
+    const groups: Record<
+      string,
+      { orderNumbers: string[]; genericName: string | undefined; orderIds: string[] }
+    > = {};
+
+    sortedOrders.forEach((order) => {
+      if (!groups[order.design]) {
+        groups[order.design] = {
+          orderNumbers: [],
+          genericName: order.genericName,
+          orderIds: [],
+        };
+      }
+      groups[order.design].orderNumbers.push(order.orderNo);
+      groups[order.design].orderIds.push(order.orderId);
+    });
+
+    return groups;
+  }, [sortedOrders]);
+
+  const handleCopyOrderNumbers = async (orderNumbers: string[]) => {
+    try {
+      await navigator.clipboard.writeText(orderNumbers.join(','));
+      toast.success("Order numbers copied to clipboard");
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  const handleApplyDateFilter = async () => {
     if (!startDate || !endDate) {
       toast.error("Please select both start and end dates");
       return;
     }
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const startTimestamp = BigInt(start.getTime() * 1_000_000);
+    const endTimestamp = BigInt(end.getTime() * 1_000_000);
+
     try {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      // Set end date to end of day
-      end.setHours(23, 59, 59, 999);
-
-      const orders = await getReadyOrdersMutation.mutateAsync({
-        startDate: start,
-        endDate: end,
+      const filtered = await getReadyOrdersByDateRangeMutation.mutateAsync({
+        startDate: startTimestamp,
+        endDate: endTimestamp,
       });
-      const normalized = normalizeOrders(orders);
-      setFetchedOrders(normalized);
-      setSelectedDesignGroups([]);
-      if (normalized.length === 0) {
-        toast.info("No ready orders found in the selected date range");
+      setFilteredOrders(filtered);
+      setIsFiltering(true);
+      toast.success(`Showing orders from ${startDate} to ${endDate}`);
+    } catch {
+      // error handled by mutation onError
+    }
+  };
+
+  const handleClearDateFilter = () => {
+    setStartDate("");
+    setEndDate("");
+    setFilteredOrders([]);
+    setIsFiltering(false);
+    toast.success("Date filter cleared");
+  };
+
+  const handleToggleDesignSelection = (designCode: string) => {
+    setSelectedDesignCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(designCode)) {
+        next.delete(designCode);
       } else {
-        toast.success(`Found ${normalized.length} ready orders`);
+        next.add(designCode);
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to fetch orders");
-    }
+      return next;
+    });
   };
 
-  // Group orders by design code
-  const designGroups = Array.from(
-    fetchedOrders.reduce((map, order) => {
-      const key = order.design;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(order);
-      return map;
-    }, new Map<string, Order[]>()).entries()
-  );
-
-  const toggleDesignGroup = (designCode: string) => {
-    setSelectedDesignGroups((prev) =>
-      prev.includes(designCode)
-        ? prev.filter((d) => d !== designCode)
-        : [...prev, designCode]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedDesignGroups.length === designGroups.length) {
-      setSelectedDesignGroups([]);
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedDesignCodes(new Set(Object.keys(groupedByDesign)));
     } else {
-      setSelectedDesignGroups(designGroups.map(([code]) => code));
+      setSelectedDesignCodes(new Set());
     }
   };
 
-  const handleMarkAsHallmark = async () => {
-    if (selectedDesignGroups.length === 0) {
+  const handleMoveToHallmark = () => {
+    if (selectedDesignCodes.size === 0) {
       toast.error("Please select at least one design group");
       return;
     }
-    // Get all order IDs for selected design groups
-    const orderIds = fetchedOrders
-      .filter((o) => selectedDesignGroups.includes(o.design))
-      .map((o) => o.orderId);
+    setShowHallmarkDialog(true);
+  };
 
+  const confirmMoveToHallmark = async () => {
     try {
-      await updateDesignGroupMutation.mutateAsync(orderIds);
-      toast.success(`${selectedDesignGroups.length} design group(s) marked as Hallmark`);
-      setFetchedOrders((prev) =>
-        prev.filter((o) => !selectedDesignGroups.includes(o.design))
-      );
-      setSelectedDesignGroups([]);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update status");
+      const orderIds: string[] = [];
+      selectedDesignCodes.forEach((designCode) => {
+        const group = groupedByDesign[designCode];
+        if (group) {
+          orderIds.push(...group.orderIds);
+        }
+      });
+
+      await updateDesignGroupStatusMutation.mutateAsync(orderIds);
+      toast.success(`${selectedDesignCodes.size} design group(s) moved to Hallmark`);
+      setSelectedDesignCodes(new Set());
+      setShowHallmarkDialog(false);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to update design groups";
+      toast.error(message);
     }
   };
 
-  return (
-    <div className="p-4 md:p-6 space-y-4">
-      <h1 className="text-2xl font-bold font-playfair text-foreground">
-        Tag Printing
-      </h1>
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Loading ready orders...</div>
+        </div>
+      </div>
+    );
+  }
 
-      <Card>
+  const designCodes = Object.keys(groupedByDesign).sort();
+  const allSelected = designCodes.length > 0 && selectedDesignCodes.size === designCodes.length;
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-foreground">Tag Printing</h1>
+        <p className="text-muted-foreground mt-2">
+          Ready orders grouped by design code (sorted by ready date)
+        </p>
+      </div>
+
+      {/* Date Filter Section */}
+      <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">Select Date Range</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Filter by Ready Date
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-3 flex-wrap">
-            <div className="space-y-1">
-              <Label htmlFor="start-date">Start Date</Label>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex items-center gap-2 flex-1">
+              <label className="text-sm font-medium whitespace-nowrap">From:</label>
               <Input
-                id="start-date"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-40"
+                className="flex-1"
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="end-date">End Date</Label>
+            <div className="flex items-center gap-2 flex-1">
+              <label className="text-sm font-medium whitespace-nowrap">To:</label>
               <Input
-                id="end-date"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-40"
+                className="flex-1"
               />
             </div>
-            <Button
-              onClick={handleFetchOrders}
-              disabled={getReadyOrdersMutation.isPending}
-              className="bg-gold hover:bg-gold-hover text-white"
-            >
-              {getReadyOrdersMutation.isPending ? (
-                <span className="flex items-center gap-1">
-                  <span className="animate-spin h-3 w-3 border border-white border-t-transparent rounded-full" />
-                  Fetching...
-                </span>
-              ) : (
-                <span className="flex items-center gap-1">
-                  <Search className="h-3 w-3" />
-                  Fetch Orders
-                </span>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleApplyDateFilter}
+                disabled={!startDate || !endDate || getReadyOrdersByDateRangeMutation.isPending}
+                className="bg-gold hover:bg-gold-hover"
+              >
+                {getReadyOrdersByDateRangeMutation.isPending ? "Filtering..." : "Apply Filter"}
+              </Button>
+              {isFiltering && (
+                <Button onClick={handleClearDateFilter} variant="outline">
+                  Clear Filter
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
+          {isFiltering && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Showing {sortedOrders.length} order(s) from {startDate} to {endDate}
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {designGroups.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={selectedDesignGroups.length === designGroups.length}
-                onCheckedChange={toggleSelectAll}
-              />
-              <span className="text-sm font-medium">
-                Select All ({designGroups.length} design groups)
-              </span>
-            </div>
-            {selectedDesignGroups.length > 0 && (
-              <Button
-                size="sm"
-                onClick={handleMarkAsHallmark}
-                disabled={updateDesignGroupMutation.isPending}
-                className="bg-gold hover:bg-gold-hover text-white"
+      {/* Bulk Selection Controls */}
+      {designCodes.length > 0 && (
+        <div className="mb-4 flex items-center justify-between bg-muted/50 p-4 rounded-lg">
+          <div className="flex items-center gap-4">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={handleSelectAll}
+              aria-label="Select all design groups"
+            />
+            <span className="text-sm font-medium">
+              {selectedDesignCodes.size > 0
+                ? `${selectedDesignCodes.size} design group(s) selected`
+                : "Select design groups"}
+            </span>
+          </div>
+          {selectedDesignCodes.size > 0 && (
+            <Button
+              onClick={handleMoveToHallmark}
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700"
+              disabled={updateDesignGroupStatusMutation.isPending}
+            >
+              {updateDesignGroupStatusMutation.isPending ? "Moving..." : "Move to Hallmark"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {designCodes.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <p className="text-center text-muted-foreground">
+              {isFiltering
+                ? "No orders found for the selected date range"
+                : "No ready orders found"}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {designCodes.map((designCode) => {
+            const { orderNumbers, genericName } = groupedByDesign[designCode];
+            const isSelected = selectedDesignCodes.has(designCode);
+
+            return (
+              <Card
+                key={designCode}
+                className={`hover:shadow-lg transition-all cursor-pointer ${
+                  isSelected ? "ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-950/20" : ""
+                }`}
+                onClick={() => handleToggleDesignSelection(designCode)}
               >
-                {updateDesignGroupMutation.isPending ? (
-                  <span className="flex items-center gap-1">
-                    <span className="animate-spin h-3 w-3 border border-white border-t-transparent rounded-full" />
-                    Updating...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <Printer className="h-3 w-3" />
-                    Mark as Hallmark ({selectedDesignGroups.length})
-                  </span>
-                )}
-              </Button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {designGroups.map(([designCode, groupOrders]) => {
-              const totalQty = groupOrders.reduce(
-                (sum, o) => sum + getQuantityAsNumber(o.quantity),
-                0
-              );
-              const isSelected = selectedDesignGroups.includes(designCode);
-
-              return (
-                <Card
-                  key={designCode}
-                  className={`cursor-pointer transition-colors ${
-                    isSelected ? "border-gold bg-gold/5" : "hover:border-gold/50"
-                  }`}
-                  onClick={() => toggleDesignGroup(designCode)}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleDesignGroup(designCode)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div>
-                          <p className="font-medium text-sm">{designCode}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {groupOrders[0]?.genericName ?? "—"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <Badge variant="secondary" className="text-xs">
-                          {groupOrders.length} orders
-                        </Badge>
-                        <p className="text-xs text-gold font-medium mt-1">
-                          Qty: {totalQty}
-                        </p>
-                      </div>
+                <CardHeader>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => handleToggleDesignSelection(designCode)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Select design ${designCode}`}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <CardTitle className="text-lg font-semibold text-gold">
+                        {designCode}
+                      </CardTitle>
+                      {genericName && (
+                        <p className="text-sm text-muted-foreground mt-1">{genericName}</p>
+                      )}
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {orderNumbers.length} order{orderNumbers.length !== 1 ? 's' : ''}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Order Numbers:</p>
+                    <div className="bg-muted rounded-md p-3 max-h-32 overflow-y-auto">
+                      <p className="text-sm font-mono break-all">
+                        {orderNumbers.join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopyOrderNumbers(orderNumbers);
+                    }}
+                    className="w-full bg-gold hover:bg-gold-hover"
+                    size="sm"
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy for MPN
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {fetchedOrders.length === 0 && !getReadyOrdersMutation.isPending && (
-        <div className="text-center text-muted-foreground py-12">
-          <Printer className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-lg font-medium">No orders loaded</p>
-          <p className="text-sm">Select a date range and fetch orders to begin</p>
-        </div>
-      )}
+      <AlertDialog open={showHallmarkDialog} onOpenChange={setShowHallmarkDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move to Hallmark?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to move {selectedDesignCodes.size} design group(s) to Hallmark
+              status? All orders in these design groups will be moved from the Ready tab to the
+              Hallmark tab.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updateDesignGroupStatusMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmMoveToHallmark}
+              disabled={updateDesignGroupStatusMutation.isPending}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {updateDesignGroupStatusMutation.isPending ? "Moving..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

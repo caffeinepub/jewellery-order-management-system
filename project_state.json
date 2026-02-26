@@ -1,24 +1,44 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
+  "summary": "Order management app with a Ready tab and Total Orders tab. Working on return-to-pending logic for RB orders in the Ready tab.",
+  "architectural_notes": [
+    "All orders in Total Orders are always in Pending status — no other status exists there.",
+    "Ready tab orders originate from Pending orders moved via status change (pending → ready) with a supplied qty recorded.",
+    "Delete and Return in Ready tab are the same feature — both remove from Ready and restore to Total Orders as Pending."
+  ],
   "known_issues": [
-    "Quantities (qtys) not loading correctly"
+    "Return to Pending fails with 'Original order not found for 1105ARB2603015-001' error when returning RB orders from Ready tab."
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-investigate-and-fix-the-issue-where-order-quantities-qtys-fail-to-load-on-the-dashboard-ensure-that-quantity-values-are-correctly-fetched-from-the-backend-passed-through-react-query-hooks-and-rendered-in-all-relevant-components-including-summarycards-totalorderstab-ordertable-and-any-other-components-that-display-qty-fields",
-      "title": "Investigate and fix the issue where order quantities (qtys) fail to load on the dashboard. Ensure that quantity values are correctly fetched from the backend, passed through React Query hooks, and rendered in all relevant components including SummaryCards, TotalOrdersTab, OrderTable, and any other components that display qty fields.",
+      "id": "feature-update-the-frontend-readytab-tsx-return-to-pending-flow-to-correctly-call-the-fixed-backend-return-function-and-display-a-success-toast-on-completion-and-an-error-toast-with-the-specific-failure-message-if-it-fails-no-other-ui-changes-are-needed",
+      "title": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
       "reqIds": [
-        "REQ-1"
+        "REQ-2"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [],
-  "projectName": "Fix quantities not loading on dashboard",
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Fix Return to Pending for RB orders in Ready tab: if supplied qty = pending qty, create new pending order line in Total Orders; if supplied qty < pending qty, restore supplied qty to existing order line in Total Orders",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Fix the backend 'returnOrdersToPending' (or equivalent) function so it no longer requires an existing 'original order' record lookup. Instead, implement the following logic for RB orders being returned from Ready to Pending: (1) If the Ready order's supplied qty equals its pending qty (fully fulfilled case), create a brand-new Pending order line in Total Orders with qty = supplied qty and all other fields copied from the Ready order, then remove the order from Ready. (2) If the Ready order's supplied qty is less than its pending qty (partially fulfilled case), find the existing order line in Total Orders by base order number and add the supplied qty back to it, restoring its status to Pending if not already, then remove the order from Ready. All orders in Total Orders must always have Pending status.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    }
+  ],
+  "gameProjectType": "none",
+  "projectName": "Jewellery Order Manager",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

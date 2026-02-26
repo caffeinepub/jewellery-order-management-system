@@ -1,72 +1,33 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw } from "lucide-react";
-import { SummaryCards } from "../components/dashboard/SummaryCards";
-import TotalOrdersTab from "../components/dashboard/TotalOrdersTab";
-import ReadyTab from "../components/dashboard/ReadyTab";
-import HallmarkTab from "../components/dashboard/HallmarkTab";
-import CustomerOrdersTab from "../components/dashboard/CustomerOrdersTab";
-import KarigarsTab from "../components/dashboard/KarigarsTab";
-import { useGetAllOrders } from "../hooks/useQueries";
-import { normalizeOrders } from "../utils/orderNormalizer";
+import SummaryCards from "@/components/dashboard/SummaryCards";
+import TotalOrdersTab from "@/components/dashboard/TotalOrdersTab";
+import ReadyTab from "@/components/dashboard/ReadyTab";
+import HallmarkTab from "@/components/dashboard/HallmarkTab";
+import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
+import KarigarsTab from "@/components/dashboard/KarigarsTab";
+import UnmappedSection from "@/components/dashboard/UnmappedSection";
 
-export function Dashboard() {
-  const [activeTab, setActiveTab] = useState("total");
-  const queryClient = useQueryClient();
+type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
-  const {
-    data: rawOrders,
-    isLoading,
-    isError,
-    error,
-  } = useGetAllOrders();
-
-  // Normalize orders to ensure quantity is always a proper bigint
-  const orders = rawOrders ? normalizeOrders(rawOrders) : [];
-
-  const handleRetry = () => {
-    queryClient.invalidateQueries({ queryKey: ["orders"] });
-  };
+export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("total");
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold font-playfair text-foreground">
-          Dashboard
-        </h1>
+    <div className="container mx-auto py-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Manage your jewellery orders and production workflow
+        </p>
       </div>
 
-      {isError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Failed to load orders</AlertTitle>
-          <AlertDescription className="flex items-center gap-2">
-            {error instanceof Error ? error.message : "An error occurred while loading orders."}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRetry}
-              className="ml-2"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Retry
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      <UnmappedSection />
 
-      <SummaryCards
-        orders={orders}
-        activeTab={activeTab}
-        isLoading={isLoading}
-        isError={isError}
-      />
+      <SummaryCards activeTab={activeTab} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex flex-wrap h-auto gap-1">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ActiveTab)} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="total">Total Orders</TabsTrigger>
           <TabsTrigger value="ready">Ready</TabsTrigger>
           <TabsTrigger value="hallmark">Hallmark</TabsTrigger>
@@ -74,24 +35,24 @@ export function Dashboard() {
           <TabsTrigger value="karigars">Karigars</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="total" className="mt-4">
-          <TotalOrdersTab orders={orders} isLoading={isLoading} />
+        <TabsContent value="total" className="space-y-4">
+          <TotalOrdersTab />
         </TabsContent>
 
-        <TabsContent value="ready" className="mt-4">
-          <ReadyTab orders={orders} isLoading={isLoading} />
+        <TabsContent value="ready" className="space-y-4">
+          <ReadyTab />
         </TabsContent>
 
-        <TabsContent value="hallmark" className="mt-4">
-          <HallmarkTab orders={orders} isLoading={isLoading} />
+        <TabsContent value="hallmark" className="space-y-4">
+          <HallmarkTab />
         </TabsContent>
 
-        <TabsContent value="customer" className="mt-4">
-          <CustomerOrdersTab orders={orders} isLoading={isLoading} />
+        <TabsContent value="customer" className="space-y-4">
+          <CustomerOrdersTab />
         </TabsContent>
 
-        <TabsContent value="karigars" className="mt-4">
-          <KarigarsTab orders={orders} isLoading={isLoading} />
+        <TabsContent value="karigars" className="space-y-4">
+          <KarigarsTab />
         </TabsContent>
       </Tabs>
     </div>

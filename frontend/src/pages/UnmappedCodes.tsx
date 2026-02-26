@@ -1,20 +1,12 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  useGetAllOrders,
-  useGetAllMasterDesignMappings,
+  useGetOrdersWithMappings,
   useUpdateDesignMapping,
-  useGetMasterDesignKarigars,
-} from "@/hooks/useQueries";
+  useReassignDesign,
+  useGetUniqueKarigarsFromDesignMappings,
+} from '@/hooks/useQueries';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -24,196 +16,258 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Edit2 } from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { normalizeOrders } from "@/utils/orderNormalizer";
+import { Check, X, Edit2 } from "lucide-react";
 
-interface UnmappedDesign {
+interface UnmappedGroup {
   designCode: string;
-  orderCount: number;
-  orderNos: string[];
+  genericName: string | null;
+  karigarName: string | null;
+  missingFields: string[];
+  count: number;
 }
 
-export function UnmappedCodes() {
-  const [editingDesign, setEditingDesign] = useState<string | null>(null);
+export default function UnmappedCodes() {
+  const { data: orders = [], isLoading } = useGetOrdersWithMappings();
+  const { data: karigars = [] } = useGetUniqueKarigarsFromDesignMappings();
+  const updateDesignMappingMutation = useUpdateDesignMapping();
+  const reassignDesignMutation = useReassignDesign();
+
+  const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editGenericName, setEditGenericName] = useState("");
   const [editKarigarName, setEditKarigarName] = useState("");
 
-  const { data: rawOrders, isLoading: ordersLoading } = useGetAllOrders();
-  const { data: mappings } = useGetAllMasterDesignMappings();
-  const { data: karigars } = useGetMasterDesignKarigars();
-  const updateMappingMutation = useUpdateDesignMapping();
+  const unmappedGroups = useMemo((): UnmappedGroup[] => {
+    const groups = new Map<string, UnmappedGroup>();
 
-  const orders = rawOrders ? normalizeOrders(rawOrders) : [];
+    orders.forEach((order) => {
+      const missingFields: string[] = [];
+      if (!order.genericName) missingFields.push("Generic Name");
+      if (!order.karigarName) missingFields.push("Karigar");
 
-  const mappedDesignCodes = useMemo(() => {
-    if (!mappings) return new Set<string>();
-    return new Set(mappings.map(([code]) => code.trim().toUpperCase()));
-  }, [mappings]);
-
-  const unmappedDesigns = useMemo((): UnmappedDesign[] => {
-    const groups: Record<string, UnmappedDesign> = {};
-    for (const order of orders) {
-      const normalizedCode = order.design?.trim().toUpperCase();
-      if (!normalizedCode) continue;
-      if (mappedDesignCodes.has(normalizedCode)) continue;
-      if (!groups[normalizedCode]) {
-        groups[normalizedCode] = {
-          designCode: order.design,
-          orderCount: 0,
-          orderNos: [],
-        };
+      if (missingFields.length > 0) {
+        const existing = groups.get(order.design);
+        if (existing) {
+          existing.count++;
+        } else {
+          groups.set(order.design, {
+            designCode: order.design,
+            genericName: order.genericName || null,
+            karigarName: order.karigarName || null,
+            missingFields,
+            count: 1,
+          });
+        }
       }
-      groups[normalizedCode].orderCount += 1;
-      if (!groups[normalizedCode].orderNos.includes(order.orderNo)) {
-        groups[normalizedCode].orderNos.push(order.orderNo);
-      }
-    }
-    return Object.values(groups).sort((a, b) =>
+    });
+
+    return Array.from(groups.values()).sort((a, b) =>
       a.designCode.localeCompare(b.designCode)
     );
-  }, [orders, mappedDesignCodes]);
+  }, [orders]);
 
-  const handleEditOpen = (designCode: string) => {
-    setEditingDesign(designCode);
+  const handleEdit = (
+    designCode: string,
+    genericName: string | null,
+    karigarName: string | null
+  ) => {
+    setEditingRow(designCode);
+    setEditGenericName(genericName || "");
+    setEditKarigarName(karigarName || "");
+  };
+
+  const handleCancel = () => {
+    setEditingRow(null);
     setEditGenericName("");
     setEditKarigarName("");
   };
 
-  const handleSave = async () => {
-    if (!editingDesign || !editGenericName.trim() || !editKarigarName) {
-      toast.error("Please fill in all fields");
+  const handleSave = async (designCode: string) => {
+    if (!editGenericName.trim() || !editKarigarName.trim()) {
+      toast.error("Both Generic Name and Karigar must be provided");
       return;
     }
+
     try {
-      await updateMappingMutation.mutateAsync({
-        designCode: editingDesign,
-        genericName: editGenericName.trim(),
-        karigarName: editKarigarName,
-      });
-      toast.success(`Mapping saved for ${editingDesign}`);
-      setEditingDesign(null);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save mapping");
+      const group = unmappedGroups.find((g) => g.designCode === designCode);
+
+      if (group?.genericName && group?.karigarName) {
+        // Both fields already exist — reassign karigar
+        await reassignDesignMutation.mutateAsync({
+          designCode,
+          newKarigar: editKarigarName.trim(),
+        });
+      } else {
+        // Use updateDesignMapping to set both fields
+        await updateDesignMappingMutation.mutateAsync({
+          designCode,
+          newGenericName: editGenericName.trim(),
+          newKarigarName: editKarigarName.trim(),
+        });
+      }
+
+      toast.success(`Design ${designCode} updated successfully`);
+      setEditingRow(null);
+      setEditGenericName("");
+      setEditKarigarName("");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to update design mapping";
+      toast.error(message);
     }
   };
 
-  if (ordersLoading) {
+  if (isLoading) {
     return (
-      <div className="p-4 md:p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-48" />
-          <div className="h-64 bg-muted rounded" />
-        </div>
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">Loading unmapped orders...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold font-playfair text-foreground">
-          Unmapped Design Codes
-        </h1>
-        <Badge variant="secondary">{unmappedDesigns.length} unmapped</Badge>
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Unmapped Design Codes</h1>
+        <p className="text-muted-foreground mt-2">
+          Design codes with missing generic names or karigar assignments
+        </p>
       </div>
 
-      {unmappedDesigns.length === 0 ? (
-        <div className="text-center text-muted-foreground py-12">
-          <p className="text-lg font-medium">All design codes are mapped!</p>
-          <p className="text-sm">No unmapped design codes found in pending orders.</p>
-        </div>
+      {unmappedGroups.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <p className="text-center text-muted-foreground">
+              All design codes are properly mapped!
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="rounded-md border border-border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Design Code</TableHead>
-                <TableHead className="text-right">Orders</TableHead>
-                <TableHead>Order Numbers</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {unmappedDesigns.map((design) => (
-                <TableRow key={design.designCode}>
-                  <TableCell className="font-medium">{design.designCode}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="outline">{design.orderCount}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                    {design.orderNos.slice(0, 5).join(", ")}
-                    {design.orderNos.length > 5 && ` +${design.orderNos.length - 5} more`}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditOpen(design.designCode)}
-                    >
-                      <Edit2 className="h-3 w-3 mr-1" />
-                      Map
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      <Dialog open={!!editingDesign} onOpenChange={(open) => { if (!open) setEditingDesign(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Map Design Code: {editingDesign}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="generic-name">Generic Name</Label>
-              <Input
-                id="generic-name"
-                value={editGenericName}
-                onChange={(e) => setEditGenericName(e.target.value)}
-                placeholder="Enter generic name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="karigar-select">Karigar</Label>
-              <Select value={editKarigarName} onValueChange={setEditKarigarName}>
-                <SelectTrigger id="karigar-select">
-                  <SelectValue placeholder="Select karigar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(karigars ?? []).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {k}
-                    </SelectItem>
+        <Card>
+          <CardHeader>
+            <CardTitle>Unmapped Designs</CardTitle>
+            <CardDescription>
+              {unmappedGroups.length} design code{unmappedGroups.length !== 1 ? "s" : ""} need
+              attention
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Design Code</TableHead>
+                    <TableHead>Generic Name</TableHead>
+                    <TableHead>Karigar</TableHead>
+                    <TableHead>Missing Fields</TableHead>
+                    <TableHead className="text-right">Orders</TableHead>
+                    <TableHead className="w-24">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unmappedGroups.map((group) => (
+                    <TableRow key={group.designCode}>
+                      <TableCell className="font-mono font-medium">
+                        {group.designCode}
+                      </TableCell>
+                      <TableCell>
+                        {editingRow === group.designCode ? (
+                          <Input
+                            value={editGenericName}
+                            onChange={(e) => setEditGenericName(e.target.value)}
+                            placeholder="Generic Name"
+                            className="h-8 text-sm"
+                          />
+                        ) : (
+                          <span className={!group.genericName ? "text-destructive italic" : ""}>
+                            {group.genericName || "Missing"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingRow === group.designCode ? (
+                          <Select
+                            value={editKarigarName}
+                            onValueChange={setEditKarigarName}
+                          >
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue placeholder="Select karigar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {karigars.map((k) => (
+                                <SelectItem key={k} value={k}>
+                                  {k}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className={!group.karigarName ? "text-destructive italic" : ""}>
+                            {group.karigarName || "Missing"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-destructive">
+                          {group.missingFields.join(", ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">{group.count}</TableCell>
+                      <TableCell>
+                        {editingRow === group.designCode ? (
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-green-600"
+                              onClick={() => handleSave(group.designCode)}
+                              disabled={
+                                updateDesignMappingMutation.isPending ||
+                                reassignDesignMutation.isPending
+                              }
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive"
+                              onClick={handleCancel}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() =>
+                              handleEdit(
+                                group.designCode,
+                                group.genericName,
+                                group.karigarName
+                              )
+                            }
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </SelectContent>
-              </Select>
+                </TableBody>
+              </Table>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingDesign(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={updateMappingMutation.isPending}
-              className="bg-gold hover:bg-gold-hover text-white"
-            >
-              {updateMappingMutation.isPending ? "Saving..." : "Save Mapping"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

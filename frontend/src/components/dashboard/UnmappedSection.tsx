@@ -1,56 +1,94 @@
-import { useMemo } from "react";
-import { Order } from "../../backend";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { useMemo } from 'react';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from '@tanstack/react-router';
+import { useGetUnmappedOrders } from '@/hooks/useQueries';
 
 interface UnmappedGroup {
   designCode: string;
-  orderCount: number;
-  orderNos: string[];
+  count: number;
+  missingGenericName: boolean;
+  missingKarigarName: boolean;
 }
 
-interface UnmappedSectionProps {
-  orders: Order[];
-}
+export default function UnmappedSection() {
+  const { data: unmappedOrders = [], isLoading } = useGetUnmappedOrders();
+  const navigate = useNavigate();
 
-export function UnmappedSection({ orders }: UnmappedSectionProps) {
-  const unmappedGroups = useMemo(() => {
-    const groups = orders
-      .filter((o) => !o.genericName && !o.karigarName)
-      .reduce<Record<string, UnmappedGroup>>((acc, order) => {
-        const key = order.design;
-        if (!acc[key]) {
-          acc[key] = { designCode: key, orderCount: 0, orderNos: [] };
-        }
-        acc[key].orderCount += 1;
-        if (!acc[key].orderNos.includes(order.orderNo)) {
-          acc[key].orderNos.push(order.orderNo);
-        }
-        return acc;
-      }, {});
-    return Object.values(groups);
-  }, [orders]);
+  const unmappedDesignCodes = useMemo((): UnmappedGroup[] => {
+    const grouped = unmappedOrders.reduce<Record<string, UnmappedGroup>>((acc, order) => {
+      if (!acc[order.design]) {
+        acc[order.design] = {
+          designCode: order.design,
+          count: 0,
+          missingGenericName: !order.genericName,
+          missingKarigarName: !order.karigarName,
+        };
+      }
+      acc[order.design].count++;
+      return acc;
+    }, {});
 
-  if (unmappedGroups.length === 0) return null;
+    return Object.values(grouped);
+  }, [unmappedOrders]);
+
+  if (isLoading) return null;
+  if (unmappedDesignCodes.length === 0) return null;
+
+  const totalOrders = unmappedDesignCodes.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <Alert variant="destructive" className="mb-4">
-      <AlertTriangle className="h-4 w-4" />
-      <AlertTitle>Unmapped Design Codes ({unmappedGroups.length})</AlertTitle>
+    <Alert variant="destructive" className="mb-6">
+      <AlertCircle className="h-5 w-5" />
+      <AlertTitle className="text-lg font-semibold">Unmapped Design Codes</AlertTitle>
       <AlertDescription>
-        <p className="mb-2 text-sm">
-          The following design codes have no karigar/generic name mapping:
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {unmappedGroups.map((group) => (
-            <span
-              key={group.designCode}
-              className="inline-flex items-center gap-1 bg-destructive/10 text-destructive rounded px-2 py-0.5 text-xs font-medium"
+        <div className="mt-2 space-y-2">
+          <p className="text-sm">
+            {totalOrders} order(s) with {unmappedDesignCodes.length} design code(s) are missing mapping
+            information.
+          </p>
+
+          <div className="mt-4 space-y-2 max-h-[300px] overflow-y-auto">
+            {unmappedDesignCodes.slice(0, 5).map((item) => (
+              <div key={item.designCode} className="p-3 flex items-center justify-between">
+                <div>
+                  <div className="font-mono text-sm font-medium">{item.designCode}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {item.count} order(s) • Missing:{' '}
+                    {item.missingGenericName && item.missingKarigarName
+                      ? 'Generic Name & Karigar Name'
+                      : item.missingGenericName
+                      ? 'Generic Name'
+                      : 'Karigar Name'}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {unmappedDesignCodes.length > 5 && (
+              <div className="text-xs text-muted-foreground text-center py-2">
+                ... and {unmappedDesignCodes.length - 5} more design codes
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate({ to: '/unmapped-codes' })}
+              className="bg-background"
             >
-              {group.designCode}
-              <span className="opacity-70">({group.orderCount})</span>
-            </span>
-          ))}
+              View All Unmapped
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate({ to: '/master-designs' })}
+            >
+              Update Master Designs
+            </Button>
+          </div>
         </div>
       </AlertDescription>
     </Alert>
