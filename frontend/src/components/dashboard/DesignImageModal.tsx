@@ -1,175 +1,96 @@
-import { useState, useEffect } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, X } from 'lucide-react';
-import { useGetDesignImage } from '@/hooks/useQueries';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ZoomIn, ZoomOut, X } from "lucide-react";
+import { useGetDesignImage } from "../../hooks/useQueries";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DesignImageModalProps {
-  designCode: string;
   open: boolean;
+  designCode: string;
   onClose: () => void;
 }
 
-export default function DesignImageModal({
-  designCode,
+export function DesignImageModal({
   open,
+  designCode,
   onClose,
 }: DesignImageModalProps) {
   const [zoom, setZoom] = useState(1);
-  const [isPanning, setIsPanning] = useState(false);
-  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const { data: designData, isLoading } = useGetDesignImage(designCode);
 
-  const { data: designData, isLoading, error } = useGetDesignImage(designCode);
-
-  useEffect(() => {
-    if (!open) {
-      setZoom(1);
-      setPanPosition({ x: 0, y: 0 });
-    }
-  }, [open]);
-
-  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 3));
-  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5));
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom > 1) {
-      setIsPanning(true);
-      setStartPan({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning && zoom > 1) {
-      setPanPosition({ x: e.clientX - startPan.x, y: e.clientY - startPan.y });
-    }
-  };
-
-  const handleMouseUp = () => setIsPanning(false);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (zoom > 1 && e.touches.length === 1) {
-      setIsPanning(true);
-      setStartPan({
-        x: e.touches[0].clientX - panPosition.x,
-        y: e.touches[0].clientY - panPosition.y,
-      });
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (isPanning && zoom > 1 && e.touches.length === 1) {
-      setPanPosition({
-        x: e.touches[0].clientX - startPan.x,
-        y: e.touches[0].clientY - startPan.y,
-      });
-    }
-  };
-
-  const handleTouchEnd = () => setIsPanning(false);
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Design: {designCode}</span>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="icon" variant="ghost" onClick={handleZoomOut} disabled={zoom <= 0.5}>
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">{Math.round(zoom * 100)}%</span>
+              <Button size="icon" variant="ghost" onClick={handleZoomIn} disabled={zoom >= 3}>
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {isLoading && (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-muted-foreground">Loading design image...</div>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-destructive">Failed to load design image</div>
-            </div>
-          )}
-
-          {!isLoading && !error && !designData && (
-            <div className="flex items-center justify-center py-12 bg-muted rounded-lg">
-              <div className="text-muted-foreground">No image available for this design</div>
-            </div>
-          )}
-
-          {designData && designData.imageUrl && (
-            <>
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Button variant="outline" size="sm" onClick={handleZoomOut}>
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground min-w-[60px] text-center">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <Button variant="outline" size="sm" onClick={handleZoomIn}>
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div
-                className="overflow-auto max-h-[50vh] border rounded-lg bg-muted/20 flex items-center justify-center p-4"
-                style={{ cursor: zoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <img
-                  src={designData.imageUrl}
-                  alt={`Design ${designCode}`}
-                  style={{
-                    transform: `scale(${zoom}) translate(${panPosition.x / zoom}px, ${panPosition.y / zoom}px)`,
-                    transition: isPanning ? 'none' : 'transform 0.2s ease-in-out',
-                    maxWidth: '100%',
-                    height: 'auto',
-                    userSelect: 'none',
-                  }}
-                  className="rounded-md"
-                  draggable={false}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground text-center">
-                {zoom > 1 ? 'Click and drag to pan' : 'Use zoom controls to magnify'}
-              </p>
-            </>
-          )}
-
-          {designData && (
-            <div className="space-y-2 border-t pt-4">
-              <h3 className="font-semibold text-sm">Design Details</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Design Code:</span>
-                  <p className="font-medium">{designData.designCode}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Generic Name:</span>
-                  <p className="font-medium">{designData.genericName || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Karigar Name:</span>
-                  <p className="font-medium">{designData.karigarName || '-'}</p>
-                </div>
-              </div>
+        <div className="overflow-auto max-h-[60vh] flex items-center justify-center bg-muted/20 rounded-lg p-4">
+          {isLoading ? (
+            <Skeleton className="w-64 h-64" />
+          ) : designData && designData.url ? (
+            <img
+              src={designData.url}
+              alt={`Design ${designCode}`}
+              style={{ transform: `scale(${zoom})`, transformOrigin: "center", transition: "transform 0.2s" }}
+              className="max-w-full object-contain"
+            />
+          ) : (
+            <div className="text-center text-muted-foreground py-12">
+              <p className="text-lg font-medium">No image available</p>
+              <p className="text-sm">Design code: {designCode}</p>
             </div>
           )}
         </div>
+
+        {designData && (
+          <div className="text-sm text-muted-foreground space-y-1 pt-2 border-t border-border">
+            <div className="flex gap-4 flex-wrap">
+              <div>
+                <span className="font-medium">Design Code:</span>{" "}
+                <span>{designCode}</span>
+              </div>
+              {designData.genericName && (
+                <div>
+                  <span className="font-medium">Generic Name:</span>{" "}
+                  <span>{designData.genericName}</span>
+                </div>
+              )}
+              {designData.karigarName && (
+                <div>
+                  <span className="font-medium">Karigar:</span>{" "}
+                  <span>{designData.karigarName}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
+
+export default DesignImageModal;

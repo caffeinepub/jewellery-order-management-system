@@ -1,37 +1,24 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management app with tabs (Total Orders, Ready, Hallmark) featuring summary cards. Has partial quantity movement (splitting) between tabs.",
-  "architectural_notes": [
-    "Total Weight must be calculated as qty × gross weight (gw) per line across all summary cards",
-    "Partial line splits must trigger summary card recalculation in both forward (split) and return directions"
-  ],
+  "summary": "New project",
+  "architectural_notes": [],
   "known_issues": [
-    "Summary cards on Total Orders tab don't update when a line is partially split (forward path broken; return path works correctly)",
-    "Total Weight shows raw weight instead of qty×gw when qty is partially moved"
+    "Quantities (qtys) not loading correctly"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-total-weight-calculation-across-all-tabs-total-orders-ready-hallmark-so-that-weight-is-always-computed-as-qty-gross-weight-gw-per-order-line-not-raw-weight-alone-for-example-if-a-line-has-qty-3-and-gw-8g-the-weight-contribution-must-be-24g-not-8g",
-      "title": "Fix Total Weight calculation across all tabs (Total Orders, Ready, Hallmark) so that weight is always computed as `qty × gross weight (gw)` per order line, not raw weight alone. For example, if a line has qty=3 and gw=8g, the weight contribution must be 24g, not 8g.",
+      "id": "feature-investigate-and-fix-the-issue-where-order-quantities-qtys-fail-to-load-on-the-dashboard-ensure-that-quantity-values-are-correctly-fetched-from-the-backend-passed-through-react-query-hooks-and-rendered-in-all-relevant-components-including-summarycards-totalorderstab-ordertable-and-any-other-components-that-display-qty-fields",
+      "title": "Investigate and fix the issue where order quantities (qtys) fail to load on the dashboard. Ensure that quantity values are correctly fetched from the backend, passed through React Query hooks, and rendered in all relevant components including SummaryCards, TotalOrdersTab, OrderTable, and any other components that display qty fields.",
       "reqIds": [
         "REQ-1"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-summary-cards-on-the-total-orders-tab-and-all-other-tabs-so-they-update-correctly-when-a-line-is-partially-split-when-3-out-of-4-qty-are-moved-to-ready-the-total-orders-summary-cards-must-immediately-reflect-the-reduced-totals-count-weight-remaining-qty-gw-qty-for-the-remaining-parent-line-rather-than-staying-unchanged-the-fix-must-be-symmetric-both-the-forward-split-path-move-to-ready-and-the-return-path-return-from-ready-must-recalculate-all-summary-card-values-consistently",
-      "title": "Fix summary cards on the Total Orders tab (and all other tabs) so they update correctly when a line is partially split. When 3 out of 4 qty are moved to Ready, the Total Orders summary cards must immediately reflect the reduced totals (count, weight=remaining_qty×gw, qty) for the remaining parent line, rather than staying unchanged. The fix must be symmetric: both the forward split path (move to Ready) and the return path (return from Ready) must recalculate all summary card values consistently.",
-      "reqIds": [
-        "REQ-2"
       ],
       "version": 1
     }
   ],
   "new_feature_requests": [],
-  "gameProjectType": "none",
-  "projectName": "Fix Total Weight calculation (qty×gw) and summary card update on partial split",
+  "projectName": "Fix quantities not loading on dashboard",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

@@ -1,98 +1,68 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Total Weight calculation (qty×gw) and summary card update on partial split",
+  "title": "Fix quantities not loading on dashboard",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix Total Weight calculation across all tabs so that weight is always computed as qty × gross weight (gw) per order line, not raw weight alone",
+      "summary": "Investigate and fix the issue where order quantities fail to load on the dashboard, ensuring quantity values are correctly fetched from the backend, passed through React Query hooks, and rendered in all relevant components including SummaryCards, TotalOrdersTab, OrderTable, and any other components that display qty fields",
       "acceptanceCriteria": [
-        "When an order line with gw=8 and qty=3 is in the Ready tab, the Total Weight summary card shows 24g (3×8), not 8g.",
-        "All summary cards (Total Orders, Ready, Hallmark) use qty×gw for every weight aggregation.",
-        "The frontend SummaryCards component computes or displays weight using qty×gw wherever it aggregates locally."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
-          "operation": "modify",
-          "description": "Update the weight computation logic to use qty × weightPerUnit (gross weight) instead of raw weightPerUnit when aggregating order weight locally. Ensure all summary data sources (getTotalOrdersSummary, getReadyOrdersSummary, getHallmarkOrdersSummary) receive the corrected weight values from the backend. Verify the component's usage instructions before implementing."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Review and update any local weight calculations or display logic to ensure consistency with qty × weightPerUnit formula. If the tab displays weight values directly (e.g., in the order table or summary section), ensure they reflect the qty×gw calculation."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Review and update any local weight calculations or display logic to ensure consistency with qty × weightPerUnit formula. Ensure the Ready tab summary cards and order displays correctly show weight as qty×gw."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Review and update any local weight calculations or display logic to ensure consistency with qty × weightPerUnit formula. Ensure the Hallmark tab summary cards and order displays correctly show weight as qty×gw."
-        },
-        {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "If the OrderTable component displays weight values directly, update the rendering logic to compute and display weight as qty × weightPerUnit. Ensure exported data (Excel, PDF, JPEG) also uses the qty×gw formula."
-        },
-        {
-          "path": "frontend/src/utils/exportUtils.ts",
-          "operation": "modify",
-          "description": "Review the Excel and PDF export functions to ensure weight is calculated and exported as qty × weightPerUnit for every order line. Update any aggregation or display logic to reflect the corrected formula."
-        },
-        {
-          "path": "frontend/src/pages/Dashboard.tsx",
-          "operation": "modify",
-          "description": "Review the dashboard page for any direct weight calculations or aggregations. Ensure all weight displays and data passed to child components use qty × weightPerUnit consistently."
-        },
-        {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
-          "operation": "modify",
-          "description": "Review the karigar detail page for any weight calculations or displays. Ensure all order weight displays and exports use qty × weightPerUnit consistently."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Fix summary cards on the Total Orders tab (and all other tabs) so they update correctly when a line is partially split, ensuring both forward split (move to Ready) and return (return from Ready) paths recalculate all summary card values consistently",
-      "acceptanceCriteria": [
-        "After partially moving qty from Total Orders to Ready (e.g., 3 of 4), the Total Orders summary cards reflect the updated totals immediately (order count, total qty reduced by 3, total weight reduced by 3×gw).",
-        "The Ready tab summary cards show the correct totals for the newly created split line (1 order, qty=3, weight=3×gw).",
-        "Returning the split line from Ready back to Total Orders updates summary cards in both tabs correctly and proportionately.",
-        "No stale cached values remain after a split or return operation; React Query cache is invalidated for all affected summary queries after any supply/split/return mutation."
+        "Quantity values are visible and non-zero (when data exists) in the SummaryCards summary metric for quantity.",
+        "Quantity columns/fields in OrderTable and TotalOrdersTab display correct values after page load.",
+        "The backend query for orders returns qty fields populated correctly.",
+        "React Query hooks in useQueries.ts correctly map and expose qty data from the backend response.",
+        "No console errors related to undefined or null qty fields."
       ],
       "file_operations": [
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Update all supply, split, and return mutation hooks (batchSupplyRBOrders, returnOrdersToPending, supplyAndReturnOrder, batchReturnOrdersToPending) to invalidate all summary queries (getTotalOrdersSummary, getReadyOrdersSummary, getHallmarkOrdersSummary, getOverallSummary) in their onSuccess callbacks. Ensure the invalidation covers all tabs affected by the mutation (e.g., both Total Orders and Ready when a split occurs). Add comprehensive cache invalidation for order list queries (getOrders, getReadyOrders, getOrdersWithMappings) to ensure order data is refetched after mutations."
-        },
-        {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "operation": "modify",
-          "description": "Review the batchSupplyRBOrders mutation call in the dialog component. Ensure the mutation triggers full cache invalidation for all affected summary queries (Total Orders, Ready, Hallmark) and order list queries after successful completion. Verify that partial splits (e.g., supplying 3 of 4 qty) correctly update summary cards in both source and destination tabs."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Review the batch return mutation (batchReturnOrdersToPending) and ensure it triggers cache invalidation for all affected summary queries (Total Orders, Ready, Hallmark) and order list queries. Ensure the Ready tab summary cards reflect the reduced totals immediately after orders are returned."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Review all mutation calls (mark as ready, supply) and ensure they trigger cache invalidation for all affected summary queries (Total Orders, Ready, Hallmark) and order list queries. Ensure the Total Orders tab summary cards reflect the reduced totals immediately after orders are moved or split."
+          "description": "Review and fix the React Query hooks that fetch orders from the backend. Ensure that the quantity field from the backend response (which uses 'quantity' as bigint per backend.d.ts) is correctly extracted and exposed in the query results. Verify that all order-fetching queries (useOrders, useOrdersQuery, useReadyOrders, etc.) properly map the 'quantity' field from the backend Order type. Add console logging during development to verify quantity values are being received from the backend actor."
         },
         {
           "path": "frontend/src/components/dashboard/SummaryCards.tsx",
           "operation": "modify",
-          "description": "Ensure the SummaryCards component relies on fresh React Query data and does not cache or memoize summary values in a way that would prevent updates after mutations. If the component performs local aggregation, ensure it uses the latest order data from React Query and correctly computes weight as qty×gw."
+          "description": "Fix the quantity calculation in the summary cards component. Ensure the component correctly accesses the 'quantity' field from each order object (which is a bigint from the backend). Convert bigint to number if needed for display using Number() or similar conversion. Verify that the reduce operation or aggregation logic properly sums quantity values. Add null/undefined checks to prevent runtime errors when quantity is missing."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Fix the quantity column rendering in the OrderTable component. Ensure the table column definition correctly references the 'quantity' property from order objects. Handle bigint-to-number conversion for display purposes (e.g., using Number() or .toString()). Add proper null/undefined handling for the quantity field. Verify that sorting by quantity works correctly if implemented."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Review and fix any quantity-related logic in the TotalOrdersTab component. Ensure that the OrderTable component receives orders with intact quantity values. Verify that any filtering or transformation logic preserves the quantity field. Check that the SuppliedQtyDialog correctly handles quantity values when marking RB orders as ready."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Review the CustomerOrdersTab component to ensure quantity values are correctly passed to the OrderTable. Verify that the filtered orders preserve the quantity field when applying search filters by order number, design code, or generic name."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Verify that the ReadyTab component correctly passes quantity values from the ready orders query to the OrderTable component. Ensure that batch operations (delete, return to pending) don't interfere with quantity display."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Review the HallmarkTab component to ensure quantity values are preserved when filtering orders by type, karigar, date range, and search text. Verify that Excel export includes quantity values correctly."
+        },
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Review the main Dashboard page to ensure that the orders query is correctly initialized and that data is being passed to child components (SummaryCards, TotalOrdersTab, etc.) with intact quantity fields. Verify error handling doesn't mask quantity-related issues."
         },
         {
           "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Review all mutation calls (mark as ready, supply) in the karigar detail page and ensure they trigger cache invalidation for all affected summary queries and order list queries. Ensure the karigar summary cards reflect the updated totals immediately after orders are moved or split."
+          "description": "Verify that the KarigarDetail page correctly displays quantity values for the karigar's pending orders. Ensure export functions (PDF, JPEG, Excel) include quantity data."
+        },
+        {
+          "path": "frontend/src/utils/exportUtils.ts",
+          "operation": "modify",
+          "description": "Review export utility functions to ensure quantity values are correctly included when exporting orders to Excel or PDF. Handle bigint-to-number conversion if needed for export libraries."
         }
       ]
     }

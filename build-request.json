@@ -1,57 +1,37 @@
 {
   "kind": "build_request",
-  "title": "Fix Total Weight calculation (qty×gw) and summary card update on partial split",
+  "title": "Fix quantities not loading on dashboard",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix Total Weight calculation across all tabs (Total Orders, Ready, Hallmark) so that weight is always computed as `qty × gross weight (gw)` per order line, not raw weight alone. For example, if a line has qty=3 and gw=8g, the weight contribution must be 24g, not 8g.",
+      "text": "Investigate and fix the issue where order quantities (qtys) fail to load on the dashboard. Ensure that quantity values are correctly fetched from the backend, passed through React Query hooks, and rendered in all relevant components including SummaryCards, TotalOrdersTab, OrderTable, and any other components that display qty fields.",
       "target": "both",
       "source": {
         "messageIds": [
-          "msg-3"
+          "msg-4"
         ],
         "quotes": [
-          "One logic missed across all tabs is total wt=qtyxgw",
-          "the ready tab showed: Total weight 8 ( this should had been 24)"
+          "Not loading qtys"
         ]
       },
       "acceptanceCriteria": [
-        "When an order line with gw=8 and qty=3 is in the Ready tab, the Total Weight summary card shows 24g (3×8), not 8g.",
-        "All summary cards (Total Orders, Ready, Hallmark) use qty×gw for every weight aggregation.",
-        "The backend weight aggregation logic (if weight is summed server-side) is also updated to use qty×gw.",
-        "The frontend SummaryCards component computes or displays weight using qty×gw wherever it aggregates locally."
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "text": "Fix summary cards on the Total Orders tab (and all other tabs) so they update correctly when a line is partially split. When 3 out of 4 qty are moved to Ready, the Total Orders summary cards must immediately reflect the reduced totals (count, weight=remaining_qty×gw, qty) for the remaining parent line, rather than staying unchanged. The fix must be symmetric: both the forward split path (move to Ready) and the return path (return from Ready) must recalculate all summary card values consistently.",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-3"
-        ],
-        "quotes": [
-          "since splitting of line in total orders , then summary cards didn't take a change in values itself",
-          "while same line was return from ready tab it increased values proportionately"
-        ]
-      },
-      "acceptanceCriteria": [
-        "After partially moving qty from Total Orders to Ready (e.g., 3 of 4), the Total Orders summary cards reflect the updated totals immediately (order count, total qty reduced by 3, total weight reduced by 3×gw).",
-        "The Ready tab summary cards show the correct totals for the newly created split line (1 order, qty=3, weight=3×gw).",
-        "Returning the split line from Ready back to Total Orders updates summary cards in both tabs correctly and proportionately.",
-        "No stale cached values remain after a split or return operation; React Query cache is invalidated for all affected summary queries after any supply/split/return mutation."
+        "Quantity values are visible and non-zero (when data exists) in the SummaryCards summary metric for quantity.",
+        "Quantity columns/fields in OrderTable and TotalOrdersTab display correct values after page load.",
+        "The backend query for orders returns qty fields populated correctly.",
+        "React Query hooks in useQueries.ts correctly map and expose qty data from the backend response.",
+        "No console errors related to undefined or null qty fields."
       ]
     }
   ],
   "constraints": [
-    "Do not change the overall order splitting logic or data model — only fix the weight formula and the cache invalidation/recalculation path for summary cards.",
-    "All summary card data sources (backend queries and frontend aggregation) must use qty×gw consistently — do not apply the fix in only one place."
+    "Do not alter immutable frontend paths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui.",
+    "Maintain single-actor Motoko backend architecture in backend/main.mo."
   ],
   "nonGoals": [
-    "Redesigning the split/supply dialog UI.",
-    "Changing order status transition rules.",
-    "Modifying any other tab behavior beyond fixing weight and summary card refresh."
+    "Redesigning the dashboard layout or UI.",
+    "Adding new order fields beyond fixing existing qty loading.",
+    "Changing authentication or identity logic."
   ],
   "imageRequirements": {
     "required": [],

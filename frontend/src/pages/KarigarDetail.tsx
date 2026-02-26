@@ -1,200 +1,193 @@
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download } from "lucide-react";
-import { useGetOrdersByKarigar, useMarkOrdersAsReady } from "@/hooks/useQueries";
-import { useActor } from "@/hooks/useActor";
-import OrderTable from "@/components/dashboard/OrderTable";
-import { exportKarigarToPDF, exportToJPEG, exportToExcel } from "@/utils/exportUtils";
-import { toast } from "sonner";
-import { OrderStatus, OrderType, Order } from "@/backend";
-import { useState, useMemo } from "react";
-import SuppliedQtyDialog from "@/components/dashboard/SuppliedQtyDialog";
+import { useGetAllOrders, useMarkOrdersAsReady } from "@/hooks/useQueries";
+import { OrderTable } from "@/components/dashboard/OrderTable";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  exportKarigarOrdersToPDF,
+  exportKarigarOrdersToJPEG,
+  exportKarigarOrdersToExcel,
+} from "@/utils/exportUtils";
+import { SuppliedQtyDialog } from "@/components/dashboard/SuppliedQtyDialog";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, FileText, Image, Download } from "lucide-react";
+import { Order, OrderStatus, OrderType } from "@/backend";
+import { normalizeOrders } from "@/utils/orderNormalizer";
+import { computeAgeingTiers } from "@/utils/ageingUtils";
+import OverdueFilterControl, {
+  OverdueSortDirection,
+  OverdueFilterThreshold,
+} from "@/components/dashboard/OverdueFilterControl";
+import { toast } from "sonner";
 
-export default function KarigarDetail() {
+export function KarigarDetail() {
   const { name } = useParams({ from: "/karigar/$name" });
   const navigate = useNavigate();
-  const { data: orders = [], isLoading } = useGetOrdersByKarigar(name);
-  const { actor } = useActor();
-  const [isExporting, setIsExporting] = useState(false);
-  const [selectedRBOrdersForSupply, setSelectedRBOrdersForSupply] = useState<Order[]>([]);
-  const markOrdersAsReadyMutation = useMarkOrdersAsReady();
 
-  const pendingOrders = orders.filter((o) => o.status === OrderStatus.Pending);
+  const { data: rawOrders, isLoading } = useGetAllOrders();
+  const markReadyMutation = useMarkOrdersAsReady();
 
-  const todayOrders = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTimestamp = today.getTime() * 1_000_000;
-    return pendingOrders.filter((order) => Number(order.createdAt) >= todayTimestamp);
-  }, [pendingOrders]);
+  const [showSupplyDialog, setShowSupplyDialog] = useState(false);
+  const [supplyOrders, setSupplyOrders] = useState<Order[]>([]);
+  const [overdueSort, setOverdueSort] = useState<OverdueSortDirection>(null);
+  const [overdueFilterThreshold, setOverdueFilterThreshold] = useState<OverdueFilterThreshold>(null);
 
-  // Use weightPerUnit × qty for correct total weight calculation
-  const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weightPerUnit * Number(o.quantity), 0);
-  const totalQuantity = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+  const orders = rawOrders ? normalizeOrders(rawOrders) : [];
 
-  const handleExport = async (
-    format: "pdf" | "jpeg" | "excel",
-    type: "daily" | "total"
-  ) => {
-    if (!actor && (format === "pdf" || format === "jpeg")) {
-      toast.error("Actor not initialized");
-      return;
+  const karigarOrders = useMemo(() => {
+    return orders.filter(
+      (o) =>
+        o.status === OrderStatus.Pending &&
+        (o.karigarName === name || (!o.karigarName && name === "Unassigned"))
+    );
+  }, [orders, name]);
+
+  const filteredOrders = useMemo(() => {
+    let result = karigarOrders;
+
+    if (overdueFilterThreshold !== null) {
+      const now = Date.now();
+      result = result.filter((o) => {
+        const createdMs = Number(o.createdAt) / 1_000_000;
+        const ageDays = (now - createdMs) / (1000 * 60 * 60 * 24);
+        return ageDays >= overdueFilterThreshold;
+      });
     }
 
-    const ordersToExport = type === "daily" ? todayOrders : pendingOrders;
-
-    if (ordersToExport.length === 0) {
-      toast.error(`No ${type} orders to export`);
-      return;
+    if (overdueSort === "mostOverdueFirst") {
+      result = [...result].sort((a, b) => Number(a.createdAt) - Number(b.createdAt));
+    } else if (overdueSort === "mostRecentFirst") {
+      result = [...result].sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
     }
 
-    setIsExporting(true);
-    try {
-      if (format === "pdf") {
-        await exportKarigarToPDF(ordersToExport, name, actor);
-        toast.success("PDF downloaded successfully. Check your Downloads folder.");
-      } else if (format === "jpeg") {
-        await exportToJPEG(ordersToExport, actor);
-        toast.success("JPEG opened in new tab. You can save it from there.");
-      } else if (format === "excel") {
-        exportToExcel(ordersToExport);
-        toast.success("Excel file downloaded successfully");
+    return result;
+  }, [karigarOrders, overdueSort, overdueFilterThreshold]);
+
+  // computeAgeingTiers returns Map<string, AgeingTier> where AgeingTier can be null.
+  // OrderTable expects AgeingTier[] where tier is non-null, so filter out null entries.
+  const ageingTiers = useMemo(() => {
+    const tiersMap = computeAgeingTiers(filteredOrders);
+    const result: Array<{ orderId: string; tier: "oldest" | "middle" | "newest" }> = [];
+    tiersMap.forEach((tier, orderId) => {
+      if (tier !== null) {
+        result.push({ orderId, tier });
       }
-    } catch {
-      toast.error(`Failed to export ${format.toUpperCase()}`);
-    } finally {
-      setIsExporting(false);
+    });
+    return result;
+  }, [filteredOrders]);
+
+  const handleMarkReady = async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) return;
+    const selectedOrders = filteredOrders.filter((o) => selectedIds.includes(o.orderId));
+    const rbOrders = selectedOrders.filter((o) => o.orderType === OrderType.RB);
+    if (rbOrders.length > 0) {
+      setSupplyOrders(rbOrders);
+      setShowSupplyDialog(true);
+    } else {
+      try {
+        await markReadyMutation.mutateAsync(selectedIds);
+        toast.success(`${selectedIds.length} order(s) marked as ready`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to mark orders as ready");
+      }
     }
   };
 
-  const handleMarkAsReady = async (selectedOrders: Order[]) => {
-    const rbPendingOrders = selectedOrders.filter(
-      (order) => order.orderType === OrderType.RB && order.status === OrderStatus.Pending
-    );
-    const nonRbOrders = selectedOrders.filter(
-      (order) => order.orderType !== OrderType.RB
-    );
-
-    if (nonRbOrders.length > 0) {
-      try {
-        const nonRbOrderIds = nonRbOrders.map((o) => o.orderId);
-        await markOrdersAsReadyMutation.mutateAsync(nonRbOrderIds);
-        toast.success(`${nonRbOrders.length} order(s) marked as Ready`);
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Failed to update orders";
-        toast.error(message);
-      }
+  const handleExportPDF = async () => {
+    try {
+      await exportKarigarOrdersToPDF(name, filteredOrders);
+      toast.success("PDF exported successfully");
+    } catch {
+      toast.error("Failed to export PDF");
     }
+  };
 
-    if (rbPendingOrders.length > 0) {
-      setSelectedRBOrdersForSupply(rbPendingOrders);
+  const handleExportJPEG = async () => {
+    try {
+      await exportKarigarOrdersToJPEG(name, filteredOrders);
+      toast.success("JPEG exported successfully");
+    } catch {
+      toast.error("Failed to export JPEG");
     }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      await exportKarigarOrdersToExcel(name, filteredOrders);
+      toast.success("Excel exported successfully");
+    } catch {
+      toast.error("Failed to export Excel");
+    }
+  };
+
+  const handleOverdueClear = () => {
+    setOverdueSort(null);
+    setOverdueFilterThreshold(null);
   };
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-muted-foreground">Loading orders...</div>
+      <div className="p-4 md:p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-48" />
+          <div className="h-64 bg-muted rounded" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: "/" })}
-          >
-            <ArrowLeft className="h-5 w-5" />
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate({ to: "/" })}
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+        <h1 className="text-xl font-bold font-playfair text-foreground flex-1">
+          {name} — Pending Orders ({filteredOrders.length})
+        </h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <OverdueFilterControl
+            sortDirection={overdueSort}
+            filterThreshold={overdueFilterThreshold}
+            onSortChange={setOverdueSort}
+            onFilterChange={setOverdueFilterThreshold}
+            onClear={handleOverdueClear}
+          />
+          <Button size="sm" variant="outline" onClick={handleExportPDF}>
+            <FileText className="h-3 w-3 mr-1" />
+            PDF
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">{name}</h1>
-            <p className="text-muted-foreground mt-1">
-              {pendingOrders.length} pending orders • {totalQuantity} pieces •{" "}
-              {totalWeight.toFixed(3)}g total weight
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isExporting || todayOrders.length === 0}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export Daily Orders
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Daily Orders ({todayOrders.length})</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExport("excel", "daily")}>
-                Export to Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf", "daily")}>
-                Export to PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("jpeg", "daily")}>
-                Export to JPEG
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isExporting || pendingOrders.length === 0}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export Total Orders
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Total Orders ({pendingOrders.length})</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExport("excel", "total")}>
-                Export to Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf", "total")}>
-                Export to PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("jpeg", "total")}>
-                Export to JPEG
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button size="sm" variant="outline" onClick={handleExportJPEG}>
+            <Image className="h-3 w-3 mr-1" />
+            JPEG
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExportExcel}>
+            <Download className="h-3 w-3 mr-1" />
+            Excel
+          </Button>
         </div>
       </div>
 
       <OrderTable
-        orders={pendingOrders}
-        enableBulkActions={true}
-        onMarkAsReady={handleMarkAsReady}
+        orders={filteredOrders}
+        showCheckboxes
+        showMarkReady
+        showDelete
+        showExport
+        ageingTiers={ageingTiers}
       />
 
-      {selectedRBOrdersForSupply.length > 0 && (
+      {showSupplyDialog && supplyOrders.length > 0 && (
         <SuppliedQtyDialog
-          orders={selectedRBOrdersForSupply}
-          onClose={() => setSelectedRBOrdersForSupply([])}
+          orders={supplyOrders}
+          onClose={() => {
+            setShowSupplyDialog(false);
+            setSupplyOrders([]);
+          }}
         />
       )}
     </div>

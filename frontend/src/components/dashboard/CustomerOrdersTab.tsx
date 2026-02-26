@@ -1,50 +1,62 @@
 import { useState, useMemo } from "react";
-import OrderTable from "./OrderTable";
-import { useGetAllOrders } from "@/hooks/useQueries";
-import { OrderType, OrderStatus } from "@/backend";
+import { Order, OrderStatus, OrderType } from "../../backend";
+import { OrderTable } from "./OrderTable";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function CustomerOrdersTab() {
-  const [searchText, setSearchText] = useState("");
-  const { data: orders = [], isLoading } = useGetAllOrders();
+interface CustomerOrdersTabProps {
+  orders: Order[];
+  isLoading?: boolean;
+}
+
+export default function CustomerOrdersTab({ orders, isLoading }: CustomerOrdersTabProps) {
+  const [search, setSearch] = useState("");
+
+  const coOrders = useMemo(() => {
+    return orders.filter(
+      (o) => o.orderType === OrderType.CO && o.status === OrderStatus.Pending
+    );
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
-    // Filter for CO type orders with Pending status only
-    let result = orders.filter(
-      (order) => order.orderType === OrderType.CO && order.status === OrderStatus.Pending
+    if (!search.trim()) return coOrders;
+    const s = search.toLowerCase();
+    return coOrders.filter(
+      (o) =>
+        o.orderNo.toLowerCase().includes(s) ||
+        o.design.toLowerCase().includes(s) ||
+        (o.genericName ?? "").toLowerCase().includes(s)
     );
-
-    // Filter by search text (order number, design code, or generic name)
-    if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      result = result.filter(
-        (order) =>
-          order.orderNo.toLowerCase().includes(search) ||
-          order.design.toLowerCase().includes(search) ||
-          (order.genericName && order.genericName.toLowerCase().includes(search))
-      );
-    }
-
-    return result;
-  }, [orders, searchText]);
+  }, [coOrders, search]);
 
   if (isLoading) {
-    return <div className="text-center py-8">Loading orders...</div>;
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex items-center gap-2">
         <Input
-          placeholder="Search by Order Number, Design Code, or Generic Name..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className="pl-9"
+          placeholder="Search by order no, design code, or generic name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
         />
       </div>
-      <OrderTable orders={filteredOrders} />
+      <OrderTable
+        orders={filteredOrders}
+        showCheckboxes
+        showMarkReady
+        showDelete
+        showExport
+      />
     </div>
   );
 }
+
+export { CustomerOrdersTab };

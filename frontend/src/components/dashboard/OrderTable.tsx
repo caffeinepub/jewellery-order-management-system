@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Order, OrderStatus, OrderType } from "../../backend";
 import {
   Table,
   TableBody,
@@ -7,18 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Loader2, Trash2 } from "lucide-react";
-import { Order, OrderType, OrderStatus } from "@/backend";
-import DesignImageModal from "./DesignImageModal";
-import { exportToExcel, exportToPDF, exportToJPEG } from "@/utils/exportUtils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,373 +20,323 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useActor } from "@/hooks/useActor";
-import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { Trash2, CheckCircle, Download, Image } from "lucide-react";
+import { useMarkOrdersAsReady, useBatchDeleteOrders } from "../../hooks/useQueries";
+import { exportOrdersToExcel } from "../../utils/exportUtils";
+import { DesignImageModal } from "./DesignImageModal";
+import { SuppliedQtyDialog } from "./SuppliedQtyDialog";
+import { getQuantityAsNumber } from "../../utils/orderNormalizer";
+import { getAgeingClass } from "../../utils/ageingUtils";
 
-// All query keys that must be refreshed after a status-change operation
-const INVALIDATE_KEYS = [
-  ["orders"],
-  ["readyOrders"],
-  ["ordersWithMappings"],
-  ["unmappedOrders"],
-  ["totalOrdersSummary"],
-  ["readyOrdersSummary"],
-  ["hallmarkOrdersSummary"],
-];
+interface AgeingTier {
+  orderId: string;
+  tier: "oldest" | "middle" | "newest";
+}
 
 interface OrderTableProps {
   orders: Order[];
-  showDateFilter?: boolean;
-  enableBulkActions?: boolean;
-  onMarkAsReady?: (selectedOrders: Order[]) => void;
-  onDelete?: (orderId: string) => void;
-  isDeleting?: boolean;
-  enableExport?: boolean;
+  showCheckboxes?: boolean;
+  showMarkReady?: boolean;
+  showDelete?: boolean;
+  showExport?: boolean;
+  onSelectionChange?: (selectedIds: string[]) => void;
+  externalSelectedIds?: string[];
+  readOnly?: boolean;
+  ageingTiers?: AgeingTier[];
 }
 
-export default function OrderTable({ 
-  orders, 
-  showDateFilter = false, 
-  enableBulkActions = false,
-  onMarkAsReady,
-  onDelete,
-  isDeleting = false,
-  enableExport = false
+function getStatusBadgeVariant(
+  status: OrderStatus
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case OrderStatus.Ready:
+      return "default";
+    case OrderStatus.Hallmark:
+      return "secondary";
+    case OrderStatus.ReturnFromHallmark:
+      return "outline";
+    case OrderStatus.Pending:
+    default:
+      return "secondary";
+  }
+}
+
+function getStatusLabel(status: OrderStatus): string {
+  switch (status) {
+    case OrderStatus.Ready:
+      return "Ready";
+    case OrderStatus.Hallmark:
+      return "Hallmark";
+    case OrderStatus.ReturnFromHallmark:
+      return "Return";
+    case OrderStatus.Pending:
+    default:
+      return "Pending";
+  }
+}
+
+export function OrderTable({
+  orders,
+  showCheckboxes = false,
+  showMarkReady = false,
+  showDelete = false,
+  showExport = false,
+  onSelectionChange,
+  externalSelectedIds,
+  readOnly = false,
+  ageingTiers = [],
 }: OrderTableProps) {
+  const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>([]);
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
+  const [showSupplyDialog, setShowSupplyDialog] = useState(false);
+  const [supplyOrders, setSupplyOrders] = useState<Order[]>([]);
 
-  const handleDesignClick = (design: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedDesign(design);
+  const markReadyMutation = useMarkOrdersAsReady();
+  const deleteMutation = useBatchDeleteOrders();
+
+  const selectedIds = externalSelectedIds ?? internalSelectedIds;
+
+  const setSelectedIds = (ids: string[]) => {
+    if (externalSelectedIds === undefined) {
+      setInternalSelectedIds(ids);
+    }
+    onSelectionChange?.(ids);
   };
 
-  const handleRowClick = (orderId: string) => {
-    if (!enableBulkActions) return;
-    
-    setSelectedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(orderId)) {
-        newSet.delete(orderId);
-      } else {
-        newSet.add(orderId);
-      }
-      return newSet;
-    });
+  const toggleSelect = (orderId: string) => {
+    const newIds = selectedIds.includes(orderId)
+      ? selectedIds.filter((id) => id !== orderId)
+      : [...selectedIds, orderId];
+    setSelectedIds(newIds);
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedRows(new Set(orders.map((o) => o.orderId)));
+  const toggleSelectAll = () => {
+    if (selectedIds.length === orders.length) {
+      setSelectedIds([]);
     } else {
-      setSelectedRows(new Set());
+      setSelectedIds(orders.map((o) => o.orderId));
     }
   };
 
-  const handleMarkAsReady = () => {
-    const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
+  const handleMarkReady = async () => {
+    if (selectedIds.length === 0) return;
 
-    // Separate orders by type
-    const rbOrders = selectedOrders.filter((order) => order.orderType === OrderType.RB);
-    const soCoOrders = selectedOrders.filter(
-      (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
-    );
+    const selectedOrders = orders.filter((o) => selectedIds.includes(o.orderId));
+    const rbOrders = selectedOrders.filter((o) => o.orderType === OrderType.RB);
 
-    if (rbOrders.length > 0 && onMarkAsReady) {
-      // Pass ALL selected orders to the parent handler so it can process
-      // RB orders via supply dialog AND SO/CO orders via markOrdersAsReady
-      onMarkAsReady(selectedOrders);
-      setSelectedRows(new Set());
-    } else if (soCoOrders.length > 0) {
-      // Only SO/CO orders selected — show confirmation dialog
-      setShowConfirmDialog(true);
+    if (rbOrders.length > 0) {
+      setSupplyOrders(rbOrders);
+      setShowSupplyDialog(true);
+    } else {
+      await markReadyMutation.mutateAsync(selectedIds);
+      setSelectedIds([]);
     }
   };
 
-  const confirmMarkAsReady = async () => {
-    if (!actor) {
-      toast.error("Actor not initialized");
-      return;
-    }
-
-    setIsUpdating(true);
-    try {
-      const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
-      const soCoOrders = selectedOrders.filter(
-        (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
-      );
-      
-      const orderIds = soCoOrders.map(order => order.orderId);
-      
-      // Call the backend method to mark orders as ready
-      await actor.markOrdersAsReady(orderIds);
-      
-      // Invalidate all order-related queries AND summary queries to refresh data across all tabs
-      await Promise.all(
-        INVALIDATE_KEYS.map((key) =>
-          queryClient.invalidateQueries({ queryKey: key })
-        )
-      );
-      
-      toast.success(`${soCoOrders.length} order(s) marked as Ready`);
-      setSelectedRows(new Set());
-      setShowConfirmDialog(false);
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to update orders";
-      toast.error(errorMessage);
-      console.error("Error updating orders:", error);
-    } finally {
-      setIsUpdating(false);
-    }
+  const handleDelete = async () => {
+    if (selectedIds.length === 0) return;
+    await deleteMutation.mutateAsync(selectedIds);
+    setSelectedIds([]);
   };
 
-  const handleExport = async (format: "excel" | "pdf" | "jpeg") => {
-    if (!actor) {
-      toast.error("Actor not initialized");
-      return;
-    }
-
-    setIsExporting(true);
-    try {
-      if (format === "excel") {
-        exportToExcel(orders);
-        toast.success("Exported to Excel");
-      } else if (format === "pdf") {
-        await exportToPDF(orders, actor);
-      } else if (format === "jpeg") {
-        await exportToJPEG(orders, actor);
-      }
-    } catch (error) {
-      toast.error(`Failed to export ${format.toUpperCase()}`);
-      console.error(error);
-    } finally {
-      setIsExporting(false);
-    }
+  const handleExport = () => {
+    exportOrdersToExcel(orders, "orders");
   };
 
-  // Group orders by design code
-  const groupedOrders = orders.reduce((acc, order) => {
-    if (!acc[order.design]) {
-      acc[order.design] = [];
-    }
-    acc[order.design].push(order);
-    return acc;
-  }, {} as Record<string, Order[]>);
-
-  const allSelected = orders.length > 0 && selectedRows.size === orders.length;
-  const someSelected = selectedRows.size > 0 && selectedRows.size < orders.length;
+  const getAgeingTierForOrder = (orderId: string) => {
+    return ageingTiers.find((t) => t.orderId === orderId)?.tier;
+  };
 
   return (
-    <div className="space-y-4">
-      {(enableBulkActions || enableExport) && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            {selectedRows.size > 0 && `${selectedRows.size} order(s) selected`}
-          </div>
-          <div className="flex gap-2">
-            {enableBulkActions && selectedRows.size > 0 && (
-              <Button
-                onClick={handleMarkAsReady}
-                size="sm"
-                className="bg-gold hover:bg-gold-hover"
-              >
-                Mark as Ready
-              </Button>
-            )}
-            {enableExport && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={isExporting}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {isExporting ? "Exporting..." : "Export"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleExport("excel")}>
-                    Export to Excel
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                    Export to PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("jpeg")}>
-                    Export to JPEG
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+    <div className="space-y-2">
+      {(showMarkReady || showDelete || showExport) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {showMarkReady && selectedIds.length > 0 && (
+            <Button
+              size="sm"
+              onClick={handleMarkReady}
+              disabled={markReadyMutation.isPending}
+              className="bg-gold hover:bg-gold-hover text-white"
+            >
+              {markReadyMutation.isPending ? (
+                <span className="flex items-center gap-1">
+                  <span className="animate-spin h-3 w-3 border border-white border-t-transparent rounded-full" />
+                  Marking...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Mark Ready ({selectedIds.length})
+                </span>
+              )}
+            </Button>
+          )}
+          {showDelete && selectedIds.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive">
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete ({selectedIds.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Orders</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {selectedIds.length} order(s)? This
+                    action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {showExport && (
+            <Button size="sm" variant="outline" onClick={handleExport}>
+              <Download className="h-3 w-3 mr-1" />
+              Export
+            </Button>
+          )}
         </div>
       )}
 
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              {enableBulkActions && (
+              {showCheckboxes && (
                 <TableHead className="w-10">
                   <Checkbox
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) (el as any).indeterminate = someSelected;
-                    }}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
+                    checked={
+                      orders.length > 0 && selectedIds.length === orders.length
+                    }
+                    onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
               )}
               <TableHead>Order No</TableHead>
-              <TableHead>Design</TableHead>
-              <TableHead>Generic Name</TableHead>
-              <TableHead>Karigar</TableHead>
-              <TableHead className="text-right">Weight (g)</TableHead>
-              <TableHead className="text-right">Size</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">Total Wt (g)</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Design</TableHead>
+              <TableHead>Product</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-right">Weight</TableHead>
+              <TableHead className="text-right">Size</TableHead>
+              <TableHead>Karigar</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Remarks</TableHead>
-              {onDelete && <TableHead className="w-10"></TableHead>}
+              <TableHead className="w-10">Img</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={enableBulkActions ? 12 : 11}
-                  className="text-center py-8 text-muted-foreground"
+                  colSpan={showCheckboxes ? 12 : 11}
+                  className="text-center text-muted-foreground py-8"
                 >
                   No orders found
                 </TableCell>
               </TableRow>
             ) : (
-              Object.entries(groupedOrders).map(([design, designOrders]) =>
-                designOrders.map((order, index) => (
+              orders.map((order) => {
+                const tier = getAgeingTierForOrder(order.orderId);
+                const ageingClass = tier ? getAgeingClass(tier) : "";
+                const qty = getQuantityAsNumber(order.quantity);
+
+                return (
                   <TableRow
                     key={order.orderId}
-                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${
-                      selectedRows.has(order.orderId) ? "bg-muted/50" : ""
-                    } ${order.originalOrderId ? "border-l-2 border-l-gold/50" : ""}`}
-                    onClick={() => handleRowClick(order.orderId)}
+                    className={`${
+                      selectedIds.includes(order.orderId)
+                        ? "bg-muted/50"
+                        : ""
+                    } ${ageingClass}`}
                   >
-                    {enableBulkActions && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                    {showCheckboxes && (
+                      <TableCell>
                         <Checkbox
-                          checked={selectedRows.has(order.orderId)}
-                          onCheckedChange={() => handleRowClick(order.orderId)}
-                          aria-label={`Select order ${order.orderNo}`}
+                          checked={selectedIds.includes(order.orderId)}
+                          onCheckedChange={() => toggleSelect(order.orderId)}
                         />
                       </TableCell>
                     )}
-                    <TableCell className="font-medium">
-                      {order.originalOrderId ? (
-                        <span className="flex items-center gap-1">
-                          <span className="text-muted-foreground text-xs">↳</span>
-                          {order.orderNo}
-                        </span>
-                      ) : (
-                        <button
-                          className="text-gold hover:underline font-medium"
-                          onClick={(e) => handleDesignClick(order.design, e)}
-                        >
-                          {order.orderNo}
-                        </button>
-                      )}
+                    <TableCell className="font-medium text-sm">
+                      {order.orderNo}
                     </TableCell>
                     <TableCell>
-                      {index === 0 ? (
-                        <button
-                          className="text-gold hover:underline"
-                          onClick={(e) => handleDesignClick(design, e)}
-                        >
-                          {design}
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground text-xs pl-2">—</span>
-                      )}
+                      <Badge variant="outline" className="text-xs">
+                        {order.orderType}
+                      </Badge>
                     </TableCell>
-                    <TableCell>{order.genericName || "—"}</TableCell>
-                    <TableCell>{order.karigarName || "—"}</TableCell>
-                    <TableCell className="text-right">
-                      {order.weightPerUnit.toFixed(3)}
+                    <TableCell className="text-sm">{order.design}</TableCell>
+                    <TableCell className="text-sm">{order.product}</TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {qty}
                     </TableCell>
-                    <TableCell className="text-right">{order.size}</TableCell>
-                    <TableCell className="text-right">
-                      {Number(order.quantity)}
+                    <TableCell className="text-right text-sm">
+                      {order.weight?.toFixed(2) ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {(order.weightPerUnit * Number(order.quantity)).toFixed(3)}
+                    <TableCell className="text-right text-sm">
+                      {order.size > 0 ? order.size : "—"}
                     </TableCell>
-                    <TableCell>{order.orderType}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-sm">
+                      {order.karigarName ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={getStatusBadgeVariant(order.status)}
+                        className="text-xs"
+                      >
+                        {getStatusLabel(order.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
                       {order.remarks || "—"}
                     </TableCell>
-                    {onDelete && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => onDelete(order.orderId)}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => setSelectedDesign(order.design)}
+                      >
+                        <Image className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                ))
-              )
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Confirmation dialog for SO/CO orders */}
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will mark {selectedRows.size} selected order(s) as Ready.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmMarkAsReady}
-              disabled={isUpdating}
-              className="bg-gold hover:bg-gold-hover"
-            >
-              {isUpdating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Confirm"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Design image modal — pass open state based on whether a design is selected */}
       {selectedDesign && (
         <DesignImageModal
-          designCode={selectedDesign}
           open={!!selectedDesign}
+          designCode={selectedDesign}
           onClose={() => setSelectedDesign(null)}
+        />
+      )}
+
+      {showSupplyDialog && supplyOrders.length > 0 && (
+        <SuppliedQtyDialog
+          orders={supplyOrders}
+          onClose={() => {
+            setShowSupplyDialog(false);
+            setSupplyOrders([]);
+            setSelectedIds([]);
+          }}
         />
       )}
     </div>

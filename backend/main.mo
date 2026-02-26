@@ -3,13 +3,9 @@ import Map "mo:core/Map";
 import List "mo:core/List";
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
-import Float "mo:core/Float";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Migration "migration";
 
-// Apply data migration on upgrade
-(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -31,7 +27,7 @@ actor {
     orderType : OrderType;
     product : Text;
     design : Text;
-    weightPerUnit : Float;
+    weight : Float;
     size : Float;
     quantity : Nat;
     remarks : Text;
@@ -55,6 +51,11 @@ actor {
     updatedAt : Time.Time;
   };
 
+  type ReturnRequest = {
+    orderNo : Text;
+    totalQuantity : Nat;
+  };
+
   type Karigar = {
     name : Text;
     createdBy : Text;
@@ -67,17 +68,6 @@ actor {
     karigarName : Text;
   };
 
-  type Summary = {
-    totalOrders : Nat;
-    totalWeight : Float;
-    totalQuantity : Nat;
-    totalCO : Nat;
-  };
-
-  type OverallSummary = {
-    originalSummary : Summary;
-  };
-
   var orders = Map.empty<Text, Order>();
   var designMappings = Map.empty<Text, DesignMapping>();
   var designImages = Map.empty<Text, Storage.ExternalBlob>();
@@ -87,14 +77,12 @@ actor {
   var masterDesignExcel : ?Storage.ExternalBlob = null;
   var activeKarigar : ?Text = null;
 
-  var originalSummary : ?Summary = null;
-
   public shared ({ caller }) func saveOrder(
     orderNo : Text,
     orderType : OrderType,
     product : Text,
     design : Text,
-    weightPerUnit : Float,
+    weight : Float,
     size : Float,
     quantity : Nat,
     remarks : Text,
@@ -112,7 +100,7 @@ actor {
       orderType;
       product;
       design;
-      weightPerUnit;
+      weight;
       size;
       quantity;
       genericName;
@@ -127,27 +115,6 @@ actor {
     };
 
     orders.add(orderId, order);
-  };
-
-  public shared ({ caller }) func ingestExcel(excelBlob : Storage.ExternalBlob, ordersData : [(Text, Order)]) : async () {
-    let totalOrders = ordersData.size();
-
-    let totalWeight = ordersData.map(func((_, order)) { order.weightPerUnit * order.quantity.toInt().toFloat() }).foldLeft(0.0, func(acc, w) { acc + w });
-    let totalQuantity = ordersData.map(func((_, order)) { order.quantity }).foldLeft(0, func(acc, qty) { acc + qty });
-    let totalCO = ordersData.filter(func((_, order)) { order.orderType == #CO }).size();
-
-    originalSummary := ?{
-      totalOrders;
-      totalWeight;
-      totalQuantity;
-      totalCO;
-    };
-
-    masterDesignExcel := ?excelBlob;
-    orders.clear();
-    for ((orderId, order) in ordersData.values()) {
-      orders.add(orderId, order);
-    };
   };
 
   public shared ({ caller }) func supplyOrder(orderId : Text, suppliedQuantity : Nat) : async () {
@@ -305,9 +272,11 @@ actor {
         };
         designMappings.add(designCode, updatedMapping);
 
+        let design = designCode;
+
         let pendingOrderIds = orders.toArray().filter(
           func((_, order)) {
-            order.design == designCode and order.status == #Pending;
+            order.design == design and order.status == #Pending;
           }
         ).map(func((orderId, _)) { orderId });
 
@@ -584,6 +553,7 @@ actor {
     );
   };
 
+  // Batch supply RB orders with partial supply handling.
   public shared ({ caller }) func batchSupplyRBOrders(
     orderQuantities : [(Text, Nat)],
   ) : async () {
@@ -675,6 +645,7 @@ actor {
       Runtime.trap("Returned quantity does not match total ready quantity for order " # orderNo);
     };
 
+    // Remove all ready orders for this orderNo from the map
     let remainingOrders = orders.filter(
       func(_, order) {
         order.status != #Ready or order.orderNo != orderNo
@@ -682,6 +653,7 @@ actor {
     );
     orders := remainingOrders;
 
+    // Find the first valid ready order
     var found = false;
     var firstReadyOrder : ?Order = null;
 
@@ -711,56 +683,6 @@ actor {
   public shared ({ caller }) func batchReturnOrdersToPending(orderRequests : [(Text, Nat)]) : async () {
     for ((orderNo, returnedQty) in orderRequests.values()) {
       await returnOrdersToPending(orderNo, returnedQty);
-    };
-  };
-
-  public query ({ caller }) func getTotalOrdersSummary() : async { totalOrders : Nat; totalWeight : Float; totalQuantity : Nat; totalCO : Nat } {
-    let filteredOrders = orders.values().toArray().filter(
-      func(order) {
-        order.status == #Pending or order.status == #ReturnFromHallmark
-      }
-    );
-
-    let totalOrders = filteredOrders.size();
-    let totalWeight = filteredOrders.foldLeft(0.0, func(acc, order) { acc + (order.weightPerUnit * order.quantity.toInt().toFloat()) });
-    let totalQuantity = filteredOrders.foldLeft(0, func(acc, order) { acc + order.quantity });
-    let totalCO = filteredOrders.filter(func(order) { order.orderType == #CO }).size();
-
-    { totalOrders; totalWeight; totalQuantity; totalCO };
-  };
-
-  public query ({ caller }) func getReadyOrdersSummary() : async { totalOrders : Nat; totalWeight : Float; totalQuantity : Nat; totalCO : Nat } {
-    let filteredOrders = orders.values().toArray().filter(
-      func(order) { order.status == #Ready }
-    );
-
-    let totalOrders = filteredOrders.size();
-    let totalWeight = filteredOrders.foldLeft(0.0, func(acc, order) { acc + (order.weightPerUnit * order.quantity.toInt().toFloat()) });
-    let totalQuantity = filteredOrders.foldLeft(0, func(acc, order) { acc + order.quantity });
-    let totalCO = filteredOrders.filter(func(order) { order.orderType == #CO }).size();
-
-    { totalOrders; totalWeight; totalQuantity; totalCO };
-  };
-
-  public query ({ caller }) func getHallmarkOrdersSummary() : async { totalOrders : Nat; totalWeight : Float; totalQuantity : Nat; totalCO : Nat } {
-    let filteredOrders = orders.values().toArray().filter(
-      func(order) { order.status == #Hallmark }
-    );
-
-    let totalOrders = filteredOrders.size();
-    let totalWeight = filteredOrders.foldLeft(0.0, func(acc, order) { acc + (order.weightPerUnit * order.quantity.toInt().toFloat()) });
-    let totalQuantity = filteredOrders.foldLeft(0, func(acc, order) { acc + order.quantity });
-    let totalCO = filteredOrders.filter(func(order) { order.orderType == #CO }).size();
-
-    { totalOrders; totalWeight; totalQuantity; totalCO };
-  };
-
-  public query ({ caller }) func getOverallSummary() : async ?OverallSummary {
-    switch (originalSummary) {
-      case (null) { null };
-      case (?orig) {
-        ?{ originalSummary = orig };
-      };
     };
   };
 

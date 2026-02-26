@@ -1,130 +1,108 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  useGetTotalOrdersSummary,
-  useGetReadyOrdersSummary,
-  useGetHallmarkOrdersSummary,
-  useGetAllOrders,
-} from '@/hooks/useQueries';
-import { Package, Weight, Hash, Users } from 'lucide-react';
-import { OrderType, OrderStatus } from '@/backend';
-import { useMemo } from 'react';
-
-type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
+import { Order, OrderStatus, OrderType } from "../../backend";
+import { getQuantityAsNumber } from "../../utils/orderNormalizer";
 
 interface SummaryCardsProps {
-  activeTab?: ActiveTab;
+  orders: Order[];
+  activeTab: string;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
-export default function SummaryCards({ activeTab }: SummaryCardsProps) {
-  // Fetch backend-derived summaries for the three main tabs
-  const { data: totalSummary, isLoading: isLoadingTotal } = useGetTotalOrdersSummary();
-  const { data: readySummary, isLoading: isLoadingReady } = useGetReadyOrdersSummary();
-  const { data: hallmarkSummary, isLoading: isLoadingHallmark } = useGetHallmarkOrdersSummary();
+function StatCard({
+  label,
+  value,
+  isLoading,
+  isError,
+}: {
+  label: string;
+  value: string | number;
+  isLoading?: boolean;
+  isError?: boolean;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1 shadow-sm">
+      <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+        {label}
+      </span>
+      {isError ? (
+        <span className="text-2xl font-bold text-muted-foreground">—</span>
+      ) : isLoading ? (
+        <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+      ) : (
+        <span className="text-2xl font-bold text-foreground">{value}</span>
+      )}
+    </div>
+  );
+}
 
-  // For customer and karigars tabs we still need the raw orders list
-  const { data: orders = [], isLoading: isLoadingOrders } = useGetAllOrders();
-
-  // Compute customer/karigar tab metrics from live order data using weightPerUnit × qty
-  const customerTabMetrics = useMemo(() => {
-    const filtered = orders.filter(
-      (order) =>
-        order?.orderType === OrderType.CO &&
-        order?.status === OrderStatus.Pending
-    );
-    return {
-      totalOrders: filtered.length,
-      totalWeight: filtered.reduce(
-        (sum, o) => sum + (o?.weightPerUnit ?? 0) * Number(o?.quantity ?? 0),
-        0
-      ),
-      totalQuantity: filtered.reduce((sum, o) => sum + Number(o?.quantity ?? 0), 0),
-      totalCO: filtered.length,
-    };
-  }, [orders]);
-
-  const karigarsTabMetrics = useMemo(() => {
-    const filtered = orders.filter(
-      (order) =>
-        order?.status === OrderStatus.Pending ||
-        order?.status === OrderStatus.ReturnFromHallmark
-    );
-    return {
-      totalOrders: filtered.length,
-      totalWeight: filtered.reduce(
-        (sum, o) => sum + (o?.weightPerUnit ?? 0) * Number(o?.quantity ?? 0),
-        0
-      ),
-      totalQuantity: filtered.reduce((sum, o) => sum + Number(o?.quantity ?? 0), 0),
-      totalCO: filtered.filter((o) => o?.orderType === OrderType.CO).length,
-    };
-  }, [orders]);
-
-  // Select the correct summary based on active tab
-  const summary = useMemo(() => {
+export function SummaryCards({
+  orders,
+  activeTab,
+  isLoading,
+  isError,
+}: SummaryCardsProps) {
+  const getFilteredOrders = () => {
+    if (isError) return [];
     switch (activeTab) {
       case "total":
-        return totalSummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
+        return orders.filter((o) => o.status === OrderStatus.Pending);
       case "ready":
-        return readySummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
+        return orders.filter((o) => o.status === OrderStatus.Ready);
       case "hallmark":
-        return hallmarkSummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
+        return orders.filter(
+          (o) =>
+            o.status === OrderStatus.Hallmark ||
+            o.status === OrderStatus.ReturnFromHallmark
+        );
       case "customer":
-        return customerTabMetrics;
-      case "karigars":
-        return karigarsTabMetrics;
+        return orders.filter(
+          (o) =>
+            o.orderType === OrderType.CO && o.status === OrderStatus.Pending
+        );
       default:
-        return totalSummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
+        return orders.filter((o) => o.status === OrderStatus.Pending);
     }
-  }, [activeTab, totalSummary, readySummary, hallmarkSummary, customerTabMetrics, karigarsTabMetrics]);
+  };
 
-  const isLoading =
-    isLoadingTotal ||
-    isLoadingReady ||
-    isLoadingHallmark ||
-    (activeTab === "customer" || activeTab === "karigars" ? isLoadingOrders : false);
+  const filtered = getFilteredOrders();
 
-  const cards = [
-    {
-      title: 'Total Orders',
-      value: summary.totalOrders,
-      icon: Package,
-    },
-    {
-      title: 'Total Weight',
-      value: `${summary.totalWeight.toFixed(2)}g`,
-      icon: Weight,
-    },
-    {
-      title: 'Total Quantity',
-      value: summary.totalQuantity,
-      icon: Hash,
-    },
-    {
-      title: 'Customer Orders',
-      value: summary.totalCO,
-      icon: Users,
-    },
-  ];
+  const totalOrders = isError ? 0 : filtered.length;
+  const totalQty = isError
+    ? 0
+    : filtered.reduce((sum, o) => sum + getQuantityAsNumber(o.quantity), 0);
+  const uniqueDesigns = isError
+    ? 0
+    : new Set(filtered.map((o) => o.design)).size;
+  const uniqueKarigars = isError
+    ? 0
+    : new Set(filtered.map((o) => o.karigarName).filter(Boolean)).size;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {cards.map((card) => (
-        <Card key={card.title} className="border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {card.title}
-            </CardTitle>
-            <card.icon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-8 w-24 animate-pulse rounded bg-muted" />
-            ) : (
-              <div className="text-2xl font-bold">{card.value}</div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <StatCard
+        label="Orders"
+        value={totalOrders}
+        isLoading={isLoading}
+        isError={isError}
+      />
+      <StatCard
+        label="Total Qty"
+        value={totalQty}
+        isLoading={isLoading}
+        isError={isError}
+      />
+      <StatCard
+        label="Designs"
+        value={uniqueDesigns}
+        isLoading={isLoading}
+        isError={isError}
+      />
+      <StatCard
+        label="Karigars"
+        value={uniqueKarigars}
+        isLoading={isLoading}
+        isError={isError}
+      />
     </div>
   );
 }

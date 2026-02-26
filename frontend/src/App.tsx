@@ -2,102 +2,49 @@ import { RouterProvider, createRouter, createRoute, createRootRoute, Outlet } fr
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import AppSidebar from '@/components/layout/AppSidebar';
-import Dashboard from '@/pages/Dashboard';
+import { Dashboard } from '@/pages/Dashboard';
 import IngestOrders from '@/pages/IngestOrders';
-import UnmappedCodes from '@/pages/UnmappedCodes';
-import MasterDesigns from '@/pages/MasterDesigns';
+import { MasterDesigns } from '@/pages/MasterDesigns';
 import DesignImages from '@/pages/DesignImages';
-import TagPrinting from '@/pages/TagPrinting';
+import { UnmappedCodes } from '@/pages/UnmappedCodes';
+import { TagPrinting } from '@/pages/TagPrinting';
 import BarcodeScanning from '@/pages/BarcodeScanning';
-import KarigarDetail from '@/pages/KarigarDetail';
+import { KarigarDetail } from '@/pages/KarigarDetail';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
-function RootLayout() {
+function Layout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full overflow-x-hidden">
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 lg:hidden">
-            <SidebarTrigger />
-          </header>
-          <main className="flex-1">
-            <Outlet />
-          </main>
-        </SidebarInset>
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
       </div>
     </SidebarProvider>
   );
 }
 
-const rootRoute = createRootRoute({
-  component: RootLayout,
-});
+const rootRoute = createRootRoute({ component: Layout });
 
-const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: Dashboard,
-});
-
-const ingestOrdersRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/ingest-orders',
-  component: IngestOrders,
-});
-
-const unmappedCodesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/unmapped-codes',
-  component: UnmappedCodes,
-});
-
-const masterDesignsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/master-designs',
-  component: MasterDesigns,
-});
-
-const designImagesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/design-images',
-  component: DesignImages,
-});
-
-const tagPrintingRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/tag-printing',
-  component: TagPrinting,
-});
-
-const barcodeScanningRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/barcode-scanning',
-  component: BarcodeScanning,
-});
-
-const karigarDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/karigar/$name',
-  component: KarigarDetail,
-});
+const dashboardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: Dashboard });
+const ingestRoute = createRoute({ getParentRoute: () => rootRoute, path: '/ingest', component: IngestOrders });
+const masterDesignsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/master-designs', component: MasterDesigns });
+const designImagesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/design-images', component: DesignImages });
+const unmappedCodesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/unmapped', component: UnmappedCodes });
+const tagPrintingRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tag-printing', component: TagPrinting });
+const barcodeScanningRoute = createRoute({ getParentRoute: () => rootRoute, path: '/barcode-scanning', component: BarcodeScanning });
+const karigarDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: '/karigar/$name', component: KarigarDetail });
 
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
-  ingestOrdersRoute,
-  unmappedCodesRoute,
+  ingestRoute,
   masterDesignsRoute,
   designImagesRoute,
+  unmappedCodesRoute,
   tagPrintingRoute,
   barcodeScanningRoute,
   karigarDetailRoute,

@@ -1,18 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Order } from "@/backend";
-import { useActor } from "@/hooks/useActor";
-import { useQueryClient } from "@tanstack/react-query";
+import { Order } from "../../backend";
+import { useBatchSupplyRBOrders } from "../../hooks/useQueries";
+import { getQuantityAsNumber } from "../../utils/orderNormalizer";
 import { toast } from "sonner";
 
 interface SuppliedQtyDialogProps {
@@ -20,162 +21,119 @@ interface SuppliedQtyDialogProps {
   onClose: () => void;
 }
 
-// All query keys that must be refreshed after a supply/split operation
-const INVALIDATE_KEYS = [
-  ["orders"],
-  ["readyOrders"],
-  ["ordersWithMappings"],
-  ["unmappedOrders"],
-  ["totalOrdersSummary"],
-  ["readyOrdersSummary"],
-  ["hallmarkOrdersSummary"],
-];
-
-export default function SuppliedQtyDialog({
-  orders,
-  onClose,
-}: SuppliedQtyDialogProps) {
-  // currentIndex tracks which RB order we are currently prompting for
+export function SuppliedQtyDialog({ orders, onClose }: SuppliedQtyDialogProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [suppliedQty, setSuppliedQty] = useState<number>(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { actor } = useActor();
+  const [suppliedQty, setSuppliedQty] = useState("");
+  const [processedOrders, setProcessedOrders] = useState<Array<[string, bigint]>>([]);
   const queryClient = useQueryClient();
+  const batchSupplyMutation = useBatchSupplyRBOrders();
 
   const currentOrder = orders[currentIndex];
+  const isLastOrder = currentIndex === orders.length - 1;
+  const maxQty = currentOrder ? getQuantityAsNumber(currentOrder.quantity) : 0;
 
-  // Reset supplied qty whenever we move to a new order
-  useEffect(() => {
-    if (currentOrder) {
-      setSuppliedQty(Number(currentOrder.quantity));
-    }
-  }, [currentIndex, currentOrder]);
-
-  const invalidateAllQueries = async () => {
-    await Promise.all(
-      INVALIDATE_KEYS.map((key) =>
-        queryClient.invalidateQueries({ queryKey: key })
-      )
-    );
-  };
-
-  const processCurrentOrder = async () => {
-    if (!actor) {
-      toast.error("Actor not initialized");
+  const handleNext = async () => {
+    const qty = parseInt(suppliedQty, 10);
+    if (isNaN(qty) || qty < 0 || qty > maxQty) {
+      toast.error(`Please enter a valid quantity between 0 and ${maxQty}`);
       return;
     }
 
-    if (suppliedQty <= 0) {
-      toast.error("Supplied quantity must be greater than 0");
-      return;
-    }
+    const newProcessed: Array<[string, bigint]> = [
+      ...processedOrders,
+      [currentOrder.orderId, BigInt(qty)],
+    ];
 
-    if (suppliedQty > Number(currentOrder.quantity)) {
-      toast.error("Supplied quantity cannot exceed order quantity");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      // Use batchSupplyRBOrders for proper partial-split handling with originalOrderId linkage
-      await actor.batchSupplyRBOrders([[currentOrder.orderId, BigInt(suppliedQty)]]);
-
-      if (suppliedQty === Number(currentOrder.quantity)) {
-        toast.success(`Order ${currentOrder.orderNo} marked as Ready`);
-      } else {
-        toast.success(
-          `Order ${currentOrder.orderNo} split: ${suppliedQty} marked as Ready, ${Number(currentOrder.quantity) - suppliedQty} remains Pending`
-        );
-      }
-
-      // Move to next order or close if done
-      if (currentIndex < orders.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-      } else {
-        // All orders processed — invalidate all queries (including summaries) and close
-        await invalidateAllQueries();
+    if (isLastOrder) {
+      try {
+        await batchSupplyMutation.mutateAsync(newProcessed);
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        toast.success("Orders processed successfully");
         onClose();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to process orders");
       }
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to supply order";
-      toast.error(errorMessage);
-      console.error("Error supplying order:", error);
-    } finally {
-      setIsProcessing(false);
+    } else {
+      setProcessedOrders(newProcessed);
+      setCurrentIndex(currentIndex + 1);
+      setSuppliedQty("");
     }
   };
 
   const handleCancel = async () => {
-    // If at least one order was already processed, invalidate queries before closing
-    if (currentIndex > 0) {
-      await invalidateAllQueries();
+    if (processedOrders.length > 0) {
+      try {
+        await batchSupplyMutation.mutateAsync(processedOrders);
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        toast.success("Partial orders processed");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to process partial orders");
+      }
     }
     onClose();
   };
 
   if (!currentOrder) return null;
 
-  const isLastOrder = currentIndex === orders.length - 1;
-  const totalOrders = orders.length;
-
   return (
-    <Dialog open={orders.length > 0} onOpenChange={handleCancel}>
+    <Dialog open onOpenChange={(open) => { if (!open) handleCancel(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            Supply RB Order
-            {totalOrders > 1 && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({currentIndex + 1} of {totalOrders})
-              </span>
-            )}
-          </DialogTitle>
+          <DialogTitle>Supply RB Order</DialogTitle>
           <DialogDescription>
-            Enter the supplied quantity for order{" "}
-            <strong>{currentOrder.orderNo}</strong>. If you supply the full
-            quantity ({Number(currentOrder.quantity)}), the order will move to
-            Ready. If you supply less, the order will split into Ready and
-            Pending.
+            Order {currentIndex + 1} of {orders.length}: {currentOrder.orderNo} — {currentOrder.design}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <span className="text-muted-foreground">Order No:</span>{" "}
+              <span className="font-medium">{currentOrder.orderNo}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Design:</span>{" "}
+              <span className="font-medium">{currentOrder.design}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Product:</span>{" "}
+              <span className="font-medium">{currentOrder.product}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Ordered Qty:</span>{" "}
+              <span className="font-medium text-gold">{maxQty}</span>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="supplied-qty">Supplied Quantity</Label>
+            <Label htmlFor="supplied-qty">Supplied Quantity (max: {maxQty})</Label>
             <Input
               id="supplied-qty"
               type="number"
-              min="1"
-              max={Number(currentOrder.quantity)}
+              min={0}
+              max={maxQty}
               value={suppliedQty}
-              onChange={(e) => setSuppliedQty(Number(e.target.value))}
+              onChange={(e) => setSuppliedQty(e.target.value)}
+              placeholder={`Enter qty (0–${maxQty})`}
+              autoFocus
             />
-            <p className="text-sm text-muted-foreground">
-              Order quantity: {Number(currentOrder.quantity)} | Weight per unit:{" "}
-              {currentOrder.weightPerUnit.toFixed(3)}g | Total weight:{" "}
-              {(currentOrder.weightPerUnit * suppliedQty).toFixed(3)}g
-            </p>
           </div>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isProcessing}
-          >
+          <Button variant="outline" onClick={handleCancel} disabled={batchSupplyMutation.isPending}>
             Cancel
           </Button>
           <Button
-            onClick={processCurrentOrder}
-            disabled={isProcessing}
-            className="bg-gold hover:bg-gold-hover"
+            onClick={handleNext}
+            disabled={batchSupplyMutation.isPending || suppliedQty === ""}
+            className="bg-gold hover:bg-gold-hover text-white"
           >
-            {isProcessing
+            {batchSupplyMutation.isPending
               ? "Processing..."
               : isLastOrder
-              ? "Confirm"
-              : "Confirm & Next"}
+              ? "Finish"
+              : "Next"}
           </Button>
         </DialogFooter>
       </DialogContent>

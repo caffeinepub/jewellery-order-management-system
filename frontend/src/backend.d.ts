@@ -29,21 +29,13 @@ export interface DesignMapping {
     genericName: string;
     designCode: string;
 }
-export interface Summary {
-    totalOrders: bigint;
-    totalCO: bigint;
-    totalWeight: number;
-    totalQuantity: bigint;
-}
-export interface OverallSummary {
-    originalSummary: Summary;
-}
 export interface Karigar {
     name: string;
     createdAt: Time;
     createdBy: string;
 }
 export interface Order {
+    weight: number;
     status: OrderStatus;
     readyDate?: Time;
     originalOrderId?: string;
@@ -51,7 +43,6 @@ export interface Order {
     size: number;
     orderType: OrderType;
     design: string;
-    weightPerUnit: number;
     orderId: string;
     orderNo: string;
     karigarName?: string;
@@ -91,36 +82,16 @@ export interface backendInterface {
     getDesignImage(designCode: string): Promise<ExternalBlob | null>;
     getDesignImageMapping(): Promise<Array<[string, ExternalBlob]>>;
     getDesignMapping(designCode: string): Promise<DesignMapping>;
-    getHallmarkOrdersSummary(): Promise<{
-        totalOrders: bigint;
-        totalCO: bigint;
-        totalWeight: number;
-        totalQuantity: bigint;
-    }>;
     getKarigars(): Promise<Array<Karigar>>;
     getMasterDesignExcel(): Promise<ExternalBlob | null>;
     getMasterDesignKarigars(): Promise<Array<string>>;
     getMasterDesigns(): Promise<Array<[string, string, string]>>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
-    getOverallSummary(): Promise<OverallSummary | null>;
     getReadyOrders(): Promise<Array<Order>>;
     getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
-    getReadyOrdersSummary(): Promise<{
-        totalOrders: bigint;
-        totalCO: bigint;
-        totalWeight: number;
-        totalQuantity: bigint;
-    }>;
-    getTotalOrdersSummary(): Promise<{
-        totalOrders: bigint;
-        totalCO: bigint;
-        totalWeight: number;
-        totalQuantity: bigint;
-    }>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     getUnreturnedOrders(): Promise<Array<Order>>;
-    ingestExcel(excelBlob: ExternalBlob, ordersData: Array<[string, Order]>): Promise<void>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     markAllAsReady(): Promise<void>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
@@ -128,7 +99,7 @@ export interface backendInterface {
     resetActiveOrders(): Promise<void>;
     returnOrdersToPending(orderNo: string, returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
-    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weightPerUnit: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateDesignGroupStatus(designCodes: Array<string>): Promise<void>;
