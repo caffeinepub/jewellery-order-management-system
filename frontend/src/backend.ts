@@ -94,16 +94,15 @@ export interface MappingRecord {
     genericName: string;
     designCode: string;
 }
-export type Time = bigint;
-export interface DesignMapping {
-    createdAt: Time;
-    createdBy: string;
-    karigarName: string;
-    updatedAt: Time;
-    updatedBy?: string;
-    genericName: string;
+export interface MasterDataRow {
+    weight: number;
+    karigar: string;
+    orderDate?: Time;
+    orderNo: string;
+    quantity: bigint;
     designCode: string;
 }
+export type Time = bigint;
 export interface _CaffeineStorageRefillInformation {
     proposed_top_up_amount?: bigint;
 }
@@ -123,6 +122,7 @@ export interface Order {
     originalOrderId?: string;
     createdAt: Time;
     size: number;
+    orderDate?: Time;
     orderType: OrderType;
     design: string;
     orderId: string;
@@ -133,6 +133,26 @@ export interface Order {
     quantity: bigint;
     remarks: string;
     product: string;
+}
+export interface DesignMapping {
+    createdAt: Time;
+    createdBy: string;
+    karigarName: string;
+    updatedAt: Time;
+    updatedBy?: string;
+    genericName: string;
+    designCode: string;
+}
+export interface MasterPersistedResponse {
+    persisted: Array<Order>;
+}
+export interface MasterReconciliationResult {
+    missingInMasterCount: bigint;
+    newLinesCount: bigint;
+    alreadyExistingRows: bigint;
+    totalUploadedRows: bigint;
+    newLines: Array<MasterDataRow>;
+    missingInMaster: Array<Order>;
 }
 export interface _CaffeineStorageRefillResult {
     success?: boolean;
@@ -178,6 +198,7 @@ export interface backendInterface {
     getMasterDesignExcel(): Promise<ExternalBlob | null>;
     getMasterDesignKarigars(): Promise<Array<string>>;
     getMasterDesigns(): Promise<Array<[string, string, string]>>;
+    getOrder(orderId: string): Promise<Order | null>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
@@ -187,11 +208,13 @@ export interface backendInterface {
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     markAllAsReady(): Promise<void>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
+    persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
+    reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
     resetActiveOrders(): Promise<void>;
     returnOrdersToPending(orderNo: string, returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
-    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateDesignGroupStatus(designCodes: Array<string>): Promise<void>;
@@ -201,7 +224,7 @@ export interface backendInterface {
     uploadDesignMapping(mappingData: Array<MappingRecord>): Promise<void>;
     uploadMasterDesignExcel(blob: ExternalBlob): Promise<void>;
 }
-import type { DesignMapping as _DesignMapping, ExternalBlob as _ExternalBlob, Order as _Order, OrderStatus as _OrderStatus, OrderType as _OrderType, Time as _Time, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
+import type { DesignMapping as _DesignMapping, ExternalBlob as _ExternalBlob, MasterDataRow as _MasterDataRow, MasterPersistedResponse as _MasterPersistedResponse, MasterReconciliationResult as _MasterReconciliationResult, Order as _Order, OrderStatus as _OrderStatus, OrderType as _OrderType, Time as _Time, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _caffeineStorageBlobIsLive(arg0: Uint8Array): Promise<boolean> {
@@ -596,17 +619,31 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getOrder(arg0: string): Promise<Order | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOrder(arg0);
+                return from_candid_opt_n34(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOrder(arg0);
+            return from_candid_opt_n34(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getOrders(arg0: OrderStatus | null, arg1: OrderType | null, arg2: string | null): Promise<Array<Order>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getOrders(to_candid_opt_n34(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n35(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n38(this._uploadFile, this._downloadFile, arg2));
+                const result = await this.actor.getOrders(to_candid_opt_n35(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n36(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n39(this._uploadFile, this._downloadFile, arg2));
                 return from_candid_vec_n22(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getOrders(to_candid_opt_n34(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n35(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n38(this._uploadFile, this._downloadFile, arg2));
+            const result = await this.actor.getOrders(to_candid_opt_n35(this._uploadFile, this._downloadFile, arg0), to_candid_opt_n36(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n39(this._uploadFile, this._downloadFile, arg2));
             return from_candid_vec_n22(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -722,6 +759,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async persistMasterDataRows(arg0: Array<MasterDataRow>): Promise<MasterPersistedResponse> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.persistMasterDataRows(to_candid_vec_n40(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_MasterPersistedResponse_n43(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.persistMasterDataRows(to_candid_vec_n40(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_MasterPersistedResponse_n43(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async reassignDesign(arg0: string, arg1: string): Promise<void> {
         if (this.processError) {
             try {
@@ -734,6 +785,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.reassignDesign(arg0, arg1);
             return result;
+        }
+    }
+    async reconcileMasterFile(arg0: Array<MasterDataRow>): Promise<MasterReconciliationResult> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.reconcileMasterFile(to_candid_vec_n40(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_MasterReconciliationResult_n45(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.reconcileMasterFile(to_candid_vec_n40(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_MasterReconciliationResult_n45(this._uploadFile, this._downloadFile, result);
         }
     }
     async resetActiveOrders(): Promise<void> {
@@ -778,17 +843,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async saveOrder(arg0: string, arg1: OrderType, arg2: string, arg3: string, arg4: number, arg5: number, arg6: bigint, arg7: string, arg8: string): Promise<void> {
+    async saveOrder(arg0: string, arg1: OrderType, arg2: string, arg3: string, arg4: number, arg5: number, arg6: bigint, arg7: string, arg8: string, arg9: Time | null): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n36(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n37(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8, to_candid_opt_n50(this._uploadFile, this._downloadFile, arg9));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n36(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            const result = await this.actor.saveOrder(arg0, to_candid_OrderType_n37(this._uploadFile, this._downloadFile, arg1), arg2, arg3, arg4, arg5, arg6, arg7, arg8, to_candid_opt_n50(this._uploadFile, this._downloadFile, arg9));
             return result;
         }
     }
@@ -911,6 +976,15 @@ function from_candid_DesignMapping_n19(_uploadFile: (file: ExternalBlob) => Prom
 async function from_candid_ExternalBlob_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExternalBlob): Promise<ExternalBlob> {
     return await _downloadFile(value);
 }
+function from_candid_MasterDataRow_n48(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _MasterDataRow): MasterDataRow {
+    return from_candid_record_n49(_uploadFile, _downloadFile, value);
+}
+function from_candid_MasterPersistedResponse_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _MasterPersistedResponse): MasterPersistedResponse {
+    return from_candid_record_n44(_uploadFile, _downloadFile, value);
+}
+function from_candid_MasterReconciliationResult_n45(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _MasterReconciliationResult): MasterReconciliationResult {
+    return from_candid_record_n46(_uploadFile, _downloadFile, value);
+}
 function from_candid_OrderStatus_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrderStatus): OrderStatus {
     return from_candid_variant_n26(_uploadFile, _downloadFile, value);
 }
@@ -931,6 +1005,9 @@ function from_candid_opt_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 }
 async function from_candid_opt_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ExternalBlob]): Promise<ExternalBlob | null> {
     return value.length === 0 ? null : await from_candid_ExternalBlob_n31(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Order]): Order | null {
+    return value.length === 0 ? null : from_candid_Order_n23(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];
@@ -972,6 +1049,7 @@ function from_candid_record_n24(_uploadFile: (file: ExternalBlob) => Promise<Uin
     originalOrderId: [] | [string];
     createdAt: _Time;
     size: number;
+    orderDate: [] | [_Time];
     orderType: _OrderType;
     design: string;
     orderId: string;
@@ -989,6 +1067,7 @@ function from_candid_record_n24(_uploadFile: (file: ExternalBlob) => Promise<Uin
     originalOrderId?: string;
     createdAt: Time;
     size: number;
+    orderDate?: Time;
     orderType: OrderType;
     design: string;
     orderId: string;
@@ -1007,6 +1086,7 @@ function from_candid_record_n24(_uploadFile: (file: ExternalBlob) => Promise<Uin
         originalOrderId: record_opt_to_undefined(from_candid_opt_n21(_uploadFile, _downloadFile, value.originalOrderId)),
         createdAt: value.createdAt,
         size: value.size,
+        orderDate: record_opt_to_undefined(from_candid_opt_n27(_uploadFile, _downloadFile, value.orderDate)),
         orderType: from_candid_OrderType_n28(_uploadFile, _downloadFile, value.orderType),
         design: value.design,
         orderId: value.orderId,
@@ -1017,6 +1097,63 @@ function from_candid_record_n24(_uploadFile: (file: ExternalBlob) => Promise<Uin
         quantity: value.quantity,
         remarks: value.remarks,
         product: value.product
+    };
+}
+function from_candid_record_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    persisted: Array<_Order>;
+}): {
+    persisted: Array<Order>;
+} {
+    return {
+        persisted: from_candid_vec_n22(_uploadFile, _downloadFile, value.persisted)
+    };
+}
+function from_candid_record_n46(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    missingInMasterCount: bigint;
+    newLinesCount: bigint;
+    alreadyExistingRows: bigint;
+    totalUploadedRows: bigint;
+    newLines: Array<_MasterDataRow>;
+    missingInMaster: Array<_Order>;
+}): {
+    missingInMasterCount: bigint;
+    newLinesCount: bigint;
+    alreadyExistingRows: bigint;
+    totalUploadedRows: bigint;
+    newLines: Array<MasterDataRow>;
+    missingInMaster: Array<Order>;
+} {
+    return {
+        missingInMasterCount: value.missingInMasterCount,
+        newLinesCount: value.newLinesCount,
+        alreadyExistingRows: value.alreadyExistingRows,
+        totalUploadedRows: value.totalUploadedRows,
+        newLines: from_candid_vec_n47(_uploadFile, _downloadFile, value.newLines),
+        missingInMaster: from_candid_vec_n22(_uploadFile, _downloadFile, value.missingInMaster)
+    };
+}
+function from_candid_record_n49(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    weight: number;
+    karigar: string;
+    orderDate: [] | [_Time];
+    orderNo: string;
+    quantity: bigint;
+    designCode: string;
+}): {
+    weight: number;
+    karigar: string;
+    orderDate?: Time;
+    orderNo: string;
+    quantity: bigint;
+    designCode: string;
+} {
+    return {
+        weight: value.weight,
+        karigar: value.karigar,
+        orderDate: record_opt_to_undefined(from_candid_opt_n27(_uploadFile, _downloadFile, value.orderDate)),
+        orderNo: value.orderNo,
+        quantity: value.quantity,
+        designCode: value.designCode
     };
 }
 function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1072,17 +1209,23 @@ function from_candid_vec_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 async function from_candid_vec_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[string, _ExternalBlob]>): Promise<Array<[string, ExternalBlob]>> {
     return await Promise.all(value.map(async (x)=>await from_candid_tuple_n33(_uploadFile, _downloadFile, x)));
 }
+function from_candid_vec_n47(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_MasterDataRow>): Array<MasterDataRow> {
+    return value.map((x)=>from_candid_MasterDataRow_n48(_uploadFile, _downloadFile, x));
+}
 function to_candid_DesignMapping_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: DesignMapping): _DesignMapping {
     return to_candid_record_n13(_uploadFile, _downloadFile, value);
 }
 async function to_candid_ExternalBlob_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExternalBlob): Promise<_ExternalBlob> {
     return await _uploadFile(value);
 }
+function to_candid_MasterDataRow_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: MasterDataRow): _MasterDataRow {
+    return to_candid_record_n42(_uploadFile, _downloadFile, value);
+}
 function to_candid_OrderStatus_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus): _OrderStatus {
     return to_candid_variant_n9(_uploadFile, _downloadFile, value);
 }
-function to_candid_OrderType_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): _OrderType {
-    return to_candid_variant_n37(_uploadFile, _downloadFile, value);
+function to_candid_OrderType_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): _OrderType {
+    return to_candid_variant_n38(_uploadFile, _downloadFile, value);
 }
 function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation): __CaffeineStorageRefillInformation {
     return to_candid_record_n3(_uploadFile, _downloadFile, value);
@@ -1090,13 +1233,16 @@ function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: Exte
 function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation | null): [] | [__CaffeineStorageRefillInformation] {
     return value === null ? candid_none() : candid_some(to_candid__CaffeineStorageRefillInformation_n2(_uploadFile, _downloadFile, value));
 }
-function to_candid_opt_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus | null): [] | [_OrderStatus] {
+function to_candid_opt_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderStatus | null): [] | [_OrderStatus] {
     return value === null ? candid_none() : candid_some(to_candid_OrderStatus_n8(_uploadFile, _downloadFile, value));
 }
-function to_candid_opt_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType | null): [] | [_OrderType] {
-    return value === null ? candid_none() : candid_some(to_candid_OrderType_n36(_uploadFile, _downloadFile, value));
+function to_candid_opt_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType | null): [] | [_OrderType] {
+    return value === null ? candid_none() : candid_some(to_candid_OrderType_n37(_uploadFile, _downloadFile, value));
 }
-function to_candid_opt_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+function to_candid_opt_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_opt_n50(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Time | null): [] | [_Time] {
     return value === null ? candid_none() : candid_some(value);
 }
 function to_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1135,6 +1281,30 @@ function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         proposed_top_up_amount: value.proposed_top_up_amount ? candid_some(value.proposed_top_up_amount) : candid_none()
     };
 }
+function to_candid_record_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    weight: number;
+    karigar: string;
+    orderDate?: Time;
+    orderNo: string;
+    quantity: bigint;
+    designCode: string;
+}): {
+    weight: number;
+    karigar: string;
+    orderDate: [] | [_Time];
+    orderNo: string;
+    quantity: bigint;
+    designCode: string;
+} {
+    return {
+        weight: value.weight,
+        karigar: value.karigar,
+        orderDate: value.orderDate ? candid_some(value.orderDate) : candid_none(),
+        orderNo: value.orderNo,
+        quantity: value.quantity,
+        designCode: value.designCode
+    };
+}
 function to_candid_tuple_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [string, DesignMapping]): [string, _DesignMapping] {
     return [
         value[0],
@@ -1147,7 +1317,7 @@ async function to_candid_tuple_n15(_uploadFile: (file: ExternalBlob) => Promise<
         await to_candid_ExternalBlob_n16(_uploadFile, _downloadFile, value[1])
     ];
 }
-function to_candid_variant_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): {
+function to_candid_variant_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: OrderType): {
     CO: null;
 } | {
     RB: null;
@@ -1186,6 +1356,9 @@ function to_candid_vec_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Arr
 }
 async function to_candid_vec_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[string, ExternalBlob]>): Promise<Array<[string, _ExternalBlob]>> {
     return await Promise.all(value.map(async (x)=>await to_candid_tuple_n15(_uploadFile, _downloadFile, x)));
+}
+function to_candid_vec_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<MasterDataRow>): Array<_MasterDataRow> {
+    return value.map((x)=>to_candid_MasterDataRow_n41(_uploadFile, _downloadFile, x));
 }
 export interface CreateActorOptions {
     agent?: Agent;

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Order } from "../../backend";
 import { useGetReadyOrders, useBatchDeleteOrders, useBatchReturnReadyOrders } from "../../hooks/useQueries";
+import { useGetAllOrders } from "../../hooks/useQueries";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useActor } from "@/hooks/useActor";
+import { useQueryClient } from "@tanstack/react-query";
+import { OrderType, OrderStatus } from "@/backend";
 
 /**
  * Groups selected orders by orderNo and sums their quantities.
@@ -42,11 +46,16 @@ function buildReturnRequests(orders: Order[]): Array<[string, bigint]> {
 
 export default function ReadyTab() {
   const { data: readyOrders = [], isLoading } = useGetReadyOrders();
+  // We also need all orders to find the pending counterpart of split RB orders
+  const { data: allOrders = [] } = useGetAllOrders();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [isReturning, setIsReturning] = useState(false);
 
   const batchDeleteMutation = useBatchDeleteOrders();
   const batchReturnMutation = useBatchReturnReadyOrders();
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return readyOrders;
@@ -108,28 +117,108 @@ export default function ReadyTab() {
     });
   };
 
-  const handleReturn = () => {
+  /**
+   * Handle return to pending with RB partial-supply merge logic.
+   *
+   * For RB orders that were partially supplied (they have originalOrderId set),
+   * we need to:
+   * 1. Find the original pending row (orderId == originalOrderId) which holds the remaining qty
+   * 2. Delete that pending row
+   * 3. Pass totalQty = pendingRemainingQty + readyQty to returnOrdersToPending
+   *    so the backend creates ONE merged pending row with the full original quantity
+   *
+   * For all other orders, use the standard return flow.
+   */
+  const handleReturn = async () => {
     if (selectedOrders.length === 0) {
       toast.error("No orders selected");
       return;
     }
-    // Build [orderNo, totalQty] tuples grouped by orderNo
-    const requests = buildReturnRequests(selectedOrders);
-    batchReturnMutation.mutate(requests, {
-      onSuccess: () => {
-        setSelectedIds(new Set());
-      },
-      onError: (error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        console.error("Return failed:", message);
-        toast.error(`Failed to return orders: ${message}`);
-      },
-    });
+
+    if (!actor) {
+      toast.error("Actor not initialized");
+      return;
+    }
+
+    setIsReturning(true);
+    try {
+      // Separate split RB orders (have originalOrderId) from regular orders
+      const splitRBOrders = selectedOrders.filter(
+        (o) => o.orderType === OrderType.RB && o.originalOrderId
+      );
+      const regularOrders = selectedOrders.filter(
+        (o) => !(o.orderType === OrderType.RB && o.originalOrderId)
+      );
+
+      // Build a map of originalOrderId -> pending order for split RB orders
+      const pendingOrdersToDelete: string[] = [];
+      // Map: orderNo -> extra qty to add from the pending remainder
+      const extraQtyByOrderNo = new Map<string, bigint>();
+
+      for (const readyOrder of splitRBOrders) {
+        const originalId = readyOrder.originalOrderId!;
+        // Find the pending counterpart in allOrders
+        const pendingCounterpart = allOrders.find(
+          (o) =>
+            o.orderId === originalId &&
+            o.status === OrderStatus.Pending
+        );
+
+        if (pendingCounterpart) {
+          pendingOrdersToDelete.push(pendingCounterpart.orderId);
+          const existing = extraQtyByOrderNo.get(readyOrder.orderNo) ?? BigInt(0);
+          extraQtyByOrderNo.set(
+            readyOrder.orderNo,
+            existing + pendingCounterpart.quantity
+          );
+        }
+      }
+
+      // Delete the pending remainder rows for split RB orders
+      if (pendingOrdersToDelete.length > 0) {
+        await actor.batchDeleteOrders(pendingOrdersToDelete);
+      }
+
+      // Build return requests: group all selected orders by orderNo, sum quantities
+      // For split RB orders, also add the pending remainder quantity
+      const grouped = new Map<string, bigint>();
+      for (const order of selectedOrders) {
+        const existing = grouped.get(order.orderNo) ?? BigInt(0);
+        grouped.set(order.orderNo, existing + order.quantity);
+      }
+      // Add extra qty from deleted pending remainders
+      for (const [orderNo, extraQty] of extraQtyByOrderNo.entries()) {
+        const existing = grouped.get(orderNo) ?? BigInt(0);
+        grouped.set(orderNo, existing + extraQty);
+      }
+
+      const requests = Array.from(grouped.entries());
+
+      await actor.batchReturnOrdersToPending(requests);
+
+      // Invalidate all relevant queries
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
+      await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+
+      setSelectedIds(new Set());
+      toast.success(
+        selectedOrders.length === 1
+          ? "Order returned to pending"
+          : `${selectedOrders.length} orders returned to pending`
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("Return failed:", message);
+      toast.error(`Failed to return orders: ${message}`);
+    } finally {
+      setIsReturning(false);
+    }
   };
 
   const isOperating =
-    batchDeleteMutation.isPending || batchReturnMutation.isPending;
+    batchDeleteMutation.isPending || batchReturnMutation.isPending || isReturning;
 
   if (isLoading) {
     return (
@@ -169,7 +258,7 @@ export default function ReadyTab() {
                   disabled={isOperating}
                   className="gap-1.5"
                 >
-                  {batchReturnMutation.isPending ? (
+                  {isReturning ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RotateCcw className="h-4 w-4" />
@@ -183,8 +272,8 @@ export default function ReadyTab() {
                   <AlertDialogDescription>
                     This will move {selectedIds.size} selected{" "}
                     {selectedIds.size === 1 ? "order" : "orders"} back to
-                    Pending status in Total Orders. The orders will be
-                    consolidated by order number.
+                    Pending status in Total Orders. For partially-supplied RB
+                    orders, the full original pending quantity will be restored.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

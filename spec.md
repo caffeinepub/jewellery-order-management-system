@@ -1,12 +1,10 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the "Return to Pending" functionality for RB orders in the Ready tab, which currently fails with "Original order not found" error.
+**Goal:** Within the Total Orders tab, sort orders inside each design code group by overdue days in descending order (most overdue first).
 
 **Planned changes:**
-- Update the backend `returnOrdersToPending` function to remove the dependency on looking up an existing original order record
-- For fully-fulfilled RB orders (supplied qty = pending qty): create a new Pending order line in Total Orders with qty equal to supplied qty and all fields copied from the Ready order, then remove from Ready
-- For partially-fulfilled RB orders (supplied qty < pending qty): find the existing Total Orders line by base order number, add supplied qty back to it and ensure status is Pending, then remove from Ready
-- Update `ReadyTab.tsx` to correctly call the fixed backend return function, show a success toast on completion, and show an error toast with the specific failure message on failure
+- In `TotalOrdersTab.tsx`, after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each group by the number of days elapsed since `orderDate` (descending).
+- Orders with a null or missing `orderDate` are placed at the bottom of their respective design code group.
 
-**User-visible outcome:** Users can successfully return selected RB orders from the Ready tab back to Pending without encountering the "Original order not found" error. Returned orders disappear from the Ready tab and reappear correctly in Total Orders with Pending status.
+**User-visible outcome:** In the Total Orders tab, each design code group displays its orders from most overdue (oldest order date) to least overdue, with undated orders at the bottom of each group.

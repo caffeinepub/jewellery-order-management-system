@@ -21,6 +21,8 @@ import {
   Printer,
   ScanLine,
   Trash2,
+  FileCheck,
+  Clock,
 } from 'lucide-react';
 import DataResetDialog from './DataResetDialog';
 
@@ -32,6 +34,8 @@ const menuItems = [
   { title: 'Design Images', icon: Image, path: '/design-images' },
   { title: 'Tag Printing', icon: Printer, path: '/tag-printing' },
   { title: 'Barcode Scanning', icon: ScanLine, path: '/barcode-scanning' },
+  { title: 'Reconciliation', icon: FileCheck, path: '/reconciliation' },
+  { title: 'Ageing Stock', icon: Clock, path: '/ageing-stock' },
 ];
 
 export default function AppSidebar() {

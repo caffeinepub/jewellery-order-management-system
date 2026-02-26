@@ -12,6 +12,8 @@ import DesignImages from '@/pages/DesignImages';
 import TagPrinting from '@/pages/TagPrinting';
 import BarcodeScanning from '@/pages/BarcodeScanning';
 import KarigarDetail from '@/pages/KarigarDetail';
+import Reconciliation from '@/pages/Reconciliation';
+import AgeingStock from '@/pages/AgeingStock';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +94,18 @@ const karigarDetailRoute = createRoute({
   component: KarigarDetail,
 });
 
+const reconciliationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reconciliation',
+  component: Reconciliation,
+});
+
+const ageingStockRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/ageing-stock',
+  component: AgeingStock,
+});
+
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   ingestOrdersRoute,
@@ -101,6 +115,8 @@ const routeTree = rootRoute.addChildren([
   tagPrintingRoute,
   barcodeScanningRoute,
   karigarDetailRoute,
+  reconciliationRoute,
+  ageingStockRoute,
 ]);
 
 const router = createRouter({ routeTree });

@@ -1,49 +1,34 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-25T17:11:47.429Z",
+  "generatedAt": "2026-02-26T15:54:32.956Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 2,
+    "total": 1,
     "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix the backend 'returnOrdersToPending' (or equivalent) function so it no longer requires an existing 'original order' record lookup. Instead, implement the following logic for RB orders being returned from Ready to Pending: (1) If the Ready order's supplied qty equals its pending qty (fully fulfilled case), create a brand-new Pending order line in Total Orders with qty = supplied qty and all other fields copied from the Ready order, then remove the order from Ready. (2) If the Ready order's supplied qty is less than its pending qty (partially fulfilled case), find the existing order line in Total Orders by base order number and add the supplied qty back to it, restoring its status to Pending if not already, then remove the order from Ready. All orders in Total Orders must always have Pending status.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-2",
-        "summary": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+        "summary": "In the Total Orders tab (TotalOrdersTab.tsx), after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each design code group by overdue days in descending order (most overdue / oldest order date first). Overdue days should be calculated as the number of days elapsed since the order's orderDate. Orders with a null or missing orderDate should be placed at the bottom of each group.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ]
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/components/dashboard/HallmarkTab.tsx",
-    "frontend/src/components/dashboard/ReadyTab.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/MasterDesigns.tsx",
+    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

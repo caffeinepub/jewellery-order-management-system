@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-frontend-readytab-tsx-return-to-pending-flow-to-correctly-call-the-fixed-backend-return-function-and-display-a-success-toast-on-completion-and-an-error-toast-with-the-specific-failure-message-if-it-fails-no-other-ui-changes-are-needed",
-      "featureTitle": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+      "featureId": "feature-in-the-total-orders-tab-totalorderstab-tsx-after-grouping-pending-returnfromhallmark-orders-by-design-code-sort-the-orders-within-each-design-code-group-by-overdue-days-in-descending-order-most-overdue-oldest-order-date-first-overdue-days-should-be-calculated-as-the-number-of-days-elapsed-since-the-order-s-orderdate-orders-with-a-null-or-missing-orderdate-should-be-placed-at-the-bottom-of-each-group",
+      "featureTitle": "In the Total Orders tab (TotalOrdersTab.tsx), after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each design code group by overdue days in descending order (most overdue / oldest order date first). Overdue days should be calculated as the number of days elapsed since the order's orderDate. Orders with a null or missing orderDate should be placed at the bottom of each group.",
       "files": [
-        "frontend/src/components/dashboard/ReadyTab.tsx"
+        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -18,7 +18,7 @@
         "blob-storage@4.0.0"
       ],
       "testIds": [
-        "REQ-2"
+        "REQ-1"
       ],
       "confidence": "high"
     }

@@ -53,6 +53,7 @@ export const Order = IDL.Record({
   'originalOrderId' : IDL.Opt(IDL.Text),
   'createdAt' : Time,
   'size' : IDL.Float64,
+  'orderDate' : IDL.Opt(Time),
   'orderType' : OrderType,
   'design' : IDL.Text,
   'orderId' : IDL.Text,
@@ -68,6 +69,25 @@ export const Karigar = IDL.Record({
   'name' : IDL.Text,
   'createdAt' : Time,
   'createdBy' : IDL.Text,
+});
+export const MasterDataRow = IDL.Record({
+  'weight' : IDL.Float64,
+  'karigar' : IDL.Text,
+  'orderDate' : IDL.Opt(Time),
+  'orderNo' : IDL.Text,
+  'quantity' : IDL.Nat,
+  'designCode' : IDL.Text,
+});
+export const MasterPersistedResponse = IDL.Record({
+  'persisted' : IDL.Vec(Order),
+});
+export const MasterReconciliationResult = IDL.Record({
+  'missingInMasterCount' : IDL.Nat,
+  'newLinesCount' : IDL.Nat,
+  'alreadyExistingRows' : IDL.Nat,
+  'totalUploadedRows' : IDL.Nat,
+  'newLines' : IDL.Vec(MasterDataRow),
+  'missingInMaster' : IDL.Vec(Order),
 });
 
 export const idlService = IDL.Service({
@@ -155,6 +175,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text, IDL.Text))],
       ['query'],
     ),
+  'getOrder' : IDL.Func([IDL.Text], [IDL.Opt(Order)], ['query']),
   'getOrders' : IDL.Func(
       [IDL.Opt(OrderStatus), IDL.Opt(OrderType), IDL.Opt(IDL.Text)],
       [IDL.Vec(Order)],
@@ -180,7 +201,17 @@ export const idlService = IDL.Service({
     ),
   'markAllAsReady' : IDL.Func([], [], []),
   'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
+  'persistMasterDataRows' : IDL.Func(
+      [IDL.Vec(MasterDataRow)],
+      [MasterPersistedResponse],
+      [],
+    ),
   'reassignDesign' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'reconcileMasterFile' : IDL.Func(
+      [IDL.Vec(MasterDataRow)],
+      [MasterReconciliationResult],
+      [],
+    ),
   'resetActiveOrders' : IDL.Func([], [], []),
   'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
   'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
@@ -195,6 +226,7 @@ export const idlService = IDL.Service({
         IDL.Nat,
         IDL.Text,
         IDL.Text,
+        IDL.Opt(Time),
       ],
       [],
       [],
@@ -257,6 +289,7 @@ export const idlFactory = ({ IDL }) => {
     'originalOrderId' : IDL.Opt(IDL.Text),
     'createdAt' : Time,
     'size' : IDL.Float64,
+    'orderDate' : IDL.Opt(Time),
     'orderType' : OrderType,
     'design' : IDL.Text,
     'orderId' : IDL.Text,
@@ -272,6 +305,23 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'createdAt' : Time,
     'createdBy' : IDL.Text,
+  });
+  const MasterDataRow = IDL.Record({
+    'weight' : IDL.Float64,
+    'karigar' : IDL.Text,
+    'orderDate' : IDL.Opt(Time),
+    'orderNo' : IDL.Text,
+    'quantity' : IDL.Nat,
+    'designCode' : IDL.Text,
+  });
+  const MasterPersistedResponse = IDL.Record({ 'persisted' : IDL.Vec(Order) });
+  const MasterReconciliationResult = IDL.Record({
+    'missingInMasterCount' : IDL.Nat,
+    'newLinesCount' : IDL.Nat,
+    'alreadyExistingRows' : IDL.Nat,
+    'totalUploadedRows' : IDL.Nat,
+    'newLines' : IDL.Vec(MasterDataRow),
+    'missingInMaster' : IDL.Vec(Order),
   });
   
   return IDL.Service({
@@ -363,6 +413,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text, IDL.Text))],
         ['query'],
       ),
+    'getOrder' : IDL.Func([IDL.Text], [IDL.Opt(Order)], ['query']),
     'getOrders' : IDL.Func(
         [IDL.Opt(OrderStatus), IDL.Opt(OrderType), IDL.Opt(IDL.Text)],
         [IDL.Vec(Order)],
@@ -388,7 +439,17 @@ export const idlFactory = ({ IDL }) => {
       ),
     'markAllAsReady' : IDL.Func([], [], []),
     'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
+    'persistMasterDataRows' : IDL.Func(
+        [IDL.Vec(MasterDataRow)],
+        [MasterPersistedResponse],
+        [],
+      ),
     'reassignDesign' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'reconcileMasterFile' : IDL.Func(
+        [IDL.Vec(MasterDataRow)],
+        [MasterReconciliationResult],
+        [],
+      ),
     'resetActiveOrders' : IDL.Func([], [], []),
     'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
     'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
@@ -403,6 +464,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Nat,
           IDL.Text,
           IDL.Text,
+          IDL.Opt(Time),
         ],
         [],
         [],

@@ -8,6 +8,16 @@ import { Button } from "@/components/ui/button";
 import SuppliedQtyDialog from "./SuppliedQtyDialog";
 import { toast } from "sonner";
 
+/** Returns overdue days for an order (positive = overdue). Orders with no valid date return -Infinity so they sort to the bottom. */
+function getOverdueDays(order: Order): number {
+  if (!order.orderDate) return -Infinity;
+  const ms = Number(order.orderDate) / 1_000_000; // nanoseconds → milliseconds
+  if (!isFinite(ms) || ms <= 0) return -Infinity;
+  const orderDateMs = ms;
+  const nowMs = Date.now();
+  return (nowMs - orderDateMs) / (1000 * 60 * 60 * 24); // days
+}
+
 export default function TotalOrdersTab() {
   const [searchText, setSearchText] = useState("");
   const [selectedOrderType, setSelectedOrderType] = useState<OrderType | "ALL">("ALL");
@@ -61,7 +71,38 @@ export default function TotalOrdersTab() {
       );
     }
 
-    return result;
+    // Sort within each design code group by overdue days descending (most overdue first).
+    // Orders with no valid orderDate go to the bottom of their group.
+    // Strategy: group → sort each group → flatten back in design-code order.
+    const groupMap = new Map<string, Order[]>();
+    for (const order of result) {
+      const key = order.design;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key)!.push(order);
+    }
+
+    // Sort each group by overdue days descending
+    for (const [, group] of groupMap) {
+      group.sort((a, b) => {
+        const daysA = getOverdueDays(a);
+        const daysB = getOverdueDays(b);
+        // Both have no date — preserve original order
+        if (daysA === -Infinity && daysB === -Infinity) return 0;
+        // No-date orders go to the bottom
+        if (daysA === -Infinity) return 1;
+        if (daysB === -Infinity) return -1;
+        // Most overdue (highest days) first
+        return daysB - daysA;
+      });
+    }
+
+    // Flatten back preserving design-code group order
+    const sorted: Order[] = [];
+    for (const [, group] of groupMap) {
+      sorted.push(...group);
+    }
+
+    return sorted;
   }, [enrichedOrders, searchText, selectedOrderType, selectedKarigar]);
 
   // Get unique karigars for filter dropdown

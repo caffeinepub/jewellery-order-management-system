@@ -1,60 +1,39 @@
 {
   "kind": "build_request",
-  "title": "Fix Return to Pending for RB Orders in Ready Tab",
-  "projectName": "Jewellery Order Manager",
-  "priority": "high",
+  "title": "Sort Total Orders by overdue days within each design code group",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the backend 'returnOrdersToPending' (or equivalent) function so it no longer requires an existing 'original order' record lookup. Instead, implement the following logic for RB orders being returned from Ready to Pending: (1) If the Ready order's supplied qty equals its pending qty (fully fulfilled case), create a brand-new Pending order line in Total Orders with qty = supplied qty and all other fields copied from the Ready order, then remove the order from Ready. (2) If the Ready order's supplied qty is less than its pending qty (partially fulfilled case), find the existing order line in Total Orders by base order number and add the supplied qty back to it, restoring its status to Pending if not already, then remove the order from Ready. All orders in Total Orders must always have Pending status.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-recent-4",
-          "msg-recent-6"
-        ],
-        "quotes": [
-          "Failed to return orders: Original order not found for 1105ARB2603015-001",
-          "if while changing status from pending to ready supplied qty = pending qty then while returning returned qty = supplied qty and it will be added as new line",
-          "if while changing status from pending to ready supplied qty < pending qty then while returning supplied qty will go back and added to same order line in the total orders",
-          "It goes back to pending. Any order reflecting in total orders is only pending status orders"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Returning a fully-fulfilled RB order (supplied qty = pending qty) from Ready creates a new Pending order line in Total Orders with qty equal to the supplied qty",
-        "Returning a partially-fulfilled RB order (supplied qty < pending qty) from Ready adds the supplied qty back to the existing Total Orders line and its status is Pending",
-        "The returned order is removed from the Ready tab after a successful return operation",
-        "No 'Original order not found' error occurs for any RB order during return",
-        "All orders visible in Total Orders have Pending status"
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "text": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+      "text": "In the Total Orders tab (TotalOrdersTab.tsx), after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each design code group by overdue days in descending order (most overdue / oldest order date first). Overdue days should be calculated as the number of days elapsed since the order's orderDate. Orders with a null or missing orderDate should be placed at the bottom of each group.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-recent-4"
+          "msg-recent-last"
         ],
         "quotes": [
-          "Failed to return orders: Original order not found for 1105ARB2603015-001"
+          "It should be sorted as per each design code group.",
+          "the data should be categorised as per overdue order from top to bottom for each design code separately"
         ]
       },
       "acceptanceCriteria": [
-        "Clicking 'Return N Orders to Pending' in the Ready tab successfully calls the backend and shows a success toast",
-        "On failure, the toast displays the specific error message returned by the backend",
-        "After a successful return, the returned orders disappear from the Ready tab list"
+        "In Total Orders tab, orders are grouped by design code as before.",
+        "Within each design code group, the order with the highest overdue days (oldest orderDate) appears first.",
+        "Orders with no orderDate appear at the bottom of their respective design code group.",
+        "The sorting is applied consistently across all design code groups.",
+        "No existing features (search, filter, karigar, order type) are affected."
       ]
     }
   ],
   "constraints": [
-    "All orders stored in Total Orders must always have Pending status — never any other status",
-    "Do not change the delete functionality in the Ready tab — it is working correctly"
+    "Do not alter the existing grouping-by-design-code structure in TotalOrdersTab.",
+    "Do not change any other tab (Ready, Hallmark, Customer Orders, Karigars).",
+    "Do not modify backend data model or queries."
   ],
   "nonGoals": [
-    "Changing return logic for non-RB order types (SO, CO)",
-    "Adding new UI components or redesigning the Ready tab",
-    "Modifying the Pending → Ready supply flow"
+    "Sorting across design code groups (only within each group).",
+    "Changes to the Ageing Stock page sorting.",
+    "Any backend changes."
   ],
   "imageRequirements": {
     "required": [],

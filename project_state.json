@@ -1,22 +1,24 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management app with a Ready tab and Total Orders tab. Working on return-to-pending logic for RB orders in the Ready tab.",
+  "summary": "Order management app with karigar tracking, ageing stock reporting, and RB order handling. Active fixes: (1) ageing stock order date parsing from Excel column C + search bar, (2) total orders sorted by overdue days within each design code group, (3) RB return validation fix, (4) summary bracket for partial RB orders, (5) merge-back logic for returned RB ready rows.",
   "architectural_notes": [
-    "All orders in Total Orders are always in Pending status — no other status exists there.",
-    "Ready tab orders originate from Pending orders moved via status change (pending → ready) with a supplied qty recorded.",
-    "Delete and Return in Ready tab are the same feature — both remove from Ready and restore to Total Orders as Pending."
+    "Ageing stock page must read from the same live orders store as the dashboard (no separate snapshot).",
+    "RB partial orders create split rows; each split row is independent for return validation purposes.",
+    "Summary card counts unique order numbers with pending splits to display (Y pending) bracket."
   ],
   "known_issues": [
-    "Return to Pending fails with 'Original order not found for 1105ARB2603015-001' error when returning RB orders from Ready tab."
+    "Ageing stock shows 'no date' because Excel column C (order date) is not being parsed and stored during ingest.",
+    "RB return fails with qty mismatch error because validation compares row qty against original full order qty.",
+    "Returning a ready RB split row creates a new pending row instead of merging with existing pending row."
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-update-the-frontend-readytab-tsx-return-to-pending-flow-to-correctly-call-the-fixed-backend-return-function-and-display-a-success-toast-on-completion-and-an-error-toast-with-the-specific-failure-message-if-it-fails-no-other-ui-changes-are-needed",
-      "title": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+      "id": "feature-in-the-total-orders-tab-totalorderstab-tsx-after-grouping-pending-returnfromhallmark-orders-by-design-code-sort-the-orders-within-each-design-code-group-by-overdue-days-in-descending-order-most-overdue-oldest-order-date-first-overdue-days-should-be-calculated-as-the-number-of-days-elapsed-since-the-order-s-orderdate-orders-with-a-null-or-missing-orderdate-should-be-placed-at-the-bottom-of-each-group",
+      "title": "In the Total Orders tab (TotalOrdersTab.tsx), after grouping Pending/ReturnFromHallmark orders by design code, sort the orders within each design code group by overdue days in descending order (most overdue / oldest order date first). Overdue days should be calculated as the number of days elapsed since the order's orderDate. Orders with a null or missing orderDate should be placed at the bottom of each group.",
       "reqIds": [
-        "REQ-2"
+        "REQ-1"
       ],
       "version": 1
     }
@@ -24,21 +26,37 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix Return to Pending for RB orders in Ready tab: if supplied qty = pending qty, create new pending order line in Total Orders; if supplied qty < pending qty, restore supplied qty to existing order line in Total Orders",
+      "summary": "Ageing stock: parse order date from Excel column C, display overdue days, add design code search bar",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Fix the backend 'returnOrdersToPending' (or equivalent) function so it no longer requires an existing 'original order' record lookup. Instead, implement the following logic for RB orders being returned from Ready to Pending: (1) If the Ready order's supplied qty equals its pending qty (fully fulfilled case), create a brand-new Pending order line in Total Orders with qty = supplied qty and all other fields copied from the Ready order, then remove the order from Ready. (2) If the Ready order's supplied qty is less than its pending qty (partially fulfilled case), find the existing order line in Total Orders by base order number and add the supplied qty back to it, restoring its status to Pending if not already, then remove the order from Ready. All orders in Total Orders must always have Pending status.",
-      "reqIds": [
-        "REQ-1"
-      ],
+      "summary": "Total Orders dashboard: sort orders by overdue days within each design code group (most overdue first)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Fix RB return validation to compare against row qty not full order qty",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Summary card: show reduced count with (Y pending) bracket for partially supplied RB orders",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Return-to-pending for RB split rows: merge returned qty back into existing pending row by order number",
+      "reqIds": [],
       "status": "pending"
     }
   ],
   "gameProjectType": "none",
-  "projectName": "Jewellery Order Manager",
+  "projectName": "Sort Total Orders by overdue days within each design code group",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

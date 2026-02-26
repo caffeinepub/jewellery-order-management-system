@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { parseOrdersExcel } from '../utils/excelParser';
-import { useSaveOrder, useGetAllOrders } from '../hooks/useQueries';
+import { useGetAllOrders } from '../hooks/useQueries';
 import { useActor } from '../hooks/useActor';
 import type { OrderType } from '../backend';
 
@@ -20,6 +20,7 @@ interface ParsedOrder {
   quantity: bigint;
   remarks: string;
   orderId: string;
+  orderDate: number | null;
 }
 
 interface UploadResult {
@@ -38,7 +39,6 @@ export default function IngestOrders() {
   const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>([]);
 
   const { actor } = useActor();
-  const saveOrderMutation = useSaveOrder();
   const { refetch: refetchOrders } = useGetAllOrders();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,8 +72,12 @@ export default function IngestOrders() {
       try {
         if (!actor) throw new Error('Actor not initialized');
 
-        // Call backend to save order - backend will handle mapping lookup
-        // If mapping doesn't exist, backend will trap with error
+        // Convert orderDate from epoch ms to nanoseconds (BigInt) for the backend
+        // Backend expects Time = bigint (nanoseconds since epoch)
+        const orderDateNano: bigint | null = order.orderDate != null
+          ? BigInt(order.orderDate) * BigInt(1_000_000)
+          : null;
+
         await actor.saveOrder(
           order.orderNo,
           order.orderType,
@@ -83,7 +87,8 @@ export default function IngestOrders() {
           order.size,
           order.quantity,
           order.remarks,
-          order.orderId
+          order.orderId,
+          orderDateNano,
         );
 
         batchResult.success++;
@@ -179,6 +184,7 @@ export default function IngestOrders() {
           <CardTitle>Upload Orders Excel</CardTitle>
           <CardDescription>
             Select an Excel file containing order data. The file will be parsed and validated before upload.
+            Include an <strong>Order Date</strong> column to enable Ageing Stock tracking.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -199,6 +205,11 @@ export default function IngestOrders() {
           {parsedOrders.length > 0 && !isProcessing && (
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm font-medium">Ready to upload: {parsedOrders.length} orders parsed</p>
+              {parsedOrders.some(o => o.orderDate != null) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ✓ Order Date column detected — ageing data will be stored
+                </p>
+              )}
             </div>
           )}
 

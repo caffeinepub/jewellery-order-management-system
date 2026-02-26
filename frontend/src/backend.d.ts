@@ -19,16 +19,15 @@ export interface MappingRecord {
     genericName: string;
     designCode: string;
 }
-export type Time = bigint;
-export interface DesignMapping {
-    createdAt: Time;
-    createdBy: string;
-    karigarName: string;
-    updatedAt: Time;
-    updatedBy?: string;
-    genericName: string;
+export interface MasterDataRow {
+    weight: number;
+    karigar: string;
+    orderDate?: Time;
+    orderNo: string;
+    quantity: bigint;
     designCode: string;
 }
+export type Time = bigint;
 export interface Karigar {
     name: string;
     createdAt: Time;
@@ -41,6 +40,7 @@ export interface Order {
     originalOrderId?: string;
     createdAt: Time;
     size: number;
+    orderDate?: Time;
     orderType: OrderType;
     design: string;
     orderId: string;
@@ -51,6 +51,26 @@ export interface Order {
     quantity: bigint;
     remarks: string;
     product: string;
+}
+export interface DesignMapping {
+    createdAt: Time;
+    createdBy: string;
+    karigarName: string;
+    updatedAt: Time;
+    updatedBy?: string;
+    genericName: string;
+    designCode: string;
+}
+export interface MasterPersistedResponse {
+    persisted: Array<Order>;
+}
+export interface MasterReconciliationResult {
+    missingInMasterCount: bigint;
+    newLinesCount: bigint;
+    alreadyExistingRows: bigint;
+    totalUploadedRows: bigint;
+    newLines: Array<MasterDataRow>;
+    missingInMaster: Array<Order>;
 }
 export enum OrderStatus {
     Ready = "Ready",
@@ -86,6 +106,7 @@ export interface backendInterface {
     getMasterDesignExcel(): Promise<ExternalBlob | null>;
     getMasterDesignKarigars(): Promise<Array<string>>;
     getMasterDesigns(): Promise<Array<[string, string, string]>>;
+    getOrder(orderId: string): Promise<Order | null>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
@@ -95,11 +116,13 @@ export interface backendInterface {
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     markAllAsReady(): Promise<void>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
+    persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
+    reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
     resetActiveOrders(): Promise<void>;
     returnOrdersToPending(orderNo: string, returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
-    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateDesignGroupStatus(designCodes: Array<string>): Promise<void>;

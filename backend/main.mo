@@ -1,14 +1,16 @@
 import Time "mo:core/Time";
-import Map "mo:core/Map";
 import List "mo:core/List";
+import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
+import Iter "mo:core/Iter";
+
+
+// Use migration via with clause.
 
 actor {
-  include MixinStorage();
-
   type OrderType = {
     #CO;
     #RB;
@@ -39,6 +41,7 @@ actor {
     updatedAt : Time.Time;
     readyDate : ?Time.Time;
     originalOrderId : ?Text;
+    orderDate : ?Time.Time; // Persisted Order Date field
   };
 
   type DesignMapping = {
@@ -73,9 +76,10 @@ actor {
   var designImages = Map.empty<Text, Storage.ExternalBlob>();
   var karigars = Map.empty<Text, Karigar>();
   var masterDesignKarigars = Map.empty<Text, Nat>();
-
   var masterDesignExcel : ?Storage.ExternalBlob = null;
   var activeKarigar : ?Text = null;
+
+  include MixinStorage();
 
   public shared ({ caller }) func saveOrder(
     orderNo : Text,
@@ -87,6 +91,7 @@ actor {
     quantity : Nat,
     remarks : Text,
     orderId : Text,
+    orderDate : ?Time.Time, // Accept orderDate as parameter
   ) : async () {
     let timestamp = Time.now();
 
@@ -112,9 +117,14 @@ actor {
       updatedAt = timestamp;
       readyDate = null;
       originalOrderId = null;
+      orderDate; // Store orderDate
     };
 
     orders.add(orderId, order);
+  };
+
+  public query ({ caller }) func getOrder(orderId : Text) : async ?Order {
+    orders.get(orderId);
   };
 
   public shared ({ caller }) func supplyOrder(orderId : Text, suppliedQuantity : Nat) : async () {
@@ -124,7 +134,6 @@ actor {
         if (suppliedQuantity > originalOrder.quantity) {
           Runtime.trap("Supplied quantity cannot be greater than original order quantity");
         };
-
         if (suppliedQuantity > 0) {
           let readyOrder : Order = {
             originalOrder with
@@ -135,7 +144,6 @@ actor {
           };
           orders.add(orderId, readyOrder);
         };
-
         let remainingQuantity = Nat.sub(originalOrder.quantity, suppliedQuantity);
         if (remainingQuantity > 0) {
           let pendingOrder : Order = {
@@ -149,10 +157,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func supplyAndReturnOrder(
-    orderId : Text,
-    suppliedQuantity : Nat,
-  ) : async () {
+  public shared ({ caller }) func supplyAndReturnOrder(orderId : Text, suppliedQuantity : Nat) : async () {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
       case (?originalOrder) {
@@ -160,13 +165,12 @@ actor {
           Runtime.trap("Supplied and returned quantity must match the original order quantity");
         };
 
-        let updatedOrder : Order = {
-          originalOrder with
-          quantity = suppliedQuantity;
+        let order : Order = {
+          originalOrder with quantity = suppliedQuantity;
           status = #ReturnFromHallmark;
           updatedAt = Time.now();
         };
-        orders.add(orderId, updatedOrder);
+        orders.add(orderId, order);
       };
     };
   };
@@ -188,9 +192,7 @@ actor {
   };
 
   public query ({ caller }) func getUniqueKarigarsFromDesignMappings() : async [Text] {
-    designMappings.values().toArray().map(
-      func(mapping) { mapping.karigarName }
-    );
+    designMappings.values().toArray().map(func(mapping) { mapping.karigarName });
   };
 
   public query ({ caller }) func getMasterDesignKarigars() : async [Text] {
@@ -235,7 +237,6 @@ actor {
             };
             karigars.add(mapping.karigarName, karigar);
           };
-
           activeKarigar := ?mapping.karigarName;
         };
       };
@@ -273,13 +274,9 @@ actor {
         designMappings.add(designCode, updatedMapping);
 
         let design = designCode;
-
         let pendingOrderIds = orders.toArray().filter(
-          func((_, order)) {
-            order.design == design and order.status == #Pending;
-          }
+          func((_, o)) { o.design == design and o.status == #Pending }
         ).map(func((orderId, _)) { orderId });
-
         for (orderId in pendingOrderIds.values()) {
           switch (orders.get(orderId)) {
             case (null) { Runtime.trap("Order with id " # orderId # " already removed") };
@@ -303,11 +300,7 @@ actor {
     };
   };
 
-  public query ({ caller }) func getOrders(
-    _statusFilter : ?OrderStatus,
-    _typeFilter : ?OrderType,
-    _searchText : ?Text,
-  ) : async [Order] {
+  public query ({ caller }) func getOrders(_statusFilter : ?OrderStatus, _typeFilter : ?OrderType, _searchText : ?Text) : async [Order] {
     orders.values().toArray();
   };
 
@@ -323,9 +316,7 @@ actor {
   };
 
   public query ({ caller }) func getReadyOrders() : async [Order] {
-    orders.values().toArray().filter(
-      func(order) { order.status == #Ready }
-    );
+    orders.values().toArray().filter(func(order) { order.status == #Ready });
   };
 
   public shared ({ caller }) func batchSaveDesignMappings(mappings : [(Text, DesignMapping)]) : async () {
@@ -476,10 +467,7 @@ actor {
     };
   };
 
-  public shared ({ caller }) func batchUpdateOrderStatus(
-    orderIds : [Text],
-    newStatus : OrderStatus,
-  ) : async () {
+  public shared ({ caller }) func batchUpdateOrderStatus(orderIds : [Text], newStatus : OrderStatus) : async () {
     for (orderId in orderIds.values()) {
       switch (orders.get(orderId)) {
         case (null) {
@@ -554,9 +542,7 @@ actor {
   };
 
   // Batch supply RB orders with partial supply handling.
-  public shared ({ caller }) func batchSupplyRBOrders(
-    orderQuantities : [(Text, Nat)],
-  ) : async () {
+  public shared ({ caller }) func batchSupplyRBOrders(orderQuantities : [(Text, Nat)]) : async () {
     let timestamp = Time.now();
 
     for ((orderId, suppliedQuantity) in orderQuantities.values()) {
@@ -686,6 +672,37 @@ actor {
     };
   };
 
+  type MasterDataRow = {
+    orderNo : Text;
+    designCode : Text;
+    karigar : Text;
+    weight : Float;
+    quantity : Nat;
+    orderDate : ?Time.Time;
+  };
+
+  type ReconciliationResult = {
+    newLines : [MasterDataRow];
+    missingInMaster : [Order];
+    totalUploadedRows : Nat;
+    alreadyExistingRows : Nat;
+    newLinesCount : Nat;
+    missingInMasterCount : Nat;
+  };
+
+  public type MasterReconciliationResult = {
+    newLines : [MasterDataRow];
+    missingInMaster : [Order];
+    totalUploadedRows : Nat;
+    alreadyExistingRows : Nat;
+    newLinesCount : Nat;
+    missingInMasterCount : Nat;
+  };
+
+  public type MasterPersistedResponse = {
+    persisted : [Order];
+  };
+
   func sumQuantities(orders : [Order]) : Nat {
     var sum = 0;
     for (order in orders.values()) {
@@ -693,4 +710,99 @@ actor {
     };
     sum;
   };
+
+  public shared ({ caller }) func reconcileMasterFile(masterDataRows : [MasterDataRow]) : async MasterReconciliationResult {
+    let ordersArray = orders.values().toArray();
+    let pendingAndReadyOrders = ordersArray.filter(
+      func(order) {
+        order.status == #Pending or order.status == #Ready
+      }
+    );
+
+    let newLines = masterDataRows.filter(
+      func(row) {
+        not containsOrder(ordersArray, row.orderNo, row.designCode);
+      }
+    );
+
+    let missingInMaster = pendingAndReadyOrders.filter(
+      func(order) {
+        not containsRow(masterDataRows, order.orderNo, order.design);
+      }
+    );
+
+    let alreadyExistingRows = masterDataRows.size() - newLines.size();
+
+    {
+      newLines;
+      missingInMaster;
+      totalUploadedRows = masterDataRows.size();
+      alreadyExistingRows;
+      newLinesCount = newLines.size();
+      missingInMasterCount = missingInMaster.size();
+    };
+  };
+
+  func containsOrder(ordersArray : [Order], orderNo : Text, designCode : Text) : Bool {
+    ordersArray.any(
+      func(order) {
+        order.orderNo == orderNo and order.design == designCode
+      }
+    );
+  };
+
+  func containsRow(masterDataRows : [MasterDataRow], orderNo : Text, designCode : Text) : Bool {
+    masterDataRows.any(
+      func(row) {
+        row.orderNo == orderNo and row.designCode == designCode
+      }
+    );
+  };
+
+  public shared ({ caller }) func persistMasterDataRows(
+    masterRows : [MasterDataRow],
+  ) : async MasterPersistedResponse {
+    let persistedRows = List.empty<Order>();
+
+    for (masterRow in masterRows.values()) {
+      if (not containsOrder(orders.values().toArray(), masterRow.orderNo, masterRow.designCode)) {
+        let timestamp = Time.now();
+        let orderId = masterRow.orderNo # "_" # masterRow.designCode;
+
+        let (genericName, karigarName) = switch (designMappings.get(masterRow.designCode)) {
+          case (null) { (null, null) };
+          case (?mapping) { (?(mapping.genericName), ?(mapping.karigarName)) };
+        };
+
+        let newOrder : Order = {
+          orderNo = masterRow.orderNo;
+          orderType = #CO;
+          product = "";
+          design = masterRow.designCode;
+          weight = masterRow.weight;
+          size = 0.0;
+          quantity = masterRow.quantity;
+          remarks = "";
+          genericName;
+          karigarName;
+          status = #Pending;
+          orderId;
+          createdAt = timestamp;
+          updatedAt = timestamp;
+          readyDate = null;
+          originalOrderId = null;
+          orderDate = masterRow.orderDate; // Persist orderDate from masterRow
+        };
+
+        orders.add(orderId, newOrder);
+        persistedRows.add(newOrder);
+      };
+    };
+
+    let persisted = persistedRows.toArray();
+    {
+      persisted;
+    };
+  };
 };
+

@@ -19,6 +19,83 @@ export function normalizeDesignCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
+/**
+ * Safely extract a numeric value from an Excel row cell.
+ * Tries multiple column name variants and handles numeric-only cells correctly.
+ */
+function extractNumber(row: any, ...keys: string[]): number {
+  for (const key of keys) {
+    const val = row[key];
+    if (val !== undefined && val !== null && val !== '') {
+      const num = Number(val);
+      if (!isNaN(num)) return num;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Safely extract a string value from an Excel row cell.
+ * Tries multiple column name variants.
+ */
+function extractString(row: any, ...keys: string[]): string {
+  for (const key of keys) {
+    const val = row[key];
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      return String(val).trim();
+    }
+  }
+  return '';
+}
+
+/**
+ * Extract and parse an order date from an Excel row.
+ * Handles Excel serial dates (numbers), JS Date objects, and string formats.
+ * Returns epoch milliseconds (number) or null if not present or not parseable.
+ * Never returns NaN or undefined.
+ */
+function extractOrderDate(row: any): number | null {
+  const keys = ['Order Date', 'OrderDate', 'ORDER DATE', 'order_date', 'orderdate', 'Date', 'DATE'];
+  for (const key of keys) {
+    const val = row[key];
+
+    // Skip empty / missing values
+    if (val === undefined || val === null || val === '') continue;
+
+    try {
+      // If it's already a JS Date object (SheetJS returns these when cellDates: true)
+      if (val instanceof Date) {
+        const ts = val.getTime();
+        if (!isNaN(ts) && ts > 0) return ts;
+        continue;
+      }
+
+      // If it's a number, treat as Excel serial date
+      if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
+        // Excel serial date: days since 1900-01-01 (with leap year bug offset)
+        // SheetJS epoch: 25569 = 1970-01-01
+        const excelEpoch = (val - 25569) * 86400 * 1000;
+        if (!isNaN(excelEpoch) && isFinite(excelEpoch) && excelEpoch > 0) return excelEpoch;
+        continue;
+      }
+
+      // If it's a string, try to parse it
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) continue;
+        const parsed = Date.parse(trimmed);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+        continue;
+      }
+    } catch {
+      // Swallow any unexpected errors and continue to next key
+      continue;
+    }
+  }
+  // Explicitly return null (never undefined or NaN)
+  return null;
+}
+
 export async function parseExcelFile(file: File): Promise<
   ParseResult<{
     orderNo: string;
@@ -29,6 +106,7 @@ export async function parseExcelFile(file: File): Promise<
     size: number;
     quantity: number;
     remarks: string;
+    orderDate: number | null;
   }>
 > {
   return new Promise((resolve, reject) => {
@@ -40,7 +118,7 @@ export async function parseExcelFile(file: File): Promise<
         
         const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
         
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
@@ -57,15 +135,20 @@ export async function parseExcelFile(file: File): Promise<
             const index = i + chunkIndex;
             const rowNumber = index + 2;
             
-            const orderNo = String(row['Order No'] || row['OrderNo'] || '').trim();
-            const orderTypeRaw = String(row['Order Type'] || row['OrderType'] || '').trim().toUpperCase();
-            const product = String(row['Product'] || '').trim();
-            const designRaw = String(row['Design'] || '').trim();
-            const design = normalizeDesignCode(designRaw); // Normalize design code
-            const weight = Number(row['Weight'] || 0);
-            const size = Number(row['Size'] || 0);
-            const quantity = Number(row['Quantity'] || 0);
-            const remarks = String(row['Remarks'] || '').trim();
+            // Try multiple column name variants for each field
+            const orderNo = extractString(row, 'Order No', 'OrderNo', 'ORDER NO', 'order_no', 'orderno');
+            const orderTypeRaw = extractString(row, 'Order Type', 'OrderType', 'ORDER TYPE', 'order_type', 'ordertype').toUpperCase();
+            const product = extractString(row, 'Product', 'PRODUCT', 'product');
+            const designRaw = extractString(row, 'Design', 'DESIGN', 'design', 'Design Code', 'DesignCode');
+            const design = normalizeDesignCode(designRaw);
+            // Use extractNumber for numeric fields — handles plain integers correctly
+            const weight = extractNumber(row, 'Weight', 'WEIGHT', 'weight', 'Wt', 'WT');
+            const size = extractNumber(row, 'Size', 'SIZE', 'size');
+            // Quantity: try all common variants; extractNumber handles 0 correctly
+            const quantity = extractNumber(row, 'Quantity', 'QUANTITY', 'Qty', 'QTY', 'qty', 'quantity');
+            const remarks = extractString(row, 'Remarks', 'REMARKS', 'remarks', 'Remark', 'REMARK');
+            // Extract order date — always null if not present or not parseable (never NaN/undefined)
+            const orderDate: number | null = extractOrderDate(row);
 
             if (!orderNo) {
               errors.push({ row: rowNumber, field: 'Order No', message: 'Order No is required' });
@@ -103,6 +186,7 @@ export async function parseExcelFile(file: File): Promise<
                 size,
                 quantity,
                 remarks,
+                orderDate,
               });
             }
           });
@@ -144,10 +228,6 @@ export async function parseMasterDesignExcel(file: File): Promise<
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        console.log('📊 Parsing Master Design Excel - Reading columns A (DESIGN CODE), B (GENERIC NAME), C (KARIGAR NAME)');
-        console.log('Sheet name:', sheetName);
-        console.log('Worksheet range:', worksheet['!ref']);
-
         // Get the range of the worksheet
         const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
         
@@ -169,8 +249,6 @@ export async function parseMasterDesignExcel(file: File): Promise<
         const CHUNK_SIZE = 100;
         const totalRows = range.e.r;
         
-        console.log(`Processing ${totalRows} rows (Row 2 onwards, skipping header Row 1)`);
-        
         for (let startRow = 1; startRow <= totalRows; startRow += CHUNK_SIZE) {
           const endRow = Math.min(startRow + CHUNK_SIZE - 1, totalRows);
           
@@ -184,14 +262,9 @@ export async function parseMasterDesignExcel(file: File): Promise<
             
             // Extract values, handling different cell types
             const designCodeRaw = cellA ? String(cellA.v || '').trim() : '';
-            const designCode = normalizeDesignCode(designCodeRaw); // Normalize design code
+            const designCode = normalizeDesignCode(designCodeRaw);
             const genericName = cellB ? String(cellB.v || '').trim() : '';
             const karigarName = cellC ? String(cellC.v || '').trim() : '';
-
-            // Log first few data rows for debugging
-            if (row <= 3) {
-              console.log(`Row ${rowNumber}: Design Code="${designCode}" (normalized from "${designCodeRaw}"), Generic Name="${genericName}", Karigar Name="${karigarName}"`);
-            }
 
             // Skip completely empty rows
             if (!designCode && !genericName && !karigarName) {
@@ -212,7 +285,7 @@ export async function parseMasterDesignExcel(file: File): Promise<
             // Only add to mappings if all required fields are present
             if (designCode && genericName && karigarName) {
               mappings.push({
-                designCode, // Already normalized
+                designCode,
                 genericName,
                 karigarName,
               });
@@ -223,11 +296,6 @@ export async function parseMasterDesignExcel(file: File): Promise<
           if (startRow + CHUNK_SIZE <= totalRows) {
             await new Promise(resolve => setTimeout(resolve, 0));
           }
-        }
-
-        console.log(`✅ Parsed ${mappings.length} valid mappings from Master Design Excel`);
-        if (errors.length > 0) {
-          console.warn(`⚠️ Found ${errors.length} validation errors`);
         }
 
         resolve({ data: mappings, errors });
@@ -252,5 +320,6 @@ export async function parseOrdersExcel(file: File): Promise<any[]> {
     ...order,
     orderId: `${order.orderNo}-${Date.now()}-${index}`,
     quantity: BigInt(order.quantity),
+    // orderDate stays as number | null for use in IngestOrders
   }));
 }

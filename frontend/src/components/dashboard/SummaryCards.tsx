@@ -15,17 +15,16 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
 
   // Safely filter orders based on active tab using useMemo
   const filteredOrders = useMemo(() => {
-    // Return empty array if orders is undefined or null
     if (!orders || !Array.isArray(orders)) {
       return [];
     }
 
-    // Filter based on active tab
     let result = orders;
     
     switch (activeTab) {
       case "total":
         // Total orders tab: Pending and ReturnFromHallmark orders
+        // For split RB orders, the pending remainder row is already included here
         result = orders.filter(
           (order) =>
             order?.status === OrderStatus.Pending ||
@@ -36,17 +35,6 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
       case "ready":
         // Ready tab: orders with Ready status
         result = orders.filter((order) => order?.status === OrderStatus.Ready);
-        
-        // Deduplicate orders by orderId - keep only the first occurrence
-        // This matches the deduplication logic in ReadyTab.tsx
-        const seenOrderIds = new Set<string>();
-        result = result.filter((order) => {
-          if (seenOrderIds.has(order.orderId)) {
-            return false;
-          }
-          seenOrderIds.add(order.orderId);
-          return true;
-        });
         break;
 
       case "hallmark":
@@ -82,32 +70,71 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
   }, [orders, activeTab]);
 
   // Calculate metrics with safe fallbacks using optional chaining
-  // Total weight = sum of (weight × quantity) for all rows
+  // Total weight = sum of (weight × quantity) for all rows in the current tab
   const totalOrders = filteredOrders?.length ?? 0;
-  const totalWeight = filteredOrders?.reduce((sum, order) => sum + ((order?.weight ?? 0) * Number(order?.quantity ?? 0)), 0) ?? 0;
-  const totalQuantity = filteredOrders?.reduce((sum, order) => sum + Number(order?.quantity ?? 0), 0) ?? 0;
-  const customerOrders = filteredOrders?.filter((order) => order?.orderType === OrderType.CO)?.length ?? 0;
+  const totalWeight = filteredOrders?.reduce(
+    (sum, order) => sum + ((order?.weight ?? 0) * Number(order?.quantity ?? 0)),
+    0
+  ) ?? 0;
+  const totalQuantity = filteredOrders?.reduce(
+    (sum, order) => sum + Number(order?.quantity ?? 0),
+    0
+  ) ?? 0;
+  const customerOrders = filteredOrders?.filter(
+    (order) => order?.orderType === OrderType.CO
+  )?.length ?? 0;
+
+  // For Total Orders tab: compute pending qty for partial RB orders (those with originalOrderId)
+  // These are the remaining-pending rows after a split; show their qty in brackets
+  const partialRBPendingQty = useMemo(() => {
+    if (activeTab !== "total" && activeTab !== "karigars") return 0;
+    // A partial RB pending row is one that has originalOrderId set and is Pending
+    // (originalOrderId is set on the ready split row, NOT on the pending remainder)
+    // The pending remainder keeps the original orderId, so we detect it differently:
+    // We look for RB Pending orders whose orderId appears as originalOrderId in any Ready order
+    const readyOriginalIds = new Set(
+      orders
+        .filter((o) => o?.status === OrderStatus.Ready && o?.originalOrderId)
+        .map((o) => o.originalOrderId!)
+    );
+    return filteredOrders
+      .filter(
+        (o) =>
+          o?.orderType === OrderType.RB &&
+          o?.status === OrderStatus.Pending &&
+          readyOriginalIds.has(o.orderId)
+      )
+      .reduce((sum, o) => sum + Number(o?.quantity ?? 0), 0);
+  }, [orders, filteredOrders, activeTab]);
 
   const cards = [
     {
       title: 'Total Orders',
       value: totalOrders,
       icon: Package,
+      // Show partial RB pending qty in brackets if any
+      subtitle:
+        partialRBPendingQty > 0
+          ? `(${partialRBPendingQty} RB pending qty)`
+          : undefined,
     },
     {
       title: 'Total Weight',
       value: `${totalWeight.toFixed(2)}g`,
       icon: Weight,
+      subtitle: undefined,
     },
     {
       title: 'Total Quantity',
       value: totalQuantity,
       icon: Hash,
+      subtitle: undefined,
     },
     {
       title: 'Customer Orders',
       value: customerOrders,
       icon: Users,
+      subtitle: undefined,
     },
   ];
 
@@ -125,7 +152,14 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
             {isLoading ? (
               <div className="h-8 w-20 animate-pulse rounded bg-muted" />
             ) : (
-              <div className="text-2xl font-semibold">{card.value}</div>
+              <>
+                <div className="text-2xl font-semibold">{card.value}</div>
+                {card.subtitle && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {card.subtitle}
+                  </p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
