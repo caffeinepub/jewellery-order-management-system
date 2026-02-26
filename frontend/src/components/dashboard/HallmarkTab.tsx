@@ -292,7 +292,8 @@ export default function HallmarkTab() {
                 <th className="p-3 text-left text-sm font-medium">Generic Name</th>
                 <th className="p-3 text-left text-sm font-medium">Karigar</th>
                 <th className="p-3 text-left text-sm font-medium">Design</th>
-                <th className="p-3 text-left text-sm font-medium">Weight (g)</th>
+                <th className="p-3 text-left text-sm font-medium">Wt/Unit (g)</th>
+                <th className="p-3 text-left text-sm font-medium">Total Wt (g)</th>
                 <th className="p-3 text-left text-sm font-medium">Size</th>
                 <th className="p-3 text-left text-sm font-medium">Qty</th>
                 <th className="p-3 text-left text-sm font-medium">Type</th>
@@ -303,7 +304,7 @@ export default function HallmarkTab() {
             <tbody>
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={12} className="p-8 text-center text-muted-foreground">
                     No orders found
                   </td>
                 </tr>
@@ -327,7 +328,10 @@ export default function HallmarkTab() {
                     <td className="p-3 text-sm">{order.genericName || "-"}</td>
                     <td className="p-3 text-sm">{order.karigarName || "-"}</td>
                     <td className="p-3 text-sm">{order.design}</td>
-                    <td className="p-3 text-sm">{order.weight.toFixed(2)}</td>
+                    <td className="p-3 text-sm">{order.weightPerUnit.toFixed(3)}</td>
+                    <td className="p-3 text-sm font-medium">
+                      {(order.weightPerUnit * Number(order.quantity)).toFixed(3)}
+                    </td>
                     <td className="p-3 text-sm">{order.size}</td>
                     <td className="p-3 text-sm">{order.quantity.toString()}</td>
                     <td className="p-3 text-sm">{order.orderType}</td>

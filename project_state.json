@@ -1,44 +1,37 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management app with a Ready tab and Total Orders tab. Working on return-to-pending logic for RB orders in the Ready tab.",
+  "summary": "Order management app with tabs (Total Orders, Ready, Hallmark) featuring summary cards. Has partial quantity movement (splitting) between tabs.",
   "architectural_notes": [
-    "All orders in Total Orders are always in Pending status — no other status exists there.",
-    "Ready tab orders originate from Pending orders moved via status change (pending → ready) with a supplied qty recorded.",
-    "Delete and Return in Ready tab are the same feature — both remove from Ready and restore to Total Orders as Pending."
+    "Total Weight must be calculated as qty × gross weight (gw) per line across all summary cards",
+    "Partial line splits must trigger summary card recalculation in both forward (split) and return directions"
   ],
   "known_issues": [
-    "Return to Pending fails with 'Original order not found for 1105ARB2603015-001' error when returning RB orders from Ready tab."
+    "Summary cards on Total Orders tab don't update when a line is partially split (forward path broken; return path works correctly)",
+    "Total Weight shows raw weight instead of qty×gw when qty is partially moved"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-update-the-frontend-readytab-tsx-return-to-pending-flow-to-correctly-call-the-fixed-backend-return-function-and-display-a-success-toast-on-completion-and-an-error-toast-with-the-specific-failure-message-if-it-fails-no-other-ui-changes-are-needed",
-      "title": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+      "id": "feature-fix-total-weight-calculation-across-all-tabs-total-orders-ready-hallmark-so-that-weight-is-always-computed-as-qty-gross-weight-gw-per-order-line-not-raw-weight-alone-for-example-if-a-line-has-qty-3-and-gw-8g-the-weight-contribution-must-be-24g-not-8g",
+      "title": "Fix Total Weight calculation across all tabs (Total Orders, Ready, Hallmark) so that weight is always computed as `qty × gross weight (gw)` per order line, not raw weight alone. For example, if a line has qty=3 and gw=8g, the weight contribution must be 24g, not 8g.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-summary-cards-on-the-total-orders-tab-and-all-other-tabs-so-they-update-correctly-when-a-line-is-partially-split-when-3-out-of-4-qty-are-moved-to-ready-the-total-orders-summary-cards-must-immediately-reflect-the-reduced-totals-count-weight-remaining-qty-gw-qty-for-the-remaining-parent-line-rather-than-staying-unchanged-the-fix-must-be-symmetric-both-the-forward-split-path-move-to-ready-and-the-return-path-return-from-ready-must-recalculate-all-summary-card-values-consistently",
+      "title": "Fix summary cards on the Total Orders tab (and all other tabs) so they update correctly when a line is partially split. When 3 out of 4 qty are moved to Ready, the Total Orders summary cards must immediately reflect the reduced totals (count, weight=remaining_qty×gw, qty) for the remaining parent line, rather than staying unchanged. The fix must be symmetric: both the forward split path (move to Ready) and the return path (return from Ready) must recalculate all summary card values consistently.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "Fix Return to Pending for RB orders in Ready tab: if supplied qty = pending qty, create new pending order line in Total Orders; if supplied qty < pending qty, restore supplied qty to existing order line in Total Orders",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Fix the backend 'returnOrdersToPending' (or equivalent) function so it no longer requires an existing 'original order' record lookup. Instead, implement the following logic for RB orders being returned from Ready to Pending: (1) If the Ready order's supplied qty equals its pending qty (fully fulfilled case), create a brand-new Pending order line in Total Orders with qty = supplied qty and all other fields copied from the Ready order, then remove the order from Ready. (2) If the Ready order's supplied qty is less than its pending qty (partially fulfilled case), find the existing order line in Total Orders by base order number and add the supplied qty back to it, restoring its status to Pending if not already, then remove the order from Ready. All orders in Total Orders must always have Pending status.",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "status": "pending"
-    }
-  ],
+  "new_feature_requests": [],
   "gameProjectType": "none",
-  "projectName": "Jewellery Order Manager",
+  "projectName": "Fix Total Weight calculation (qty×gw) and summary card update on partial split",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

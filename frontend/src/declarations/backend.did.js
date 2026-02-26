@@ -47,7 +47,6 @@ export const OrderType = IDL.Variant({
   'SO' : IDL.Null,
 });
 export const Order = IDL.Record({
-  'weight' : IDL.Float64,
   'status' : OrderStatus,
   'readyDate' : IDL.Opt(Time),
   'originalOrderId' : IDL.Opt(IDL.Text),
@@ -55,6 +54,7 @@ export const Order = IDL.Record({
   'size' : IDL.Float64,
   'orderType' : OrderType,
   'design' : IDL.Text,
+  'weightPerUnit' : IDL.Float64,
   'orderId' : IDL.Text,
   'orderNo' : IDL.Text,
   'karigarName' : IDL.Opt(IDL.Text),
@@ -69,6 +69,13 @@ export const Karigar = IDL.Record({
   'createdAt' : Time,
   'createdBy' : IDL.Text,
 });
+export const Summary = IDL.Record({
+  'totalOrders' : IDL.Nat,
+  'totalCO' : IDL.Nat,
+  'totalWeight' : IDL.Float64,
+  'totalQuantity' : IDL.Nat,
+});
+export const OverallSummary = IDL.Record({ 'originalSummary' : Summary });
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -147,6 +154,18 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
+  'getHallmarkOrdersSummary' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'totalOrders' : IDL.Nat,
+          'totalCO' : IDL.Nat,
+          'totalWeight' : IDL.Float64,
+          'totalQuantity' : IDL.Nat,
+        }),
+      ],
+      ['query'],
+    ),
   'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
   'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
   'getMasterDesignKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
@@ -161,10 +180,35 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getOverallSummary' : IDL.Func([], [IDL.Opt(OverallSummary)], ['query']),
   'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getReadyOrdersByDateRange' : IDL.Func(
       [Time, Time],
       [IDL.Vec(Order)],
+      ['query'],
+    ),
+  'getReadyOrdersSummary' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'totalOrders' : IDL.Nat,
+          'totalCO' : IDL.Nat,
+          'totalWeight' : IDL.Float64,
+          'totalQuantity' : IDL.Nat,
+        }),
+      ],
+      ['query'],
+    ),
+  'getTotalOrdersSummary' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'totalOrders' : IDL.Nat,
+          'totalCO' : IDL.Nat,
+          'totalWeight' : IDL.Float64,
+          'totalQuantity' : IDL.Nat,
+        }),
+      ],
       ['query'],
     ),
   'getUniqueKarigarsFromDesignMappings' : IDL.Func(
@@ -173,6 +217,11 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getUnreturnedOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'ingestExcel' : IDL.Func(
+      [ExternalBlob, IDL.Vec(IDL.Tuple(IDL.Text, Order))],
+      [],
+      [],
+    ),
   'isExistingDesignCodes' : IDL.Func(
       [IDL.Vec(IDL.Text)],
       [IDL.Vec(IDL.Bool)],
@@ -251,7 +300,6 @@ export const idlFactory = ({ IDL }) => {
     'SO' : IDL.Null,
   });
   const Order = IDL.Record({
-    'weight' : IDL.Float64,
     'status' : OrderStatus,
     'readyDate' : IDL.Opt(Time),
     'originalOrderId' : IDL.Opt(IDL.Text),
@@ -259,6 +307,7 @@ export const idlFactory = ({ IDL }) => {
     'size' : IDL.Float64,
     'orderType' : OrderType,
     'design' : IDL.Text,
+    'weightPerUnit' : IDL.Float64,
     'orderId' : IDL.Text,
     'orderNo' : IDL.Text,
     'karigarName' : IDL.Opt(IDL.Text),
@@ -273,6 +322,13 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Time,
     'createdBy' : IDL.Text,
   });
+  const Summary = IDL.Record({
+    'totalOrders' : IDL.Nat,
+    'totalCO' : IDL.Nat,
+    'totalWeight' : IDL.Float64,
+    'totalQuantity' : IDL.Nat,
+  });
+  const OverallSummary = IDL.Record({ 'originalSummary' : Summary });
   
   return IDL.Service({
     '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -355,6 +411,18 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
+    'getHallmarkOrdersSummary' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'totalOrders' : IDL.Nat,
+            'totalCO' : IDL.Nat,
+            'totalWeight' : IDL.Float64,
+            'totalQuantity' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
     'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
     'getMasterDesignKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
@@ -369,10 +437,35 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getOverallSummary' : IDL.Func([], [IDL.Opt(OverallSummary)], ['query']),
     'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getReadyOrdersByDateRange' : IDL.Func(
         [Time, Time],
         [IDL.Vec(Order)],
+        ['query'],
+      ),
+    'getReadyOrdersSummary' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'totalOrders' : IDL.Nat,
+            'totalCO' : IDL.Nat,
+            'totalWeight' : IDL.Float64,
+            'totalQuantity' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
+    'getTotalOrdersSummary' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'totalOrders' : IDL.Nat,
+            'totalCO' : IDL.Nat,
+            'totalWeight' : IDL.Float64,
+            'totalQuantity' : IDL.Nat,
+          }),
+        ],
         ['query'],
       ),
     'getUniqueKarigarsFromDesignMappings' : IDL.Func(
@@ -381,6 +474,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getUnreturnedOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'ingestExcel' : IDL.Func(
+        [ExternalBlob, IDL.Vec(IDL.Tuple(IDL.Text, Order))],
+        [],
+        [],
+      ),
     'isExistingDesignCodes' : IDL.Func(
         [IDL.Vec(IDL.Text)],
         [IDL.Vec(IDL.Bool)],

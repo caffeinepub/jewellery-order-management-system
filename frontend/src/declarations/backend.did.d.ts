@@ -31,7 +31,6 @@ export interface MappingRecord {
   'designCode' : string,
 }
 export interface Order {
-  'weight' : number,
   'status' : OrderStatus,
   'readyDate' : [] | [Time],
   'originalOrderId' : [] | [string],
@@ -39,6 +38,7 @@ export interface Order {
   'size' : number,
   'orderType' : OrderType,
   'design' : string,
+  'weightPerUnit' : number,
   'orderId' : string,
   'orderNo' : string,
   'karigarName' : [] | [string],
@@ -55,6 +55,13 @@ export type OrderStatus = { 'Ready' : null } |
 export type OrderType = { 'CO' : null } |
   { 'RB' : null } |
   { 'SO' : null };
+export interface OverallSummary { 'originalSummary' : Summary }
+export interface Summary {
+  'totalOrders' : bigint,
+  'totalCO' : bigint,
+  'totalWeight' : number,
+  'totalQuantity' : bigint,
+}
 export type Time = bigint;
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
@@ -116,6 +123,15 @@ export interface _SERVICE {
   'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
   'getDesignImageMapping' : ActorMethod<[], Array<[string, ExternalBlob]>>,
   'getDesignMapping' : ActorMethod<[string], DesignMapping>,
+  'getHallmarkOrdersSummary' : ActorMethod<
+    [],
+    {
+      'totalOrders' : bigint,
+      'totalCO' : bigint,
+      'totalWeight' : number,
+      'totalQuantity' : bigint,
+    }
+  >,
   'getKarigars' : ActorMethod<[], Array<Karigar>>,
   'getMasterDesignExcel' : ActorMethod<[], [] | [ExternalBlob]>,
   'getMasterDesignKarigars' : ActorMethod<[], Array<string>>,
@@ -125,10 +141,33 @@ export interface _SERVICE {
     Array<Order>
   >,
   'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
+  'getOverallSummary' : ActorMethod<[], [] | [OverallSummary]>,
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getReadyOrdersByDateRange' : ActorMethod<[Time, Time], Array<Order>>,
+  'getReadyOrdersSummary' : ActorMethod<
+    [],
+    {
+      'totalOrders' : bigint,
+      'totalCO' : bigint,
+      'totalWeight' : number,
+      'totalQuantity' : bigint,
+    }
+  >,
+  'getTotalOrdersSummary' : ActorMethod<
+    [],
+    {
+      'totalOrders' : bigint,
+      'totalCO' : bigint,
+      'totalWeight' : number,
+      'totalQuantity' : bigint,
+    }
+  >,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'getUnreturnedOrders' : ActorMethod<[], Array<Order>>,
+  'ingestExcel' : ActorMethod<
+    [ExternalBlob, Array<[string, Order]>],
+    undefined
+  >,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'markAllAsReady' : ActorMethod<[], undefined>,
   'markOrdersAsReady' : ActorMethod<[Array<string>], undefined>,

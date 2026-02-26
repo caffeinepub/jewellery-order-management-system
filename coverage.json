@@ -1,37 +1,62 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-25T17:11:47.429Z",
+  "generatedAt": "2026-02-26T04:54:03.780Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
     "total": 2,
-    "implemented": 1,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix the backend 'returnOrdersToPending' (or equivalent) function so it no longer requires an existing 'original order' record lookup. Instead, implement the following logic for RB orders being returned from Ready to Pending: (1) If the Ready order's supplied qty equals its pending qty (fully fulfilled case), create a brand-new Pending order line in Total Orders with qty = supplied qty and all other fields copied from the Ready order, then remove the order from Ready. (2) If the Ready order's supplied qty is less than its pending qty (partially fulfilled case), find the existing order line in Total Orders by base order number and add the supplied qty back to it, restoring its status to Pending if not already, then remove the order from Ready. All orders in Total Orders must always have Pending status.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Fix Total Weight calculation across all tabs (Total Orders, Ready, Hallmark) so that weight is always computed as `qty × gross weight (gw)` per order line, not raw weight alone. For example, if a line has qty=3 and gw=8g, the weight contribution must be 24g, not 8g.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/utils/exportUtils.ts",
+          "frontend/src/pages/Dashboard.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/utils/exportUtils.ts",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display a success toast on completion and an error toast with the specific failure message if it fails. No other UI changes are needed.",
+        "summary": "Fix summary cards on the Total Orders tab (and all other tabs) so they update correctly when a line is partially split. When 3 out of 4 qty are moved to Ready, the Total Orders summary cards must immediately reflect the reduced totals (count, weight=remaining_qty×gw, qty) for the remaining parent line, rather than staying unchanged. The fix must be symmetric: both the forward split path (move to Ready) and the return path (return from Ready) must recalculate all summary card values consistently.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
         ]
       }
     ]
   },
   "changedFiles": [
     "backend/main.mo",
+    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
@@ -39,11 +64,14 @@
     "frontend/src/backend.d.ts",
     "frontend/src/backend.ts",
     "frontend/src/components/dashboard/HallmarkTab.tsx",
+    "frontend/src/components/dashboard/OrderTable.tsx",
     "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/components/dashboard/SummaryCards.tsx",
+    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/declarations/backend.did.d.ts",
     "frontend/src/declarations/backend.did.js",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/MasterDesigns.tsx",
+    "frontend/src/pages/KarigarDetail.tsx",
+    "frontend/src/utils/exportUtils.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

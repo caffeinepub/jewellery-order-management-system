@@ -36,7 +36,8 @@ export default function KarigarDetail() {
     return pendingOrders.filter((order) => Number(order.createdAt) >= todayTimestamp);
   }, [pendingOrders]);
 
-  const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weight * Number(o.quantity), 0);
+  // Use weightPerUnit × qty for correct total weight calculation
+  const totalWeight = pendingOrders.reduce((sum, o) => sum + o.weightPerUnit * Number(o.quantity), 0);
   const totalQuantity = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
 
   const handleExport = async (

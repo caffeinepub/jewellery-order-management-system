@@ -1,21 +1,98 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix Return to Pending for RB Orders in Ready Tab",
+  "title": "Fix Total Weight calculation (qty×gw) and summary card update on partial split",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Update the frontend ReadyTab.tsx return-to-pending flow to correctly call the fixed backend return function and display success/error toasts",
+      "id": "REQ-1",
+      "summary": "Fix Total Weight calculation across all tabs so that weight is always computed as qty × gross weight (gw) per order line, not raw weight alone",
       "acceptanceCriteria": [
-        "Clicking 'Return N Orders to Pending' in the Ready tab successfully calls the backend and shows a success toast",
-        "On failure, the toast displays the specific error message returned by the backend",
-        "After a successful return, the returned orders disappear from the Ready tab list"
+        "When an order line with gw=8 and qty=3 is in the Ready tab, the Total Weight summary card shows 24g (3×8), not 8g.",
+        "All summary cards (Total Orders, Ready, Hallmark) use qty×gw for every weight aggregation.",
+        "The frontend SummaryCards component computes or displays weight using qty×gw wherever it aggregates locally."
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Update the weight computation logic to use qty × weightPerUnit (gross weight) instead of raw weightPerUnit when aggregating order weight locally. Ensure all summary data sources (getTotalOrdersSummary, getReadyOrdersSummary, getHallmarkOrdersSummary) receive the corrected weight values from the backend. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Review and update any local weight calculations or display logic to ensure consistency with qty × weightPerUnit formula. If the tab displays weight values directly (e.g., in the order table or summary section), ensure they reflect the qty×gw calculation."
+        },
+        {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Update the return-to-pending click handler to call the backend batchReturnOrdersToPending mutation with the selected order IDs and their quantities. On success, display a success toast message (e.g., 'N orders returned to pending successfully') and clear the selection. On error, extract the error message from the mutation result and display it in an error toast. Ensure the orders disappear from the Ready tab list after a successful return by relying on the React Query cache invalidation from the mutation hook."
+          "description": "Review and update any local weight calculations or display logic to ensure consistency with qty × weightPerUnit formula. Ensure the Ready tab summary cards and order displays correctly show weight as qty×gw."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Review and update any local weight calculations or display logic to ensure consistency with qty × weightPerUnit formula. Ensure the Hallmark tab summary cards and order displays correctly show weight as qty×gw."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "If the OrderTable component displays weight values directly, update the rendering logic to compute and display weight as qty × weightPerUnit. Ensure exported data (Excel, PDF, JPEG) also uses the qty×gw formula."
+        },
+        {
+          "path": "frontend/src/utils/exportUtils.ts",
+          "operation": "modify",
+          "description": "Review the Excel and PDF export functions to ensure weight is calculated and exported as qty × weightPerUnit for every order line. Update any aggregation or display logic to reflect the corrected formula."
+        },
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Review the dashboard page for any direct weight calculations or aggregations. Ensure all weight displays and data passed to child components use qty × weightPerUnit consistently."
+        },
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Review the karigar detail page for any weight calculations or displays. Ensure all order weight displays and exports use qty × weightPerUnit consistently."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Fix summary cards on the Total Orders tab (and all other tabs) so they update correctly when a line is partially split, ensuring both forward split (move to Ready) and return (return from Ready) paths recalculate all summary card values consistently",
+      "acceptanceCriteria": [
+        "After partially moving qty from Total Orders to Ready (e.g., 3 of 4), the Total Orders summary cards reflect the updated totals immediately (order count, total qty reduced by 3, total weight reduced by 3×gw).",
+        "The Ready tab summary cards show the correct totals for the newly created split line (1 order, qty=3, weight=3×gw).",
+        "Returning the split line from Ready back to Total Orders updates summary cards in both tabs correctly and proportionately.",
+        "No stale cached values remain after a split or return operation; React Query cache is invalidated for all affected summary queries after any supply/split/return mutation."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Update all supply, split, and return mutation hooks (batchSupplyRBOrders, returnOrdersToPending, supplyAndReturnOrder, batchReturnOrdersToPending) to invalidate all summary queries (getTotalOrdersSummary, getReadyOrdersSummary, getHallmarkOrdersSummary, getOverallSummary) in their onSuccess callbacks. Ensure the invalidation covers all tabs affected by the mutation (e.g., both Total Orders and Ready when a split occurs). Add comprehensive cache invalidation for order list queries (getOrders, getReadyOrders, getOrdersWithMappings) to ensure order data is refetched after mutations."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "operation": "modify",
+          "description": "Review the batchSupplyRBOrders mutation call in the dialog component. Ensure the mutation triggers full cache invalidation for all affected summary queries (Total Orders, Ready, Hallmark) and order list queries after successful completion. Verify that partial splits (e.g., supplying 3 of 4 qty) correctly update summary cards in both source and destination tabs."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Review the batch return mutation (batchReturnOrdersToPending) and ensure it triggers cache invalidation for all affected summary queries (Total Orders, Ready, Hallmark) and order list queries. Ensure the Ready tab summary cards reflect the reduced totals immediately after orders are returned."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Review all mutation calls (mark as ready, supply) and ensure they trigger cache invalidation for all affected summary queries (Total Orders, Ready, Hallmark) and order list queries. Ensure the Total Orders tab summary cards reflect the reduced totals immediately after orders are moved or split."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Ensure the SummaryCards component relies on fresh React Query data and does not cache or memoize summary values in a way that would prevent updates after mutations. If the component performs local aggregation, ensure it uses the latest order data from React Query and correctly computes weight as qty×gw."
+        },
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Review all mutation calls (mark as ready, supply) in the karigar detail page and ensure they trigger cache invalidation for all affected summary queries and order list queries. Ensure the karigar summary cards reflect the updated totals immediately after orders are moved or split."
         }
       ]
     }

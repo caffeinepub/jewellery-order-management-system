@@ -1,8 +1,13 @@
-import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGetAllOrders } from '@/hooks/useQueries';
+import {
+  useGetTotalOrdersSummary,
+  useGetReadyOrdersSummary,
+  useGetHallmarkOrdersSummary,
+  useGetAllOrders,
+} from '@/hooks/useQueries';
 import { Package, Weight, Hash, Users } from 'lucide-react';
 import { OrderType, OrderStatus } from '@/backend';
+import { useMemo } from 'react';
 
 type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
@@ -11,102 +16,92 @@ interface SummaryCardsProps {
 }
 
 export default function SummaryCards({ activeTab }: SummaryCardsProps) {
-  const { data: orders = [], isLoading } = useGetAllOrders();
+  // Fetch backend-derived summaries for the three main tabs
+  const { data: totalSummary, isLoading: isLoadingTotal } = useGetTotalOrdersSummary();
+  const { data: readySummary, isLoading: isLoadingReady } = useGetReadyOrdersSummary();
+  const { data: hallmarkSummary, isLoading: isLoadingHallmark } = useGetHallmarkOrdersSummary();
 
-  // Safely filter orders based on active tab using useMemo
-  const filteredOrders = useMemo(() => {
-    // Return empty array if orders is undefined or null
-    if (!orders || !Array.isArray(orders)) {
-      return [];
-    }
+  // For customer and karigars tabs we still need the raw orders list
+  const { data: orders = [], isLoading: isLoadingOrders } = useGetAllOrders();
 
-    // Filter based on active tab
-    let result = orders;
-    
+  // Compute customer/karigar tab metrics from live order data using weightPerUnit × qty
+  const customerTabMetrics = useMemo(() => {
+    const filtered = orders.filter(
+      (order) =>
+        order?.orderType === OrderType.CO &&
+        order?.status === OrderStatus.Pending
+    );
+    return {
+      totalOrders: filtered.length,
+      totalWeight: filtered.reduce(
+        (sum, o) => sum + (o?.weightPerUnit ?? 0) * Number(o?.quantity ?? 0),
+        0
+      ),
+      totalQuantity: filtered.reduce((sum, o) => sum + Number(o?.quantity ?? 0), 0),
+      totalCO: filtered.length,
+    };
+  }, [orders]);
+
+  const karigarsTabMetrics = useMemo(() => {
+    const filtered = orders.filter(
+      (order) =>
+        order?.status === OrderStatus.Pending ||
+        order?.status === OrderStatus.ReturnFromHallmark
+    );
+    return {
+      totalOrders: filtered.length,
+      totalWeight: filtered.reduce(
+        (sum, o) => sum + (o?.weightPerUnit ?? 0) * Number(o?.quantity ?? 0),
+        0
+      ),
+      totalQuantity: filtered.reduce((sum, o) => sum + Number(o?.quantity ?? 0), 0),
+      totalCO: filtered.filter((o) => o?.orderType === OrderType.CO).length,
+    };
+  }, [orders]);
+
+  // Select the correct summary based on active tab
+  const summary = useMemo(() => {
     switch (activeTab) {
       case "total":
-        // Total orders tab: Pending and ReturnFromHallmark orders
-        result = orders.filter(
-          (order) =>
-            order?.status === OrderStatus.Pending ||
-            order?.status === OrderStatus.ReturnFromHallmark
-        );
-        break;
-
+        return totalSummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
       case "ready":
-        // Ready tab: orders with Ready status
-        result = orders.filter((order) => order?.status === OrderStatus.Ready);
-        
-        // Deduplicate orders by orderId - keep only the first occurrence
-        // This matches the deduplication logic in ReadyTab.tsx
-        const seenOrderIds = new Set<string>();
-        result = result.filter((order) => {
-          if (seenOrderIds.has(order.orderId)) {
-            return false;
-          }
-          seenOrderIds.add(order.orderId);
-          return true;
-        });
-        break;
-
+        return readySummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
       case "hallmark":
-        // Hallmark tab: Hallmark orders only
-        result = orders.filter(
-          (order) => order?.status === OrderStatus.Hallmark
-        );
-        break;
-
+        return hallmarkSummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
       case "customer":
-        // Customer orders tab: CO type orders with Pending status
-        result = orders.filter(
-          (order) =>
-            order?.orderType === OrderType.CO &&
-            order?.status === OrderStatus.Pending
-        );
-        break;
-
+        return customerTabMetrics;
       case "karigars":
-        // Karigars tab: show same as total orders (Pending and ReturnFromHallmark)
-        result = orders.filter(
-          (order) =>
-            order?.status === OrderStatus.Pending ||
-            order?.status === OrderStatus.ReturnFromHallmark
-        );
-        break;
-
+        return karigarsTabMetrics;
       default:
-        result = orders;
+        return totalSummary ?? { totalOrders: 0, totalWeight: 0, totalQuantity: 0, totalCO: 0 };
     }
-    
-    return result;
-  }, [orders, activeTab]);
+  }, [activeTab, totalSummary, readySummary, hallmarkSummary, customerTabMetrics, karigarsTabMetrics]);
 
-  // Calculate metrics with safe fallbacks using optional chaining
-  // Total weight = sum of (weight × quantity) for all rows
-  const totalOrders = filteredOrders?.length ?? 0;
-  const totalWeight = filteredOrders?.reduce((sum, order) => sum + ((order?.weight ?? 0) * Number(order?.quantity ?? 0)), 0) ?? 0;
-  const totalQuantity = filteredOrders?.reduce((sum, order) => sum + Number(order?.quantity ?? 0), 0) ?? 0;
-  const customerOrders = filteredOrders?.filter((order) => order?.orderType === OrderType.CO)?.length ?? 0;
+  const isLoading =
+    isLoadingTotal ||
+    isLoadingReady ||
+    isLoadingHallmark ||
+    (activeTab === "customer" || activeTab === "karigars" ? isLoadingOrders : false);
 
   const cards = [
     {
       title: 'Total Orders',
-      value: totalOrders,
+      value: summary.totalOrders,
       icon: Package,
     },
     {
       title: 'Total Weight',
-      value: `${totalWeight.toFixed(2)}g`,
+      value: `${summary.totalWeight.toFixed(2)}g`,
       icon: Weight,
     },
     {
       title: 'Total Quantity',
-      value: totalQuantity,
+      value: summary.totalQuantity,
       icon: Hash,
     },
     {
       title: 'Customer Orders',
-      value: customerOrders,
+      value: summary.totalCO,
       icon: Users,
     },
   ];
@@ -123,9 +118,9 @@ export default function SummaryCards({ activeTab }: SummaryCardsProps) {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="h-8 w-20 animate-pulse rounded bg-muted" />
+              <div className="h-8 w-24 animate-pulse rounded bg-muted" />
             ) : (
-              <div className="text-2xl font-semibold">{card.value}</div>
+              <div className="text-2xl font-bold">{card.value}</div>
             )}
           </CardContent>
         </Card>

@@ -11,7 +11,8 @@ export async function exportToExcel(orders: Order[]) {
       Design: order.design,
       "Generic Name": order.genericName || "-",
       Karigar: order.karigarName || "-",
-      "Weight (g)": order.weight,
+      "Weight/Unit (g)": order.weightPerUnit,
+      "Total Weight (g)": order.weightPerUnit * Number(order.quantity),
       Size: order.size,
       Quantity: Number(order.quantity),
       Type: order.orderType,
@@ -184,7 +185,8 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<void> {
         <tr>
           <th>Generic Name</th>
           <th>Karigar</th>
-          <th>Weight</th>
+          <th>Wt/Unit (g)</th>
+          <th>Total Wt (g)</th>
           <th>Size</th>
           <th>Qty</th>
           <th>Remarks</th>
@@ -194,12 +196,14 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<void> {
       <tbody>`;
 
     designOrders.forEach((order) => {
+      const totalWeight = order.weightPerUnit * Number(order.quantity);
       html += `<tr>
         <td>${order.genericName || "-"}</td>
         <td>${order.karigarName || "-"}</td>
-        <td>${order.weight.toFixed(3)}</td>
+        <td>${order.weightPerUnit.toFixed(3)}</td>
+        <td>${totalWeight.toFixed(3)}</td>
         <td>${order.size.toFixed(2)}</td>
-        <td>${order.quantity}</td>
+        <td>${Number(order.quantity)}</td>
         <td>${order.remarks || "-"}</td>
         <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
       </tr>`;
@@ -216,7 +220,6 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<void> {
   
   // Mobile-specific handling
   if (isMobile()) {
-    // For mobile devices, use anchor element with download attribute
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = `orders_${new Date().toISOString().split("T")[0]}.html`;
@@ -224,19 +227,14 @@ export async function exportToPDF(orders: Order[], actor?: any): Promise<void> {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up
     setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   } else {
-    // For desktop, use anchor element
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = `orders_${new Date().toISOString().split("T")[0]}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up
     setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   }
 }
@@ -265,7 +263,6 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
     const imageUrl = await fetchDesignImageURL(designCode, actor);
     if (!imageUrl) return { designCode, base64Image: null };
     
-    // Convert to base64 for embedding in HTML
     const base64Image = await loadImageAsBase64(imageUrl);
     return { designCode, base64Image };
   });
@@ -322,7 +319,8 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
         <tr>
           <th>Generic Name</th>
           <th>Karigar</th>
-          <th>Weight</th>
+          <th>Wt/Unit (g)</th>
+          <th>Total Wt (g)</th>
           <th>Size</th>
           <th>Qty</th>
           <th>Remarks</th>
@@ -332,12 +330,14 @@ export async function exportToJPEG(orders: Order[], actor?: any) {
       <tbody>`;
 
     designOrders.forEach((order) => {
+      const totalWeight = order.weightPerUnit * Number(order.quantity);
       html += `<tr>
         <td>${order.genericName || "-"}</td>
         <td>${order.karigarName || "-"}</td>
-        <td>${order.weight.toFixed(3)}</td>
+        <td>${order.weightPerUnit.toFixed(3)}</td>
+        <td>${totalWeight.toFixed(3)}</td>
         <td>${order.size.toFixed(2)}</td>
-        <td>${order.quantity}</td>
+        <td>${Number(order.quantity)}</td>
         <td>${order.remarks || "-"}</td>
         <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
       </tr>`;
@@ -383,7 +383,6 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
     const imageUrl = await fetchDesignImageURL(designCode, actor);
     if (!imageUrl) return { designCode, base64Image: null };
     
-    // Convert to base64 for embedding in HTML
     const base64Image = await loadImageAsBase64(imageUrl);
     return { designCode, base64Image };
   });
@@ -442,7 +441,8 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
       <thead>
         <tr>
           <th>Generic Name</th>
-          <th>Weight</th>
+          <th>Wt/Unit (g)</th>
+          <th>Total Wt (g)</th>
           <th>Size</th>
           <th>Qty</th>
           <th>Remarks</th>
@@ -452,11 +452,13 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
       <tbody>`;
 
     designOrders.forEach((order) => {
+      const totalWeight = order.weightPerUnit * Number(order.quantity);
       html += `<tr>
         <td>${order.genericName || "-"}</td>
-        <td>${order.weight.toFixed(3)}</td>
+        <td>${order.weightPerUnit.toFixed(3)}</td>
+        <td>${totalWeight.toFixed(3)}</td>
         <td>${order.size.toFixed(2)}</td>
-        <td>${order.quantity}</td>
+        <td>${Number(order.quantity)}</td>
         <td>${order.remarks || "-"}</td>
         <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
       </tr>`;
@@ -471,9 +473,7 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
   const blob = new Blob([html], { type: 'text/html' });
   const blobUrl = URL.createObjectURL(blob);
   
-  // Mobile-specific handling
   if (isMobile()) {
-    // For mobile devices, use anchor element with download attribute
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = `${karigarName}_orders_${new Date().toISOString().split("T")[0]}.html`;
@@ -481,19 +481,14 @@ export async function exportKarigarToPDF(orders: Order[], karigarName: string, a
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up
     setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   } else {
-    // For desktop, use anchor element
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = `${karigarName}_orders_${new Date().toISOString().split("T")[0]}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up
     setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
   }
 }

@@ -264,7 +264,8 @@ export default function ReadyTab() {
                 <TableHead>Karigar</TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
+                <TableHead className="text-right">Wt/Unit (g)</TableHead>
+                <TableHead className="text-right">Total Wt (g)</TableHead>
                 <TableHead>Ready Date</TableHead>
               </TableRow>
             </TableHeader>
@@ -294,7 +295,10 @@ export default function ReadyTab() {
                     {order.quantity.toString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    {order.weight.toFixed(2)}g
+                    {order.weightPerUnit.toFixed(3)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {(order.weightPerUnit * Number(order.quantity)).toFixed(3)}
                   </TableCell>
                   <TableCell>
                     {order.readyDate

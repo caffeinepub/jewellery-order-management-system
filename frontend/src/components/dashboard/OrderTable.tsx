@@ -33,6 +33,17 @@ import { useActor } from "@/hooks/useActor";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
+// All query keys that must be refreshed after a status-change operation
+const INVALIDATE_KEYS = [
+  ["orders"],
+  ["readyOrders"],
+  ["ordersWithMappings"],
+  ["unmappedOrders"],
+  ["totalOrdersSummary"],
+  ["readyOrdersSummary"],
+  ["hallmarkOrdersSummary"],
+];
+
 interface OrderTableProps {
   orders: Order[];
   showDateFilter?: boolean;
@@ -125,11 +136,12 @@ export default function OrderTable({
       // Call the backend method to mark orders as ready
       await actor.markOrdersAsReady(orderIds);
       
-      // Invalidate all order-related queries to refresh data across all tabs
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-      await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      await queryClient.invalidateQueries({ queryKey: ["ready-orders"] });
+      // Invalidate all order-related queries AND summary queries to refresh data across all tabs
+      await Promise.all(
+        INVALIDATE_KEYS.map((key) =>
+          queryClient.invalidateQueries({ queryKey: key })
+        )
+      );
       
       toast.success(`${soCoOrders.length} order(s) marked as Ready`);
       setSelectedRows(new Set());
@@ -221,37 +233,40 @@ export default function OrderTable({
         </div>
       )}
 
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               {enableBulkActions && (
-                <TableHead className="w-12">
+                <TableHead className="w-10">
                   <Checkbox
                     checked={allSelected}
+                    ref={(el) => {
+                      if (el) (el as any).indeterminate = someSelected;
+                    }}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all"
-                    className={someSelected ? "data-[state=checked]:bg-gold" : ""}
                   />
                 </TableHead>
               )}
+              <TableHead>Order No</TableHead>
+              <TableHead>Design</TableHead>
               <TableHead>Generic Name</TableHead>
               <TableHead>Karigar</TableHead>
-              <TableHead>Design</TableHead>
-              <TableHead>Weight (g)</TableHead>
-              <TableHead>Size</TableHead>
-              <TableHead>Qty</TableHead>
+              <TableHead className="text-right">Weight (g)</TableHead>
+              <TableHead className="text-right">Size</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-right">Total Wt (g)</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Remarks</TableHead>
-              <TableHead>Status</TableHead>
-              {onDelete && <TableHead className="w-16"></TableHead>}
+              {onDelete && <TableHead className="w-10"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={onDelete ? 11 : 10}
+                  colSpan={enableBulkActions ? 12 : 11}
                   className="text-center py-8 text-muted-foreground"
                 >
                   No orders found
@@ -262,13 +277,13 @@ export default function OrderTable({
                 designOrders.map((order, index) => (
                   <TableRow
                     key={order.orderId}
+                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+                      selectedRows.has(order.orderId) ? "bg-muted/50" : ""
+                    } ${order.originalOrderId ? "border-l-2 border-l-gold/50" : ""}`}
                     onClick={() => handleRowClick(order.orderId)}
-                    className={`cursor-pointer ${
-                      selectedRows.has(order.orderId) ? "bg-red-100 dark:bg-red-950/30" : ""
-                    }`}
                   >
                     {enableBulkActions && (
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedRows.has(order.orderId)}
                           onCheckedChange={() => handleRowClick(order.orderId)}
@@ -276,56 +291,57 @@ export default function OrderTable({
                         />
                       </TableCell>
                     )}
-                    <TableCell>{order.genericName || "-"}</TableCell>
-                    <TableCell>{order.karigarName || "-"}</TableCell>
+                    <TableCell className="font-medium">
+                      {order.originalOrderId ? (
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground text-xs">↳</span>
+                          {order.orderNo}
+                        </span>
+                      ) : (
+                        <button
+                          className="text-gold hover:underline font-medium"
+                          onClick={(e) => handleDesignClick(order.design, e)}
+                        >
+                          {order.orderNo}
+                        </button>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {index === 0 ? (
                         <button
+                          className="text-gold hover:underline"
                           onClick={(e) => handleDesignClick(design, e)}
-                          className="text-gold hover:text-gold-hover underline font-medium"
                         >
                           {design}
                         </button>
                       ) : (
-                        <span className="text-muted-foreground">↳</span>
+                        <span className="text-muted-foreground text-xs pl-2">—</span>
                       )}
                     </TableCell>
-                    <TableCell>{order.weight.toFixed(3)}</TableCell>
-                    <TableCell>{order.size}</TableCell>
-                    <TableCell>{Number(order.quantity)}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-muted">
-                        {order.orderType}
-                      </span>
+                    <TableCell>{order.genericName || "—"}</TableCell>
+                    <TableCell>{order.karigarName || "—"}</TableCell>
+                    <TableCell className="text-right">
+                      {order.weightPerUnit.toFixed(3)}
                     </TableCell>
-                    <TableCell>{order.remarks || "-"}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                          order.status === OrderStatus.Ready
-                            ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                            : order.status === OrderStatus.Pending
-                            ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
-                            : order.status === OrderStatus.Hallmark
-                            ? "bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300"
-                            : "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
-                        }`}
-                      >
-                        {order.status === OrderStatus.ReturnFromHallmark ? "Returned" : order.status}
-                      </span>
+                    <TableCell className="text-right">{order.size}</TableCell>
+                    <TableCell className="text-right">
+                      {Number(order.quantity)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {(order.weightPerUnit * Number(order.quantity)).toFixed(3)}
+                    </TableCell>
+                    <TableCell>{order.orderType}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {order.remarks || "—"}
                     </TableCell>
                     {onDelete && (
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(order.orderId);
-                          }}
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => onDelete(order.orderId)}
                           disabled={isDeleting}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                          title="Reset to Pending"
                         >
                           {isDeleting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -343,20 +359,14 @@ export default function OrderTable({
         </Table>
       </div>
 
-      {selectedDesign && (
-        <DesignImageModal
-          designCode={selectedDesign}
-          open={!!selectedDesign}
-          onClose={() => setSelectedDesign(null)}
-        />
-      )}
-
+      {/* Confirmation dialog for SO/CO orders */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark {selectedRows.size} order(s) as Ready? This action will update the order status.
+              This will mark {selectedRows.size} selected order(s) as Ready.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -366,11 +376,27 @@ export default function OrderTable({
               disabled={isUpdating}
               className="bg-gold hover:bg-gold-hover"
             >
-              {isUpdating ? "Updating..." : "Confirm"}
+              {isUpdating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Confirm"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Design image modal — pass open state based on whether a design is selected */}
+      {selectedDesign && (
+        <DesignImageModal
+          designCode={selectedDesign}
+          open={!!selectedDesign}
+          onClose={() => setSelectedDesign(null)}
+        />
+      )}
     </div>
   );
 }

@@ -20,6 +20,17 @@ interface SuppliedQtyDialogProps {
   onClose: () => void;
 }
 
+// All query keys that must be refreshed after a supply/split operation
+const INVALIDATE_KEYS = [
+  ["orders"],
+  ["readyOrders"],
+  ["ordersWithMappings"],
+  ["unmappedOrders"],
+  ["totalOrdersSummary"],
+  ["readyOrdersSummary"],
+  ["hallmarkOrdersSummary"],
+];
+
 export default function SuppliedQtyDialog({
   orders,
   onClose,
@@ -40,11 +51,12 @@ export default function SuppliedQtyDialog({
     }
   }, [currentIndex, currentOrder]);
 
-  const invalidateQueries = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["orders"] });
-    await queryClient.invalidateQueries({ queryKey: ["ready-orders"] });
-    await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-    await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
+  const invalidateAllQueries = async () => {
+    await Promise.all(
+      INVALIDATE_KEYS.map((key) =>
+        queryClient.invalidateQueries({ queryKey: key })
+      )
+    );
   };
 
   const processCurrentOrder = async () => {
@@ -80,8 +92,8 @@ export default function SuppliedQtyDialog({
       if (currentIndex < orders.length - 1) {
         setCurrentIndex((prev) => prev + 1);
       } else {
-        // All orders processed — invalidate and close
-        await invalidateQueries();
+        // All orders processed — invalidate all queries (including summaries) and close
+        await invalidateAllQueries();
         onClose();
       }
     } catch (error: any) {
@@ -96,7 +108,7 @@ export default function SuppliedQtyDialog({
   const handleCancel = async () => {
     // If at least one order was already processed, invalidate queries before closing
     if (currentIndex > 0) {
-      await invalidateQueries();
+      await invalidateAllQueries();
     }
     onClose();
   };
@@ -139,7 +151,9 @@ export default function SuppliedQtyDialog({
               onChange={(e) => setSuppliedQty(Number(e.target.value))}
             />
             <p className="text-sm text-muted-foreground">
-              Order quantity: {Number(currentOrder.quantity)}
+              Order quantity: {Number(currentOrder.quantity)} | Weight per unit:{" "}
+              {currentOrder.weightPerUnit.toFixed(3)}g | Total weight:{" "}
+              {(currentOrder.weightPerUnit * suppliedQty).toFixed(3)}g
             </p>
           </div>
         </div>
