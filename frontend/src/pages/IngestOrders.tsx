@@ -1,280 +1,285 @@
-import { useState } from 'react';
-import { Upload, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
-import { toast } from 'sonner';
-import { parseOrdersExcel } from '../utils/excelParser';
-import { useGetAllOrders } from '../hooks/useQueries';
-import { useActor } from '../hooks/useActor';
-import type { OrderType } from '../backend';
-
-interface ParsedOrder {
-  orderNo: string;
-  orderType: OrderType;
-  product: string;
-  design: string;
-  weight: number;
-  size: number;
-  quantity: bigint;
-  remarks: string;
-  orderId: string;
-  orderDate: number | null;
-}
+import { useState, useRef } from "react";
+import { useActor } from "../hooks/useActor";
+import { OrderType } from "../backend";
+import { parseOrdersExcel } from "../utils/excelParser";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Upload, CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
 
 interface UploadResult {
   success: number;
   failed: number;
-  errors: Array<{ row: number; error: string }>;
+  errors: { row: number; message: string }[];
 }
 
-const BATCH_SIZE = 50;
-
 export default function IngestOrders() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<UploadResult | null>(null);
-  const [parsedOrders, setParsedOrders] = useState<ParsedOrder[]>([]);
-
   const { actor } = useActor();
-  const { refetch: refetchOrders } = useGetAllOrders();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [hasOrderDateColumn, setHasOrderDateColumn] = useState(false);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    setUploadResult(null);
+    setParseError(null);
+    setHasOrderDateColumn(false);
 
-    setFile(selectedFile);
-    setResult(null);
-    setParsedOrders([]);
+    if (file) {
+      try {
+        // Quick peek to detect Order Date column using the existing parseOrdersExcel util
+        const parsed = await parseOrdersExcel(file);
+        setHasOrderDateColumn(parsed.some((o) => o.orderDate !== null));
+      } catch {
+        // ignore peek errors — full validation happens on upload
+      }
+    }
+  }
+
+  async function handleUpload() {
+    if (!actor || !selectedFile) return;
+
+    setIsUploading(true);
+    setUploadResult(null);
+    setParseError(null);
 
     try {
-      const orders = await parseOrdersExcel(selectedFile);
-      setParsedOrders(orders);
-      toast.success(`Parsed ${orders.length} orders from Excel`);
-    } catch (error) {
-      console.error('Error parsing Excel:', error);
-      toast.error('Failed to parse Excel file. Please check the format.');
-      setFile(null);
-    }
-  };
+      // Parse the file using the existing utility (returns array of orders)
+      const parsedOrders = await parseOrdersExcel(selectedFile);
 
-  const processBatch = async (orders: ParsedOrder[], startIdx: number): Promise<UploadResult> => {
-    const batchResult: UploadResult = { success: 0, failed: 0, errors: [] };
-    const endIdx = Math.min(startIdx + BATCH_SIZE, orders.length);
-    const batch = orders.slice(startIdx, endIdx);
-
-    for (let i = 0; i < batch.length; i++) {
-      const order = batch[i];
-      const currentRow = startIdx + i + 2; // +2 for header row and 0-based index
-
-      try {
-        if (!actor) throw new Error('Actor not initialized');
-
-        // Convert orderDate from epoch ms to nanoseconds (BigInt) for the backend
-        // Backend expects Time = bigint (nanoseconds since epoch)
-        const orderDateNano: bigint | null = order.orderDate != null
-          ? BigInt(order.orderDate) * BigInt(1_000_000)
-          : null;
-
-        await actor.saveOrder(
-          order.orderNo,
-          order.orderType,
-          order.product,
-          order.design,
-          order.weight,
-          order.size,
-          order.quantity,
-          order.remarks,
-          order.orderId,
-          orderDateNano,
-        );
-
-        batchResult.success++;
-      } catch (error: any) {
-        batchResult.failed++;
-        const errorMsg = error?.message || 'Unknown error';
-        batchResult.errors.push({
-          row: currentRow,
-          error: errorMsg.includes('Design mapping not found')
-            ? `Design code "${order.design}" not found in Master Design Excel. Please upload Master Design Excel first.`
-            : errorMsg,
-        });
+      if (parsedOrders.length === 0) {
+        setParseError("No valid orders found in the file.");
+        setIsUploading(false);
+        return;
       }
 
-      // Update progress
-      const totalProcessed = startIdx + i + 1;
-      setProgress(Math.round((totalProcessed / orders.length) * 100));
-    }
+      let success = 0;
+      let failed = 0;
+      const errors: { row: number; message: string }[] = [];
 
-    return batchResult;
-  };
+      // Process orders sequentially to avoid instruction limit issues on the canister
+      for (let i = 0; i < parsedOrders.length; i++) {
+        const order = parsedOrders[i];
+        const rowNum = i + 2; // Excel rows start at 2 (row 1 is header)
 
-  const handleUpload = async () => {
-    if (!file || parsedOrders.length === 0) {
-      toast.error('Please select a valid Excel file first');
-      return;
-    }
+        try {
+          // Validate required fields before sending to avoid unnecessary canister calls
+          if (!order.orderNo || order.orderNo.trim() === "") {
+            throw new Error("Missing order number");
+          }
+          if (!order.design || order.design.trim() === "") {
+            throw new Error("Missing design code");
+          }
 
-    if (!actor) {
-      toast.error('Backend not initialized. Please wait and try again.');
-      return;
-    }
+          // Generate a unique orderId: orderNo + design + timestamp + index + random suffix
+          // More unique than just orderNo+timestamp to prevent duplicate key traps in the canister
+          const uniqueSuffix = `${Date.now()}-${i}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}`;
+          const orderId = `${order.orderNo.trim()}-${order.design.trim()}-${uniqueSuffix}`;
 
-    setIsProcessing(true);
-    setProgress(0);
+          const orderType =
+            order.orderType === OrderType.RB
+              ? OrderType.RB
+              : order.orderType === OrderType.SO
+              ? OrderType.SO
+              : OrderType.CO;
 
-    const finalResult: UploadResult = { success: 0, failed: 0, errors: [] };
+          // Convert orderDate from epoch ms (number) to nanoseconds BigInt, or null
+          const orderDateNano: bigint | null =
+            order.orderDate !== null && order.orderDate !== undefined
+              ? BigInt(Math.round(order.orderDate)) * BigInt(1_000_000)
+              : null;
 
-    try {
-      // Process orders in batches
-      for (let i = 0; i < parsedOrders.length; i += BATCH_SIZE) {
-        const batchResult = await processBatch(parsedOrders, i);
-        finalResult.success += batchResult.success;
-        finalResult.failed += batchResult.failed;
-        finalResult.errors.push(...batchResult.errors);
+          await actor.saveOrder(
+            order.orderNo.trim(),
+            orderType,
+            (order.product ?? "").trim(),
+            order.design.trim(),
+            order.weight ?? 0,
+            order.size ?? 0,
+            order.quantity, // already BigInt from parseOrdersExcel
+            (order.remarks ?? "").trim(),
+            orderId,
+            orderDateNano
+          );
 
-        // Small delay between batches to prevent overwhelming the backend
-        if (i + BATCH_SIZE < parsedOrders.length) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          success++;
+        } catch (err: unknown) {
+          failed++;
+          let message = "Unknown error";
+          if (err instanceof Error) {
+            const raw = err.message;
+            // Extract the meaningful part from IC canister rejection messages
+            if (raw.includes('"reject_message"')) {
+              const match = raw.match(/"reject_message"\s*:\s*"([^"]+)"/);
+              message = match ? match[1] : raw.slice(0, 300);
+            } else if (raw.includes("Canister") && raw.length > 300) {
+              // Shorten long canister error messages to the first meaningful line
+              const lines = raw.split("\n");
+              message = lines[0]?.slice(0, 300) ?? raw.slice(0, 300);
+            } else {
+              message = raw.slice(0, 300);
+            }
+          }
+          errors.push({ row: rowNum, message });
         }
       }
 
-      setResult(finalResult);
-
-      if (finalResult.success > 0) {
-        await refetchOrders();
-        toast.success(`Successfully uploaded ${finalResult.success} orders`);
-      }
-
-      if (finalResult.failed > 0) {
-        toast.error(`Failed to upload ${finalResult.failed} orders. Check details below.`);
-      }
-
-      // Clear file input
-      setFile(null);
-      setParsedOrders([]);
-    } catch (error) {
-      console.error('Error during upload:', error);
-      toast.error('An unexpected error occurred during upload');
+      setUploadResult({ success, failed, errors });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to parse file";
+      setParseError(message);
     } finally {
-      setIsProcessing(false);
-      setProgress(100);
+      setIsUploading(false);
     }
-  };
+  }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 p-4">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Ingest Orders</h1>
-        <p className="text-muted-foreground">Upload Excel file to import orders into the system</p>
+        <h1 className="text-2xl font-bold text-foreground">Ingest Orders</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Upload an Excel file to import orders into the system. Orders with
+          unmapped design codes will fail to upload.
+        </p>
       </div>
-
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Important:</strong> Before uploading orders, make sure you have uploaded the Master Design Excel
-          with all design code mappings. Orders with unmapped design codes will fail to upload.
-        </AlertDescription>
-      </Alert>
 
       <Card>
         <CardHeader>
-          <CardTitle>Upload Orders Excel</CardTitle>
+          <CardTitle className="text-base">Upload Orders Excel</CardTitle>
           <CardDescription>
-            Select an Excel file containing order data. The file will be parsed and validated before upload.
-            Include an <strong>Order Date</strong> column to enable Ageing Stock tracking.
+            Select an Excel file containing order data. The file will be parsed
+            and validated before upload.{" "}
+            {hasOrderDateColumn && (
+              <>
+                Include an <strong>Order Date</strong> column to enable Ageing
+                Stock tracking.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              Choose File
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {selectedFile ? selectedFile.name : "No file chosen"}
+            </span>
             <input
+              ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls"
+              className="hidden"
               onChange={handleFileChange}
-              disabled={isProcessing}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <Button onClick={handleUpload} disabled={!file || isProcessing || parsedOrders.length === 0}>
-              <Upload className="mr-2 h-4 w-4" />
-              {isProcessing ? 'Processing...' : 'Upload'}
-            </Button>
           </div>
 
-          {parsedOrders.length > 0 && !isProcessing && (
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm font-medium">Ready to upload: {parsedOrders.length} orders parsed</p>
-              {parsedOrders.some(o => o.orderDate != null) && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  ✓ Order Date column detected — ageing data will be stored
-                </p>
-              )}
-            </div>
-          )}
+          <Button
+            className="w-full"
+            onClick={handleUpload}
+            disabled={!selectedFile || isUploading || !actor}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </>
+            )}
+          </Button>
 
-          {isProcessing && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Processing orders...</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} />
-            </div>
-          )}
-
-          {result && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <div>
-                        <p className="text-2xl font-bold">{result.success}</p>
-                        <p className="text-sm text-muted-foreground">Successful</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-5 w-5 text-red-600" />
-                      <div>
-                        <p className="text-2xl font-bold">{result.failed}</p>
-                        <p className="text-sm text-muted-foreground">Failed</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {result.errors.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Upload Errors</CardTitle>
-                    <CardDescription>The following orders failed to upload:</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {result.errors.map((error, idx) => (
-                        <Alert key={idx} variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>Row {error.row}:</strong> {error.error}
-                          </AlertDescription>
-                        </Alert>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+          {parseError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{parseError}</AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>
+
+      {uploadResult && (
+        <>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-8 w-8 text-emerald-500 shrink-0" />
+                <div>
+                  <div className="text-3xl font-bold text-foreground">
+                    {uploadResult.success}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Successful
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <XCircle className="h-8 w-8 text-destructive shrink-0" />
+                <div>
+                  <div className="text-3xl font-bold text-foreground">
+                    {uploadResult.failed}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Failed</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {uploadResult.errors.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base text-destructive">
+                  Upload Errors
+                </CardTitle>
+                <CardDescription>
+                  The following orders failed to upload:
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 max-h-80 overflow-y-auto">
+                {uploadResult.errors.map((err, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold text-sm text-foreground">
+                        Row {err.row}:
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5 break-all">
+                        {err.message}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

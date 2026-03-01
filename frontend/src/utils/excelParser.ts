@@ -20,6 +20,14 @@ export function normalizeDesignCode(code: string): string {
 }
 
 /**
+ * Normalize a header name for comparison: uppercase, remove spaces and underscores.
+ * e.g. "Order Type", "order_type", "ORDERTYPE" all become "ORDERTYPE"
+ */
+function normalizeHeaderName(name: string): string {
+  return name.trim().toUpperCase().replace(/[\s_]+/g, '');
+}
+
+/**
  * Safely extract a numeric value from an Excel row cell.
  */
 function extractNumber(row: any, ...keys: string[]): number {
@@ -160,6 +168,18 @@ function extractOrderDate(row: any): number | null {
   return null;
 }
 
+/**
+ * Resolve the Order Type value from a raw cell string.
+ * Returns OrderType.RB for "RB", OrderType.SO for "SO",
+ * and OrderType.CO for "CO", blank, or any unrecognised value.
+ */
+function resolveOrderType(raw: string): OrderType {
+  const normalized = raw.trim().toUpperCase();
+  if (normalized === 'RB') return OrderType.RB;
+  if (normalized === 'SO') return OrderType.SO;
+  return OrderType.CO; // CO, blank, or unrecognised → default CO
+}
+
 export async function parseExcelFile(file: File): Promise<
   ParseResult<{
     orderNo: string;
@@ -188,6 +208,35 @@ export async function parseExcelFile(file: File): Promise<
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
+
+        // ── Step 1: Scan row 1 headers for an "Order Type" column ──────────────
+        // We read the raw header row to find the column key that matches
+        // "ORDERTYPE" (after normalizing spaces/underscores/case).
+        const TARGET_HEADER = normalizeHeaderName('Order Type'); // "ORDERTYPE"
+        let orderTypeHeaderKey: string | null = null;
+
+        // sheet_to_json with header:1 gives us the first row as an array of values.
+        const headerRows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: '',
+          range: 0, // only first row
+        });
+
+        if (headerRows.length > 0) {
+          const firstRow: any[] = headerRows[0];
+          for (const cell of firstRow) {
+            if (cell !== undefined && cell !== null && String(cell).trim() !== '') {
+              const cellStr = String(cell).trim();
+              if (normalizeHeaderName(cellStr) === TARGET_HEADER) {
+                // Found the header — record the exact key as it appears in the sheet
+                orderTypeHeaderKey = cellStr;
+                break;
+              }
+            }
+          }
+        }
+
+        // ── Step 2: Parse data rows ─────────────────────────────────────────────
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
         const orders: any[] = [];
@@ -202,7 +251,6 @@ export async function parseExcelFile(file: File): Promise<
             const rowNumber = index + 2;
 
             const orderNo = extractString(row, 'Order No', 'OrderNo', 'ORDER NO', 'order_no', 'orderno');
-            const orderTypeRaw = extractString(row, 'Order Type', 'OrderType', 'ORDER TYPE', 'order_type', 'ordertype', 'Type', 'TYPE').toUpperCase();
             const product = extractString(row, 'Product', 'PRODUCT', 'product');
             const designRaw = extractString(row, 'Design', 'DESIGN', 'design', 'Design Code', 'DesignCode');
             const design = normalizeDesignCode(designRaw);
@@ -212,11 +260,20 @@ export async function parseExcelFile(file: File): Promise<
             const remarks = extractString(row, 'Remarks', 'REMARKS', 'remarks', 'Remark', 'REMARK');
             const orderDate: number | null = extractOrderDate(row);
 
+            // ── Determine Order Type ──────────────────────────────────────────
+            // If an "Order Type" header column was found in row 1, read from it.
+            // Otherwise fall back to CO for all rows (backward compatibility).
+            let orderType: OrderType;
+            if (orderTypeHeaderKey !== null) {
+              const rawVal = extractString(row, orderTypeHeaderKey);
+              orderType = resolveOrderType(rawVal);
+            } else {
+              // No Order Type column in this file — default all to CO
+              orderType = OrderType.CO;
+            }
+
             if (!orderNo) {
               errors.push({ row: rowNumber, field: 'Order No', message: 'Order No is required' });
-            }
-            if (!orderTypeRaw || (orderTypeRaw !== 'CO' && orderTypeRaw !== 'RB' && orderTypeRaw !== 'SO')) {
-              errors.push({ row: rowNumber, field: 'Order Type', message: 'Order Type must be CO, RB, or SO' });
             }
             if (!product) {
               errors.push({ row: rowNumber, field: 'Product', message: 'Product is required' });
@@ -226,17 +283,6 @@ export async function parseExcelFile(file: File): Promise<
             }
 
             if (orderNo) {
-              let orderType: OrderType;
-              if (orderTypeRaw === 'CO') {
-                orderType = OrderType.CO;
-              } else if (orderTypeRaw === 'RB') {
-                orderType = OrderType.RB;
-              } else if (orderTypeRaw === 'SO') {
-                orderType = OrderType.SO;
-              } else {
-                orderType = OrderType.RB;
-              }
-
               orders.push({
                 orderNo,
                 orderType,

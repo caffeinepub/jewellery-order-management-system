@@ -1,56 +1,69 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-03-01T06:56:30.711Z",
+  "generatedAt": "2026-03-01T21:56:31.460Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 3,
+    "total": 4,
+    "implemented": 4,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "When an RB order is partially marked as Ready via the supplied quantity popup, the Total Orders summary card must immediately recalculate: decrement Total Orders count by 1 and display a '1 RB Pending' indicator, reduce Total Qty by the supplied quantity, reduce Total Weight by the corresponding supplied weight, and leave Customer Order count unchanged. This recalculation must happen at the data and state level only with no UI, workflow, or structural changes.",
+        "summary": "In the Total Orders tab (TotalOrdersTab.tsx), group pending orders by design code. Each design code group displays a single header row showing: design code (clickable), order type badge (RB/CO/SO), karigar name, total sub-order count, total qty, and total weight. The group row has a chevron toggle to expand/collapse its sub-orders. Sub-order rows show: order number, qty, weight, generic name, order date, and an ageing badge (days since order date, colour-coded: green ≤14d, amber 15–29d, red ≥30d). A checkbox on the group row selects all its sub-orders; individual sub-order checkboxes also work. The Mark as Ready action continues to work on selected sub-orders.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx",
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/utils/ageingBadge.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx",
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/utils/ageingBadge.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "When a partially supplied RB order is marked Return to Pending from the Ready tab, the Total Orders summary card totals must fully restore to their pre-supply original values: Total Orders count increases back by 1, Total Qty increases by the previously supplied quantity, Total Weight increases by the previously supplied weight, and Customer Order count remains unchanged.",
+        "summary": "Apply the same grouped design code layout (expandable sub-orders, ageing badges, karigar name, order type badge) to the Ready tab (ReadyTab.tsx) and the Hallmark tab (HallmarkTab.tsx), preserving their existing actions (return to pending for Ready; mark as returned for Hallmark).",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ],
         "matchedFiles": [
           "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Implement mandatory RB row consolidation logic: when a partially supplied RB order is returned to Pending, the remaining pending fragment and any other pending fragments of the same logical RB order must automatically merge into a single consolidated row with combined quantity and weight before being displayed or before any further Mark as Ready action is allowed. The supplied quantity popup must appear only once per logical RB order, not separately for each split fragment. No UI, structural, or workflow changes are permitted - only the data consolidation and merge logic must change.",
+        "summary": "When the user clicks a design code in any group header row (Total Orders, Ready, Hallmark tabs), open the existing DesignImageModal for that design code, showing the associated design image with zoom/pan support.",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/pages/AgeingStock.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ],
         "matchedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/pages/AgeingStock.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Add a search bar and two filter dropdowns (order type: All Types / RB / CO / SO; karigar: All Karigars / <list of karigars>) above the orders table in the Total Orders, Ready, and Hallmark tabs. The search input filters rows by design code, order number, or generic name (case-insensitive, partial match). The order type dropdown filters to show only groups matching the selected type. The karigar dropdown filters to show only groups assigned to the selected karigar. All three controls work together (AND logic). Match the UI shown in the uploaded screenshot: search bar on the left, two pill/capsule dropdowns on the right.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx"
         ]
       }
     ]
@@ -60,13 +73,10 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/components/dashboard/HallmarkTab.tsx",
     "frontend/src/components/dashboard/ReadyTab.tsx",
-    "frontend/src/components/dashboard/SummaryCards.tsx",
-    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/pages/AgeingStock.tsx",
-    "frontend/src/pages/Dashboard.tsx",
-    "frontend/src/pages/KarigarDetail.tsx",
+    "frontend/src/utils/ageingBadge.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

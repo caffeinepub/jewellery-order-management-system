@@ -90,8 +90,6 @@ export interface backendInterface {
     batchGetByStatus(ids: Array<string>, compareStatus: OrderStatus): Promise<Array<string>>;
     batchReturnOrdersToPending(orderRequests: Array<[string, bigint]>): Promise<void>;
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
-    batchSupplyNewRBOrders(orderQuantities: Array<[string, bigint]>): Promise<void>;
-    batchSupplyRBOrders(orderQuantities: Array<[string, bigint]>): Promise<void>;
     batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     clearAllDesignMappings(): Promise<void>;
@@ -110,6 +108,11 @@ export interface backendInterface {
     getOrder(orderId: string): Promise<Order | null>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
+    getRBSummary(): Promise<{
+        totalOrders: bigint;
+        totalQty: bigint;
+        totalWeight: number;
+    }>;
     getReadyOrders(): Promise<Array<Order>>;
     getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
@@ -120,9 +123,9 @@ export interface backendInterface {
     persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
+    registerKarigar(name: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
     returnOrdersToPending(orderNo: string, returnedQty: bigint): Promise<void>;
-    returnReadyOrderToPending(orderId: string, returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;

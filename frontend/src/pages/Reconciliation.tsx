@@ -19,7 +19,38 @@ import { useReconcileMasterFile, usePersistMasterDataRows } from '@/hooks/useQue
 import type { MasterDataRow, MasterReconciliationResult, Order } from '@/backend';
 import { normalizeDesignCode } from '@/utils/excelParser';
 
-async function parseMasterFileForReconciliation(file: File): Promise<MasterDataRow[]> {
+/**
+ * Extended row type that carries the parsed Order Type alongside the
+ * standard MasterDataRow fields. The orderType is used for display only
+ * since MasterDataRow (backend type) does not include it.
+ */
+interface ReconciliationRow extends MasterDataRow {
+  orderType: 'SO' | 'CO' | 'RB';
+}
+
+/**
+ * Normalize a header name for comparison: uppercase, remove spaces and underscores.
+ * e.g. "Order T", "Order Type", "ORDERTYPE" all become "ORDERTYPE"
+ * Also handles the truncated "Order T" header seen in the Excel file.
+ */
+function normalizeHeaderForOrderType(name: string): boolean {
+  const normalized = name.trim().toUpperCase().replace(/[\s_]+/g, '');
+  // Match "ORDERTYPE", "ORDERT" (truncated), "ORDER T" variants
+  return normalized === 'ORDERTYPE' || normalized === 'ORDERT';
+}
+
+/**
+ * Resolve the Order Type value from a raw cell string.
+ * Returns 'RB' for "RB", 'SO' for "SO", 'CO' for "CO", blank, or unrecognised.
+ */
+function resolveOrderType(raw: string): 'SO' | 'CO' | 'RB' {
+  const normalized = String(raw || '').trim().toUpperCase();
+  if (normalized === 'RB') return 'RB';
+  if (normalized === 'SO') return 'SO';
+  return 'CO';
+}
+
+async function parseMasterFileForReconciliation(file: File): Promise<ReconciliationRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -29,9 +60,33 @@ async function parseMasterFileForReconciliation(file: File): Promise<MasterDataR
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
+
+        // ── Step 1: Scan row 1 headers to find the Order Type column key ──────
+        // sheet_to_json with header:1 gives us the first row as an array of values.
+        const headerRows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: '',
+          range: 0, // only first row
+        });
+
+        let orderTypeHeaderKey: string | null = null;
+        if (headerRows.length > 0) {
+          const firstRow: any[] = headerRows[0];
+          for (const cell of firstRow) {
+            if (cell !== undefined && cell !== null && String(cell).trim() !== '') {
+              const cellStr = String(cell).trim();
+              if (normalizeHeaderForOrderType(cellStr)) {
+                orderTypeHeaderKey = cellStr;
+                break;
+              }
+            }
+          }
+        }
+
+        // ── Step 2: Parse data rows ─────────────────────────────────────────
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-        const rows: MasterDataRow[] = [];
+        const rows: ReconciliationRow[] = [];
         for (const row of jsonData as any[]) {
           const orderNo = String(
             row['Order No'] || row['OrderNo'] || row['ORDER NO'] || row['order no'] || ''
@@ -48,8 +103,15 @@ async function parseMasterFileForReconciliation(file: File): Promise<MasterDataR
             Math.round(Number(row['Quantity'] || row['QUANTITY'] || row['quantity'] || row['Qty'] || 0))
           );
 
+          // ── Read Order Type from the detected column (column B = "Order T") ──
+          let orderType: 'SO' | 'CO' | 'RB' = 'CO';
+          if (orderTypeHeaderKey !== null) {
+            const rawVal = String(row[orderTypeHeaderKey] || '').trim();
+            orderType = resolveOrderType(rawVal);
+          }
+
           if (orderNo && designCode) {
-            rows.push({ orderNo, designCode, karigar, weight, quantity });
+            rows.push({ orderNo, designCode, karigar, weight, quantity, orderType });
           }
         }
         resolve(rows);
@@ -87,10 +149,25 @@ function SummaryCard({
   );
 }
 
+function OrderTypeBadge({ type }: { type: 'SO' | 'CO' | 'RB' }) {
+  const styles: Record<string, string> = {
+    SO: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/30',
+    CO: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/30',
+    RB: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30',
+  };
+  return (
+    <Badge className={`${styles[type] ?? styles['CO']} hover:opacity-80`}>
+      {type}
+    </Badge>
+  );
+}
+
 export default function Reconciliation() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [result, setResult] = useState<MasterReconciliationResult | null>(null);
+  // Store the full parsed rows (with orderType) separately for display
+  const [parsedNewLines, setParsedNewLines] = useState<ReconciliationRow[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   const reconcileMutation = useReconcileMasterFile();
@@ -102,6 +179,7 @@ export default function Reconciliation() {
 
     setIsParsing(true);
     setResult(null);
+    setParsedNewLines([]);
     setSelectedKeys(new Set());
 
     try {
@@ -111,8 +189,19 @@ export default function Reconciliation() {
         setIsParsing(false);
         return;
       }
-      const reconciliationResult = await reconcileMutation.mutateAsync(rows);
+      // Pass only the MasterDataRow fields to the backend (orderType is frontend-only)
+      const masterDataRows: MasterDataRow[] = rows.map(({ orderType: _ot, ...rest }) => rest);
+      const reconciliationResult = await reconcileMutation.mutateAsync(masterDataRows);
       setResult(reconciliationResult);
+
+      // Build a lookup map for the new lines so we can attach orderType for display
+      const newLineKeys = new Set(
+        reconciliationResult.newLines.map((r) => `${r.orderNo}__${r.designCode}`)
+      );
+      const newLinesWithType = rows.filter((r) =>
+        newLineKeys.has(`${r.orderNo}__${r.designCode}`)
+      );
+      setParsedNewLines(newLinesWithType);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       toast.error(`Reconciliation failed: ${message}`);
@@ -126,14 +215,13 @@ export default function Reconciliation() {
   const rowKey = (row: MasterDataRow) => `${row.orderNo}__${row.designCode}`;
 
   const allSelected =
-    result && result.newLines.length > 0 && selectedKeys.size === result.newLines.length;
+    parsedNewLines.length > 0 && selectedKeys.size === parsedNewLines.length;
 
   const toggleSelectAll = () => {
-    if (!result) return;
     if (allSelected) {
       setSelectedKeys(new Set());
     } else {
-      setSelectedKeys(new Set(result.newLines.map(rowKey)));
+      setSelectedKeys(new Set(parsedNewLines.map(rowKey)));
     }
   };
 
@@ -148,9 +236,11 @@ export default function Reconciliation() {
 
   const handleAddSelected = async () => {
     if (!result || selectedKeys.size === 0) return;
-    const selectedRows = result.newLines.filter((r) => selectedKeys.has(rowKey(r)));
+    const selectedRows = parsedNewLines.filter((r) => selectedKeys.has(rowKey(r)));
+    // Strip orderType before sending to backend (MasterDataRow doesn't include it)
+    const masterDataRows: MasterDataRow[] = selectedRows.map(({ orderType: _ot, ...rest }) => rest);
     try {
-      const response = await persistMutation.mutateAsync(selectedRows);
+      const response = await persistMutation.mutateAsync(masterDataRows);
       const count = response.persisted.length;
       toast.success(
         count > 0
@@ -158,16 +248,17 @@ export default function Reconciliation() {
           : 'No new orders were added (all may already exist).'
       );
       // Remove persisted rows from the new lines section
+      const persistedKeys = new Set(
+        response.persisted.map((o: Order) => `${o.orderNo}__${o.design}`)
+      );
+      const remainingParsed = parsedNewLines.filter((r) => !persistedKeys.has(rowKey(r)));
+      setParsedNewLines(remainingParsed);
       setResult((prev) => {
         if (!prev) return prev;
-        const persistedKeys = new Set(
-          response.persisted.map((o: Order) => `${o.orderNo}__${o.design}`)
-        );
-        const remaining = prev.newLines.filter((r) => !persistedKeys.has(rowKey(r)));
         return {
           ...prev,
-          newLines: remaining,
-          newLinesCount: BigInt(remaining.length),
+          newLines: remainingParsed,
+          newLinesCount: BigInt(remainingParsed.length),
           alreadyExistingRows: BigInt(Number(prev.alreadyExistingRows) + response.persisted.length),
         };
       });
@@ -182,7 +273,7 @@ export default function Reconciliation() {
 
   const noDifferences =
     result &&
-    result.newLines.length === 0 &&
+    parsedNewLines.length === 0 &&
     result.missingInMaster.length === 0;
 
   return (
@@ -209,6 +300,7 @@ export default function Reconciliation() {
           <CardDescription>
             Upload the latest full master Excel file (.xlsx or .xls). The system will compare all
             rows against existing records using Order No + Design Code as the unique key.
+            Order Type (SO, CO, RB) is read from column B.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -239,8 +331,8 @@ export default function Reconciliation() {
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Accepted formats: .xlsx, .xls — Expected columns: Order No, Design Code, Karigar,
-              Weight, Quantity
+              Accepted formats: .xlsx, .xls — Expected columns: Order No, Order Type, Design Code,
+              Karigar, Weight, Quantity
             </p>
           </div>
         </CardContent>
@@ -263,7 +355,7 @@ export default function Reconciliation() {
             />
             <SummaryCard
               label="New Lines"
-              value={Number(result.newLinesCount)}
+              value={parsedNewLines.length}
               color="gold"
             />
             <SummaryCard
@@ -283,14 +375,14 @@ export default function Reconciliation() {
           )}
 
           {/* Section 1: New Lines Found */}
-          {result.newLines.length > 0 && (
+          {parsedNewLines.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <CardTitle className="text-base flex items-center gap-2">
                       New Lines Found
-                      <Badge variant="secondary">{result.newLines.length}</Badge>
+                      <Badge variant="secondary">{parsedNewLines.length}</Badge>
                     </CardTitle>
                     <CardDescription className="mt-1">
                       These rows exist in the uploaded file but are not found in any existing table.
@@ -335,6 +427,7 @@ export default function Reconciliation() {
                           />
                         </TableHead>
                         <TableHead>Order No</TableHead>
+                        <TableHead>Order Type</TableHead>
                         <TableHead>Design Code</TableHead>
                         <TableHead>Karigar</TableHead>
                         <TableHead className="text-right">Weight</TableHead>
@@ -343,7 +436,7 @@ export default function Reconciliation() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {result.newLines.map((row) => {
+                      {parsedNewLines.map((row) => {
                         const key = rowKey(row);
                         return (
                           <TableRow
@@ -359,6 +452,9 @@ export default function Reconciliation() {
                               />
                             </TableCell>
                             <TableCell className="font-medium">{row.orderNo}</TableCell>
+                            <TableCell>
+                              <OrderTypeBadge type={row.orderType} />
+                            </TableCell>
                             <TableCell>{row.designCode}</TableCell>
                             <TableCell>{row.karigar || '—'}</TableCell>
                             <TableCell className="text-right">{row.weight.toFixed(2)}</TableCell>
@@ -409,6 +505,7 @@ export default function Reconciliation() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Order No</TableHead>
+                        <TableHead>Order Type</TableHead>
                         <TableHead>Design Code</TableHead>
                         <TableHead>Current Status</TableHead>
                         <TableHead>Karigar</TableHead>
@@ -421,6 +518,17 @@ export default function Reconciliation() {
                       {result.missingInMaster.map((order) => (
                         <TableRow key={order.orderId}>
                           <TableCell className="font-medium">{order.orderNo}</TableCell>
+                          <TableCell>
+                            <OrderTypeBadge
+                              type={
+                                order.orderType === 'RB'
+                                  ? 'RB'
+                                  : order.orderType === 'SO'
+                                  ? 'SO'
+                                  : 'CO'
+                              }
+                            />
+                          </TableCell>
                           <TableCell>{order.design}</TableCell>
                           <TableCell>
                             <Badge

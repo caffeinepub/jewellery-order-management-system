@@ -113,8 +113,6 @@ export interface _SERVICE {
     [Array<[string, DesignMapping]>],
     undefined
   >,
-  'batchSupplyNewRBOrders' : ActorMethod<[Array<[string, bigint]>], undefined>,
-  'batchSupplyRBOrders' : ActorMethod<[Array<[string, bigint]>], undefined>,
   'batchUpdateOrderStatus' : ActorMethod<
     [Array<string>, OrderStatus],
     undefined
@@ -145,6 +143,10 @@ export interface _SERVICE {
     Array<Order>
   >,
   'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
+  'getRBSummary' : ActorMethod<
+    [],
+    { 'totalOrders' : bigint, 'totalQty' : bigint, 'totalWeight' : number }
+  >,
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getReadyOrdersByDateRange' : ActorMethod<[Time, Time], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
@@ -161,9 +163,9 @@ export interface _SERVICE {
     [Array<MasterDataRow>],
     MasterReconciliationResult
   >,
+  'registerKarigar' : ActorMethod<[string], undefined>,
   'resetActiveOrders' : ActorMethod<[], undefined>,
   'returnOrdersToPending' : ActorMethod<[string, bigint], undefined>,
-  'returnReadyOrderToPending' : ActorMethod<[string, bigint], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'saveOrder' : ActorMethod<
     [

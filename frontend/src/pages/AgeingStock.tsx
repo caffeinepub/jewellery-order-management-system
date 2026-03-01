@@ -13,12 +13,10 @@ import { toast } from 'sonner';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Convert backend Time (nanoseconds bigint) to epoch milliseconds */
 function nanoToMs(nano: bigint): number {
   return Number(nano / BigInt(1_000_000));
 }
 
-/** Compute age in whole days from a timestamp (ms) to today */
 function daysAgo(epochMs: number): number {
   const diff = Date.now() - epochMs;
   if (diff < 0) return 0;
@@ -34,7 +32,6 @@ function getAgeBand(days: number | null): AgeBand {
   return 'red';
 }
 
-// Use explicit Tailwind color classes (not CSS variables) for reliable rendering
 const ageBandBadgeClasses: Record<AgeBand, string> = {
   green: 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-700',
   yellow: 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700',
@@ -64,7 +61,6 @@ interface DesignGroup {
   totalWeight: number;
 }
 
-/** Safely extract orderDate as epoch ms, returning null for missing/invalid values */
 function safeOrderDateMs(order: Order): number | null {
   try {
     const od = order.orderDate;
@@ -85,10 +81,9 @@ export default function AgeingStock() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [rbDialogOpen, setRbDialogOpen] = useState(false);
   const [rbOrdersForDialog, setRbOrdersForDialog] = useState<Order[]>([]);
+  const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
 
-  // ── Derive pending orders enriched with age data ──────────────────────────
   const groups = useMemo<DesignGroup[]>(() => {
     const pending = allOrders.filter(o => o.status === OrderStatus.Pending);
 
@@ -140,7 +135,6 @@ export default function AgeingStock() {
     return result;
   }, [allOrders]);
 
-  // ── Selection helpers ─────────────────────────────────────────────────────
   const toggleOrder = (orderId: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -179,7 +173,6 @@ export default function AgeingStock() {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  // ── Mark Ready handler ────────────────────────────────────────────────────
   const handleMarkReady = async () => {
     if (selectedIds.size === 0) return;
 
@@ -206,19 +199,16 @@ export default function AgeingStock() {
 
     if (rbOrders.length > 0) {
       setRbOrdersForDialog(rbOrders);
-      setRbDialogOpen(true);
+      setSupplyDialogOpen(true);
     }
   };
 
-  const handleDialogClose = (open: boolean) => {
-    if (!open) {
-      setRbOrdersForDialog([]);
-      setSelectedIds(new Set());
-      setRbDialogOpen(false);
-    }
+  const handleDialogClose = () => {
+    setRbOrdersForDialog([]);
+    setSupplyDialogOpen(false);
+    setSelectedIds(new Set());
   };
 
-  // ── Derived counts ────────────────────────────────────────────────────────
   const allPendingOrders = groups.flatMap(g => g.orders);
   const totalPending = allPendingOrders.length;
   const ordersWithDate = allPendingOrders.filter(o => o.ageDays !== null);
@@ -227,7 +217,6 @@ export default function AgeingStock() {
   const ageingCount = ordersWithDate.filter(o => o.ageBand === 'yellow').length;
   const overdueCount = ordersWithDate.filter(o => o.ageBand === 'red').length;
 
-  // ── Loading state ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 md:p-6 space-y-6">
@@ -245,7 +234,6 @@ export default function AgeingStock() {
     );
   }
 
-  // ── Error state ───────────────────────────────────────────────────────────
   if (isError) {
     return (
       <div className="container mx-auto p-4 md:p-6">
@@ -332,7 +320,6 @@ export default function AgeingStock() {
         </Card>
       </div>
 
-      {/* No-date notice */}
       {ordersWithoutDate.length > 0 && (
         <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           <CalendarX className="h-4 w-4 flex-shrink-0" />
@@ -343,7 +330,6 @@ export default function AgeingStock() {
         </div>
       )}
 
-      {/* Select all / clear */}
       {totalPending > 0 && (
         <div className="flex items-center gap-3 text-sm">
           <Button variant="ghost" size="sm" onClick={selectAll} className="h-7 px-2">
@@ -360,7 +346,6 @@ export default function AgeingStock() {
         </div>
       )}
 
-      {/* Empty state */}
       {totalPending === 0 && (
         <Card className="bg-card">
           <CardContent className="py-16 text-center">
@@ -371,7 +356,6 @@ export default function AgeingStock() {
         </Card>
       )}
 
-      {/* Design groups */}
       <div className="space-y-3">
         {groups.map(group => {
           const isExpanded = expandedGroups.has(group.designCode);
@@ -381,10 +365,8 @@ export default function AgeingStock() {
 
           return (
             <Card key={group.designCode} className={`overflow-hidden bg-card ${ageBandLeftBorderClasses[groupBand]}`}>
-              {/* Group header */}
               <CardHeader className="py-3 px-4 cursor-pointer select-none" onClick={() => toggleExpanded(group.designCode)}>
                 <div className="flex items-center gap-3">
-                  {/* Group checkbox */}
                   <div onClick={e => { e.stopPropagation(); toggleGroup(group.designCode, group.orders); }}>
                     <Checkbox
                       checked={allGroupSelected}
@@ -393,13 +375,11 @@ export default function AgeingStock() {
                     />
                   </div>
 
-                  {/* Expand icon */}
                   {isExpanded
                     ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   }
 
-                  {/* Design info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-sm text-foreground">{group.designCode}</span>
@@ -412,69 +392,58 @@ export default function AgeingStock() {
                     </div>
                   </div>
 
-                  {/* Summary */}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground flex-shrink-0">
-                    <span>{group.orders.length} order{group.orders.length > 1 ? 's' : ''}</span>
                     <span>Qty: {group.totalQty}</span>
                     <span>Wt: {group.totalWeight.toFixed(2)}g</span>
+                    <span>{group.orders.length} order{group.orders.length !== 1 ? 's' : ''}</span>
                   </div>
                 </div>
               </CardHeader>
 
-              {/* Order rows */}
               {isExpanded && (
                 <CardContent className="p-0">
-                  <div className="divide-y divide-border">
-                    {group.orders.map((order, idx) => {
+                  <div className="divide-y">
+                    {group.orders.map(order => {
                       const isSelected = selectedIds.has(order.orderId);
                       const band = order.ageBand;
-
                       return (
                         <div
                           key={order.orderId}
-                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${isSelected ? 'bg-muted/50' : 'hover:bg-muted/30'}`}
+                          className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-muted/30 ${isSelected ? 'bg-primary/5' : ''}`}
+                          onClick={() => toggleOrder(order.orderId)}
                         >
-                          {/* FIFO rank */}
-                          <span className="text-xs text-muted-foreground w-5 text-center flex-shrink-0">
-                            {idx + 1}
-                          </span>
-
-                          {/* Row checkbox */}
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleOrder(order.orderId)}
-                          />
-
-                          {/* Order details */}
-                          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-sm">
-                            <div>
-                              <span className="text-xs text-muted-foreground block">Order No</span>
-                              <span className="font-medium truncate text-foreground">{order.orderNo}</span>
+                          <div onClick={e => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleOrder(order.orderId)}
+                              className="mt-0.5"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-sm text-foreground">{order.orderNo}</span>
+                              <Badge variant="outline" className="text-xs h-5">{order.orderType}</Badge>
+                              {order.karigarName && (
+                                <span className="text-xs text-muted-foreground">{order.karigarName}</span>
+                              )}
                             </div>
-                            <div>
-                              <span className="text-xs text-muted-foreground block">Product</span>
-                              <span className="truncate text-foreground">{order.product || '—'}</span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-muted-foreground block">Qty</span>
-                              <span className="text-foreground">{Number(order.quantity)}</span>
-                            </div>
-                            <div>
-                              <span className="text-xs text-muted-foreground block">Weight</span>
-                              <span className="text-foreground">{(order.weight * Number(order.quantity)).toFixed(2)}g</span>
+                            <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted-foreground">
+                              <span>Qty: {Number(order.quantity)}</span>
+                              <span>Wt: {(order.weight * Number(order.quantity)).toFixed(2)}g</span>
+                              {order.remarks && <span className="truncate max-w-[200px]">{order.remarks}</span>}
                             </div>
                           </div>
-
-                          {/* Age badge */}
-                          {order.ageDays !== null ? (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ageBandBadgeClasses[band]}`}>
-                              {order.ageDays}d
-                            </span>
-                          ) : (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ageBandBadgeClasses['none']}`}>
-                              —
-                            </span>
-                          )}
+                          <div className="flex-shrink-0">
+                            {order.ageDays !== null ? (
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ageBandBadgeClasses[band]}`}>
+                                {order.ageDays}d
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ageBandBadgeClasses['none']}`}>
+                                No date
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -486,11 +455,13 @@ export default function AgeingStock() {
         })}
       </div>
 
-      {/* RB Supply Dialog */}
+      {/* SuppliedQtyDialog for RB orders */}
       <SuppliedQtyDialog
-        open={rbDialogOpen}
-        onOpenChange={handleDialogClose}
-        orders={rbOrdersForDialog}
+        open={supplyDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleDialogClose();
+        }}
+        rbOrders={rbOrdersForDialog}
       />
     </div>
   );

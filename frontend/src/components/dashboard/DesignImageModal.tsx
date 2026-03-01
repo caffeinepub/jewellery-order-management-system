@@ -27,6 +27,9 @@ export default function DesignImageModal({
 
   const { data: designData, isLoading, error } = useGetDesignImage(designCode);
 
+  // Derive the image URL from the blob using getDirectURL()
+  const imageUrl = designData?.blob ? designData.blob.getDirectURL() : null;
+
   useEffect(() => {
     if (!open) {
       setZoom(1);
@@ -104,7 +107,7 @@ export default function DesignImageModal({
             </div>
           )}
 
-          {designData && designData.imageUrl && (
+          {designData && imageUrl && (
             <>
               <div className="flex items-center justify-center gap-2 mb-4">
                 <Button variant="outline" size="sm" onClick={handleZoomOut}>
@@ -130,7 +133,7 @@ export default function DesignImageModal({
                 onTouchEnd={handleTouchEnd}
               >
                 <img
-                  src={designData.imageUrl}
+                  src={imageUrl}
                   alt={`Design ${designCode}`}
                   style={{
                     transform: `scale(${zoom}) translate(${panPosition.x / zoom}px, ${panPosition.y / zoom}px)`,
@@ -155,7 +158,7 @@ export default function DesignImageModal({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Design Code:</span>
-                  <p className="font-medium">{designData.designCode}</p>
+                  <p className="font-medium">{designCode}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Generic Name:</span>

@@ -18,7 +18,7 @@ import {
   useAddKarigar,
   useUpdateDesignMapping,
 } from "@/hooks/useQueries";
-import { MappingRecord, DesignMapping, ExternalBlob } from "@/backend";
+import { MappingRecord, DesignMapping } from "@/backend";
 import { normalizeDesignCode } from "@/utils/excelParser";
 import {
   Table,
@@ -52,6 +52,10 @@ export default function MasterDesigns() {
   const { data: masterDesignMappings = [] } = useGetAllMasterDesignMappings();
   const { data: allOrders = [] } = useGetAllOrders();
   const { data: availableKarigars = [] } = useGetUniqueKarigarsFromDesignMappings();
+
+  // Suppress unused variable warnings for mutations not directly called in JSX
+  void assignOrdersToKarigarMutation;
+  void reassignDesignMutation;
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -121,10 +125,10 @@ export default function MasterDesigns() {
       // Update master design karigars list
       await updateMasterDesignKarigarsMutation.mutateAsync(Array.from(uniqueKarigars));
 
-      // Upload the raw Excel file for reference as an ExternalBlob
+      // Upload the raw Excel file for reference — pass Uint8Array directly,
+      // the hook wraps it in ExternalBlob internally
       const uint8Data = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
-      const excelBlob = ExternalBlob.fromBytes(uint8Data);
-      await uploadMasterDesignExcelMutation.mutateAsync(excelBlob);
+      await uploadMasterDesignExcelMutation.mutateAsync(uint8Data);
 
       setUploadProgress(100);
       toast.success(`Successfully uploaded ${mappings.length} design mappings`);

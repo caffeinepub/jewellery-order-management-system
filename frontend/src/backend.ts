@@ -182,8 +182,6 @@ export interface backendInterface {
     batchGetByStatus(ids: Array<string>, compareStatus: OrderStatus): Promise<Array<string>>;
     batchReturnOrdersToPending(orderRequests: Array<[string, bigint]>): Promise<void>;
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
-    batchSupplyNewRBOrders(orderQuantities: Array<[string, bigint]>): Promise<void>;
-    batchSupplyRBOrders(orderQuantities: Array<[string, bigint]>): Promise<void>;
     batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
     clearAllDesignMappings(): Promise<void>;
@@ -202,6 +200,11 @@ export interface backendInterface {
     getOrder(orderId: string): Promise<Order | null>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
+    getRBSummary(): Promise<{
+        totalOrders: bigint;
+        totalQty: bigint;
+        totalWeight: number;
+    }>;
     getReadyOrders(): Promise<Array<Order>>;
     getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
@@ -212,9 +215,9 @@ export interface backendInterface {
     persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
     reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
+    registerKarigar(name: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
     returnOrdersToPending(orderNo: string, returnedQty: bigint): Promise<void>;
-    returnReadyOrderToPending(orderId: string, returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
@@ -394,34 +397,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.batchSaveDesignMappings(to_candid_vec_n10(this._uploadFile, this._downloadFile, arg0));
-            return result;
-        }
-    }
-    async batchSupplyNewRBOrders(arg0: Array<[string, bigint]>): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.batchSupplyNewRBOrders(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.batchSupplyNewRBOrders(arg0);
-            return result;
-        }
-    }
-    async batchSupplyRBOrders(arg0: Array<[string, bigint]>): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.batchSupplyRBOrders(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.batchSupplyRBOrders(arg0);
             return result;
         }
     }
@@ -677,6 +652,24 @@ export class Backend implements backendInterface {
             return from_candid_vec_n22(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getRBSummary(): Promise<{
+        totalOrders: bigint;
+        totalQty: bigint;
+        totalWeight: number;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getRBSummary();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getRBSummary();
+            return result;
+        }
+    }
     async getReadyOrders(): Promise<Array<Order>> {
         if (this.processError) {
             try {
@@ -817,6 +810,20 @@ export class Backend implements backendInterface {
             return from_candid_MasterReconciliationResult_n45(this._uploadFile, this._downloadFile, result);
         }
     }
+    async registerKarigar(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerKarigar(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerKarigar(arg0);
+            return result;
+        }
+    }
     async resetActiveOrders(): Promise<void> {
         if (this.processError) {
             try {
@@ -842,20 +849,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.returnOrdersToPending(arg0, arg1);
-            return result;
-        }
-    }
-    async returnReadyOrderToPending(arg0: string, arg1: bigint): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.returnReadyOrderToPending(arg0, arg1);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.returnReadyOrderToPending(arg0, arg1);
             return result;
         }
     }

@@ -1,83 +1,111 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix RB partial supply calculation and consolidation logic",
+  "title": "Batch 3 & 4: Grouped display layout with expandable rows, ageing badges, image modal, and filters/search across tabs",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix summary card recalculation when RB order is partially supplied: decrement Total Orders by 1, show '1 RB Pending' indicator, reduce Total Qty and Total Weight by supplied amounts, keep Customer Order count unchanged",
+      "summary": "Transform Total Orders tab to display grouped, expandable design code rows with ageing badges, karigar name, order type badges, and hierarchical selection",
       "acceptanceCriteria": [
-        "After confirming a partial RB supply, the Total Orders count in the summary card decreases by exactly 1.",
-        "A '1 RB Pending' indicator appears on the Total Orders summary card after partial RB supply.",
-        "Total Qty in the summary card decreases by exactly the supplied quantity entered in the popup.",
-        "Total Weight in the summary card decreases by exactly the weight corresponding to the supplied quantity.",
-        "Customer Order count in the summary card remains unchanged after a partial RB supply."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
-          "operation": "modify",
-          "description": "Update the calculation logic to correctly handle partial RB supplies: when an RB order is partially supplied, decrement the total orders count by 1 (not by the ratio of supplied qty), subtract the supplied quantity from Total Qty, subtract the corresponding supplied weight from Total Weight, display a '1 RB Pending' indicator when applicable, and ensure Customer Order count (CO-type orders) remains unchanged. The fix must occur in the data aggregation logic that computes summary metrics from the orders array."
-        },
-        {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "operation": "modify",
-          "description": "Ensure that after calling batchSupplyRBOrders, the component triggers a refetch or state update so that SummaryCards.tsx receives the updated order data reflecting the partial supply. No UI or workflow changes; only ensure proper data flow and invalidation of cached queries so the summary card recalculates correctly."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Fix summary card restoration when partially supplied RB order is returned to Pending: restore Total Orders count, Total Qty, and Total Weight to their pre-supply values, keep Customer Order count unchanged",
-      "acceptanceCriteria": [
-        "After Return to Pending, Total Orders count in the summary card is restored to the value before the partial supply.",
-        "After Return to Pending, Total Qty is restored to the value before the partial supply.",
-        "After Return to Pending, Total Weight is restored to the value before the partial supply.",
-        "Customer Order count remains unchanged throughout the return-to-pending flow."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Update the return-to-pending logic to ensure that when a partially supplied RB order is returned to Pending status, the backend mutation is called with the correct returned quantity, and after the mutation completes, all relevant queries are invalidated so that SummaryCards.tsx recalculates totals from fresh data. The fix must ensure that the restored pending order(s) contribute their full original quantity and weight back into the summary card totals. No UI or workflow changes."
-        },
-        {
-          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
-          "operation": "modify",
-          "description": "Verify and adjust the calculation logic to correctly handle return-to-pending flows: when an RB order fragment is returned to Pending, ensure that the Total Orders count increments back by 1 (not by a ratio), Total Qty and Total Weight are restored by adding back the returned quantity and weight, and Customer Order count remains unchanged. This may involve tracking or reconstructing the original pre-supply values from the order data structure."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Implement mandatory RB row consolidation logic: when a partially supplied RB order is returned to Pending, automatically merge all pending fragments of the same logical RB order into a single consolidated row with combined quantity and weight before display or any Mark as Ready action, and ensure the supplied quantity popup appears only once per logical RB order",
-      "acceptanceCriteria": [
-        "After Return to Pending, all split fragments of the same logical RB order are merged into a single row in the pending list.",
-        "The merged row shows the sum of quantities and weights of all merged fragments.",
-        "The supplied quantity popup appears only once for a logical RB order, not once per split fragment.",
-        "Before any Mark as Ready action for an RB order, split fragments are auto-merged into one consolidated row.",
-        "No duplicate RB rows for the same logical order exist in the pending list at any time."
+        "Orders are visually grouped by design code with a collapsible group header row",
+        "Group header shows design code, order type badge (RB/CO/SO), karigar name, sub-order count, qty, and weight",
+        "Chevron icon toggles expand/collapse of sub-orders for that group",
+        "Sub-order rows show order number, qty, weight, generic name, order date, and ageing badge",
+        "Ageing badge is green for ≤14 days, amber for 15–29 days, red for ≥30 days",
+        "Group checkbox selects/deselects all sub-orders in the group",
+        "Individual sub-order checkboxes work independently",
+        "Mark as Ready action works correctly on selected sub-orders"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Implement RB row consolidation logic that merges split fragments of the same logical RB order into a single consolidated row before rendering the pending orders table. Use the orderNo field (or originalOrderId if present) to identify fragments belonging to the same logical RB order. Sum the quantity and weight of all fragments and display them as one row. Ensure that when the user selects a consolidated RB row and clicks Mark as Ready, the supplied quantity dialog receives the consolidated row data (not individual fragments), so the popup appears only once per logical RB order. No UI or workflow changes; only data transformation and consolidation logic."
+          "description": "Replace the existing OrderTable with a new grouped layout that groups orders by design code. Implement collapsible group rows with a chevron toggle. Each group header displays: design code (clickable), order type badge (RB/CO/SO derived from first order in group), karigar name, total sub-order count, aggregate qty sum, and aggregate weight sum. Include a checkbox on the group header that selects/deselects all sub-orders in that group. Sub-order rows (shown when expanded) display: order number, qty, weight, generic name, order date, and an ageing badge computed as days since order date (green ≤14d, amber 15–29d, red ≥30d). Each sub-order has its own checkbox. Preserve the existing Mark as Ready action and SuppliedQtyDialog for RB orders. Manage expansion state using React state (e.g., a Set of expanded design codes)."
         },
         {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "path": "frontend/src/utils/ageingBadge.tsx",
+          "operation": "create",
+          "description": "Create a reusable AgeingBadge component that accepts an order date (Time bigint) and computes the number of days since that date. Return a badge with the text '{days}d' and background color: green (bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300) for ≤14 days, amber (bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300) for 15–29 days, red (bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300) for ≥30 days. Use Tailwind classes and shadcn/ui Badge component for consistent styling."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Apply the same grouped design code layout with expandable sub-orders, ageing badges, karigar name, and order type badges to Ready and Hallmark tabs",
+      "acceptanceCriteria": [
+        "Ready tab groups orders by design code with expandable sub-orders, ageing badges, karigar name, and order type badge",
+        "Hallmark tab groups orders by design code with expandable sub-orders, ageing badges, karigar name, and order type badge",
+        "Existing action buttons (return to pending, mark as returned) remain functional on sub-order rows or group rows as appropriate"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Ensure that the dialog only processes consolidated RB rows (one entry per logical RB order) rather than multiple split fragments. When the dialog is opened with a list of selected orders, verify that RB-type orders have been pre-consolidated in TotalOrdersTab.tsx so that the user enters the supplied quantity only once per logical RB order. If any consolidation state is needed, handle it via the orders prop passed from TotalOrdersTab. No UI changes."
+          "description": "Replace the existing table with the same grouped design code layout implemented in TotalOrdersTab. Group ready orders by design code, display group headers with design code (clickable), order type badge, karigar name, sub-order count, aggregate qty, and aggregate weight. Include a chevron toggle for expand/collapse and a group checkbox. Sub-order rows show order number, qty, weight, generic name, order date, and ageing badge (reusing the AgeingBadge component). Preserve the existing 'return to pending' action (delete mutation) on individual sub-orders. Manage expansion state per-group."
         },
         {
-          "path": "frontend/src/pages/AgeingStock.tsx",
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
           "operation": "modify",
-          "description": "Apply the same RB row consolidation logic as in TotalOrdersTab.tsx: before displaying pending orders grouped by design code, merge split RB fragments of the same logical order (identified by orderNo or originalOrderId) into a single consolidated row with summed quantity and weight. Ensure that when the user selects a consolidated RB row and triggers Mark as Ready, the supplied quantity dialog operates on the consolidated row, not on individual fragments. No UI or workflow changes."
+          "description": "Replace the existing table with the same grouped design code layout. Group hallmark orders by design code, display group headers with design code (clickable), order type badge, karigar name, sub-order count, aggregate qty, and aggregate weight. Include a chevron toggle and group checkbox. Sub-order rows show order number, qty, weight, generic name, order date, and ageing badge. Preserve the existing filters (order type, karigar, date range, search text) and the 'mark as returned' bulk action. Ensure the filters operate on the grouped data and the bulk selection applies across expanded sub-orders. Manage expansion state per-group."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Enable design code click in group headers to open DesignImageModal across Total Orders, Ready, and Hallmark tabs",
+      "acceptanceCriteria": [
+        "Clicking a design code text in the group header opens DesignImageModal for that design code",
+        "Modal shows the design image with zoom and pan (existing DesignImageModal behaviour)",
+        "Modal can be closed and the table remains in its current expand/collapse state",
+        "Works across Total Orders, Ready, and Hallmark tabs"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Add state to track the currently selected design code for the image modal (e.g., const [selectedDesignCode, setSelectedDesignCode] = useState<string | null>(null)). In the group header row, wrap the design code text in a clickable element (button or link styled as text) that calls setSelectedDesignCode(designCode) on click. Render the existing DesignImageModal component at the bottom of the component, passing selectedDesignCode and an onClose handler that resets selectedDesignCode to null. Ensure the modal does not interfere with expansion state."
         },
         {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "When returning a partially supplied RB order to Pending, ensure that after the backend mutation completes and queries are invalidated, the pending orders list (displayed in TotalOrdersTab or AgeingStock) will automatically consolidate any resulting split fragments due to the consolidation logic in those components. No additional consolidation logic is needed in ReadyTab itself; just ensure proper query invalidation so that the pending list re-renders with consolidated rows. No UI changes."
+          "description": "Add state to track the currently selected design code for the image modal. In the group header row, make the design code clickable to open DesignImageModal. Render DesignImageModal at the bottom of the component with selectedDesignCode and onClose handler. Preserve expansion state when modal opens and closes."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Add state to track the currently selected design code for the image modal. In the group header row, make the design code clickable to open DesignImageModal. Render DesignImageModal at the bottom of the component with selectedDesignCode and onClose handler. Preserve expansion state when modal opens and closes."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Add search bar and two filter dropdowns (order type, karigar) above the orders table in Total Orders, Ready, and Hallmark tabs",
+      "acceptanceCriteria": [
+        "Search bar is present above the orders table in Total Orders, Ready, and Hallmark tabs",
+        "Typing in the search bar filters groups/sub-orders by design code, order number, or generic name (partial, case-insensitive)",
+        "Order type dropdown offers options: All Types, RB, CO, SO",
+        "Karigar dropdown is populated with unique karigar names from current orders, plus an 'All Karigars' default",
+        "Selecting an order type hides groups that do not match",
+        "Selecting a karigar hides groups not assigned to that karigar",
+        "All three controls combine with AND logic",
+        "Filters reset when switching tabs",
+        "Layout matches the screenshot: search left, two dropdowns right"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Add state for search text, selected order type filter (All Types | RB | CO | SO), and selected karigar filter (All Karigars | specific karigar name). Derive the list of unique karigars from the orders data. Above the grouped table, render a flex container with: a search input (shadcn/ui Input) on the left with placeholder 'Search by order no, design code, generic name', and two shadcn/ui Select dropdowns on the right styled as pill/capsule buttons (one for order type, one for karigar). Apply filters to the orders data before grouping: filter by search text (match design code, order number, or generic name case-insensitively), filter by order type if not 'All Types', filter by karigar name if not 'All Karigars'. Use AND logic. Reset filters to default on component mount or when tab changes."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Add state for search text, order type filter, and karigar filter. Derive unique karigars from ready orders. Above the grouped table, render the same filter UI: search input on the left, two pill-style Select dropdowns (order type, karigar) on the right. Apply filters to ready orders before grouping using AND logic (search text matches design code/order number/generic name, order type matches if not 'All Types', karigar matches if not 'All Karigars'). Reset filters on component mount."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "HallmarkTab already has filters (order type, karigar, date range, search text). Refactor the existing filter UI to match the new layout: search input on the left, order type and karigar dropdowns on the right (styled as pills). Ensure the filters combine with AND logic and apply to the grouped data. Preserve the existing date range filter and export functionality. Reset filters on component mount."
         }
       ]
     }

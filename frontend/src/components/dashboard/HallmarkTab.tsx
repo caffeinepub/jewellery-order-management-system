@@ -2,8 +2,16 @@ import { useState, useMemo } from "react";
 import { useGetAllOrders, useGetMasterDesigns, useBatchUpdateOrderStatus } from "@/hooks/useQueries";
 import { OrderType, OrderStatus } from "@/backend";
 import { Input } from "@/components/ui/input";
-import { Search, Download } from "lucide-react";
+import { Search, Download, ChevronDown, ChevronRight, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -15,29 +23,53 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { exportToExcel } from "@/utils/exportUtils";
+import DesignImageModal from "./DesignImageModal";
+import { AgeingBadge } from "@/utils/ageingBadge";
+import { Order } from "@/backend";
+
+interface DesignGroup {
+  designCode: string;
+  orders: Order[];
+  totalQty: number;
+  totalWeight: number;
+  orderType: OrderType;
+  karigarName: string;
+}
+
+function getOrderTypeBadgeClass(type: OrderType): string {
+  switch (type) {
+    case OrderType.RB:
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+    case OrderType.SO:
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
+    case OrderType.CO:
+    default:
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+  }
+}
 
 export default function HallmarkTab() {
   const [searchText, setSearchText] = useState("");
-  const [selectedOrderType, setSelectedOrderType] = useState<OrderType | "ALL">("ALL");
-  const [selectedKarigar, setSelectedKarigar] = useState<string>("ALL");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>("ALL");
+  const [karigarFilter, setKarigarFilter] = useState<string>("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedDesignCode, setSelectedDesignCode] = useState<string | null>(null);
+
   const { data: orders = [], isLoading } = useGetAllOrders();
   const { data: masterDesigns } = useGetMasterDesigns();
   const batchUpdateOrderStatusMutation = useBatchUpdateOrderStatus();
 
   const enrichedOrders = useMemo(() => {
     if (!masterDesigns) return orders;
-    
     return orders.map((order) => {
       const normalizedDesign = order.design.toUpperCase().trim();
       const mapping = masterDesigns.get(normalizedDesign);
-      
       return {
         ...order,
         genericName: mapping?.genericName || order.genericName,
@@ -46,66 +78,94 @@ export default function HallmarkTab() {
     });
   }, [orders, masterDesigns]);
 
+  const hallmarkOrders = useMemo(
+    () => enrichedOrders.filter((o) => o.status === OrderStatus.Hallmark),
+    [enrichedOrders]
+  );
+
+  const uniqueKarigars = useMemo(() => {
+    const set = new Set<string>();
+    hallmarkOrders.forEach((o) => {
+      if (o.karigarName) set.add(o.karigarName);
+    });
+    return Array.from(set).sort();
+  }, [hallmarkOrders]);
+
   const filteredOrders = useMemo(() => {
-    // Filter for Hallmark status orders only
-    let result = enrichedOrders.filter((order) => order.status === OrderStatus.Hallmark);
+    let result = hallmarkOrders;
 
-    // Filter by order type
-    if (selectedOrderType !== "ALL") {
-      result = result.filter((order) => order.orderType === selectedOrderType);
+    if (orderTypeFilter !== "ALL") {
+      result = result.filter((o) => o.orderType === orderTypeFilter);
     }
-
-    // Filter by karigar
-    if (selectedKarigar !== "ALL") {
-      result = result.filter((order) => order.karigarName === selectedKarigar);
+    if (karigarFilter !== "ALL") {
+      result = result.filter((o) => o.karigarName === karigarFilter);
     }
-
-    // Filter by date range
     if (startDate) {
       const start = new Date(startDate).getTime();
-      result = result.filter((order) => Number(order.createdAt) / 1000000 >= start);
+      result = result.filter((o) => Number(o.createdAt) / 1_000_000 >= start);
     }
     if (endDate) {
-      const end = new Date(endDate).getTime() + 86400000; // Add 1 day to include end date
-      result = result.filter((order) => Number(order.createdAt) / 1000000 < end);
+      const end = new Date(endDate).getTime() + 86400000;
+      result = result.filter((o) => Number(o.createdAt) / 1_000_000 < end);
     }
-
-    // Filter by search text (order number, design code, or generic name)
     if (searchText.trim()) {
-      const search = searchText.toLowerCase();
+      const s = searchText.toLowerCase();
       result = result.filter(
-        (order) =>
-          order.orderNo.toLowerCase().includes(search) ||
-          order.design.toLowerCase().includes(search) ||
-          (order.genericName && order.genericName.toLowerCase().includes(search))
+        (o) =>
+          o.orderNo.toLowerCase().includes(s) ||
+          o.design.toLowerCase().includes(s) ||
+          (o.genericName && o.genericName.toLowerCase().includes(s))
       );
     }
-
     return result;
-  }, [enrichedOrders, searchText, selectedOrderType, selectedKarigar, startDate, endDate]);
+  }, [hallmarkOrders, searchText, orderTypeFilter, karigarFilter, startDate, endDate]);
 
-  // Get unique karigars for filter dropdown
-  const uniqueKarigars = useMemo(() => {
-    const karigars = new Set<string>();
-    enrichedOrders
-      .filter((order) => order.status === OrderStatus.Hallmark)
-      .forEach((order) => {
-        if (order.karigarName) {
-          karigars.add(order.karigarName);
-        }
-      });
-    return Array.from(karigars).sort();
-  }, [enrichedOrders]);
+  // Group by design code
+  const designGroups = useMemo((): DesignGroup[] => {
+    const map = new Map<string, Order[]>();
+    filteredOrders.forEach((o) => {
+      const key = o.design;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    });
+    return Array.from(map.entries()).map(([designCode, groupOrders]) => ({
+      designCode,
+      orders: groupOrders,
+      totalQty: groupOrders.reduce((s, o) => s + Number(o.quantity), 0),
+      totalWeight: groupOrders.reduce((s, o) => s + o.weight * Number(o.quantity), 0),
+      orderType: groupOrders[0].orderType,
+      karigarName: groupOrders[0].karigarName || "-",
+    }));
+  }, [filteredOrders]);
 
-  const handleRowClick = (orderId: string) => {
+  const toggleGroup = (designCode: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(designCode)) next.delete(designCode);
+      else next.add(designCode);
+      return next;
+    });
+  };
+
+  const toggleRow = (orderId: string) => {
     setSelectedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(orderId)) {
-        newSet.delete(orderId);
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const toggleGroupSelection = (group: DesignGroup) => {
+    const allSelected = group.orders.every((o) => selectedRows.has(o.orderId));
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        group.orders.forEach((o) => next.delete(o.orderId));
       } else {
-        newSet.add(orderId);
+        group.orders.forEach((o) => next.add(o.orderId));
       }
-      return newSet;
+      return next;
     });
   };
 
@@ -138,7 +198,6 @@ export default function HallmarkTab() {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to update orders";
       toast.error(errorMessage);
-      console.error("Error updating orders:", error);
     }
   };
 
@@ -147,226 +206,262 @@ export default function HallmarkTab() {
     try {
       exportToExcel(filteredOrders);
       toast.success("Exported to Excel successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to export to Excel");
-      console.error("Export error:", error);
     } finally {
       setIsExporting(false);
     }
   };
 
   const allSelected = filteredOrders.length > 0 && selectedRows.size === filteredOrders.length;
-  const someSelected = selectedRows.size > 0 && selectedRows.size < filteredOrders.length;
 
   if (isLoading) {
     return <div className="text-center py-8">Loading orders...</div>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
+    <div className="space-y-3">
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by Order Number, Design Code, or Generic Name..."
+            placeholder="Search by order no, design code, generic name"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-9"
           />
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={selectedOrderType === "ALL" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType("ALL")}
-          >
-            All
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.CO ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.CO)}
-          >
-            CO
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.RB ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.RB)}
-          >
-            RB
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.SO ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.SO)}
-          >
-            SO
-          </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+            <SelectTrigger className="h-9 w-[130px] rounded-full text-xs">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Types</SelectItem>
+              <SelectItem value={OrderType.RB}>RB</SelectItem>
+              <SelectItem value={OrderType.CO}>CO</SelectItem>
+              <SelectItem value={OrderType.SO}>SO</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={karigarFilter} onValueChange={setKarigarFilter}>
+            <SelectTrigger className="h-9 w-[140px] rounded-full text-xs">
+              <SelectValue placeholder="All Karigars" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Karigars</SelectItem>
+              {uniqueKarigars.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {k}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <select
-          value={selectedKarigar}
-          onChange={(e) => setSelectedKarigar(e.target.value)}
-          className="px-3 py-2 border rounded-md bg-background text-sm"
-        >
-          <option value="ALL">All Karigars</option>
-          {uniqueKarigars.map((karigar) => (
-            <option key={karigar} value={karigar}>
-              {karigar}
-            </option>
-          ))}
-        </select>
       </div>
-      <div className="flex gap-4">
+
+      {/* Date range filters */}
+      <div className="flex gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">From:</label>
-          <Input
+          <span className="text-xs text-muted-foreground">From:</span>
+          <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-40"
+            className="px-2 py-1 border rounded-md bg-background text-sm h-8"
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">To:</label>
-          <Input
+          <span className="text-xs text-muted-foreground">To:</span>
+          <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-40"
+            className="px-2 py-1 border rounded-md bg-background text-sm h-8"
           />
         </div>
       </div>
 
-      {/* Bulk selection controls and export */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      {/* Action bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
           <Checkbox
             checked={allSelected}
             onCheckedChange={handleSelectAll}
-            aria-label="Select all"
-            className={someSelected ? "data-[state=checked]:bg-gold" : ""}
           />
           <span className="text-sm text-muted-foreground">
-            {selectedRows.size > 0 ? `${selectedRows.size} order(s) selected` : "Select orders"}
+            {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
+            {selectedRows.size > 0 && ` · ${selectedRows.size} selected`}
           </span>
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={handleExport}
-            size="sm"
             variant="outline"
+            size="sm"
+            onClick={handleExport}
             disabled={isExporting || filteredOrders.length === 0}
-            className="gap-2"
           >
-            <Download className="h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export to Excel"}
+            <Download className="h-4 w-4 mr-1.5" />
+            Export
           </Button>
-          {selectedRows.size > 0 && (
-            <Button
-              onClick={handleMarkAsReturned}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={batchUpdateOrderStatusMutation.isPending}
-            >
-              {batchUpdateOrderStatusMutation.isPending ? "Updating..." : "Mark as Returned"}
-            </Button>
-          )}
+          <Button
+            size="sm"
+            onClick={handleMarkAsReturned}
+            disabled={selectedRows.size === 0 || batchUpdateOrderStatusMutation.isPending}
+            className="bg-gold hover:bg-gold-hover text-white"
+          >
+            Mark Returned ({selectedRows.size})
+          </Button>
         </div>
       </div>
 
-      {/* Custom table with row selection */}
-      <div className="rounded-lg border bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="p-3 text-left">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
-                  />
-                </th>
-                <th className="p-3 text-left text-sm font-medium">Order No</th>
-                <th className="p-3 text-left text-sm font-medium">Generic Name</th>
-                <th className="p-3 text-left text-sm font-medium">Karigar</th>
-                <th className="p-3 text-left text-sm font-medium">Design</th>
-                <th className="p-3 text-left text-sm font-medium">Weight (g)</th>
-                <th className="p-3 text-left text-sm font-medium">Size</th>
-                <th className="p-3 text-left text-sm font-medium">Qty</th>
-                <th className="p-3 text-left text-sm font-medium">Type</th>
-                <th className="p-3 text-left text-sm font-medium">Remarks</th>
-                <th className="p-3 text-left text-sm font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="p-8 text-center text-muted-foreground">
-                    No orders found
-                  </td>
-                </tr>
-              ) : (
-                filteredOrders.map((order) => (
-                  <tr
-                    key={order.orderId}
-                    className={`border-b hover:bg-muted/50 cursor-pointer transition-colors ${
-                      selectedRows.has(order.orderId) ? "bg-muted" : ""
-                    }`}
-                    onClick={() => handleRowClick(order.orderId)}
-                  >
-                    <td className="p-3">
-                      <Checkbox
-                        checked={selectedRows.has(order.orderId)}
-                        onCheckedChange={() => handleRowClick(order.orderId)}
-                        aria-label={`Select order ${order.orderNo}`}
-                      />
-                    </td>
-                    <td className="p-3 text-sm">{order.orderNo}</td>
-                    <td className="p-3 text-sm">{order.genericName || "-"}</td>
-                    <td className="p-3 text-sm">{order.karigarName || "-"}</td>
-                    <td className="p-3 text-sm">{order.design}</td>
-                    <td className="p-3 text-sm">{order.weight.toFixed(2)}</td>
-                    <td className="p-3 text-sm">{order.size}</td>
-                    <td className="p-3 text-sm">{order.quantity.toString()}</td>
-                    <td className="p-3 text-sm">{order.orderType}</td>
-                    <td className="p-3 text-sm">{order.remarks || "-"}</td>
-                    <td className="p-3 text-sm">
-                      <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800">
-                        {order.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>No hallmark orders found</p>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-1.5">
+          {designGroups.map((group) => {
+            const isExpanded = expandedGroups.has(group.designCode);
+            const groupAllSelected = group.orders.every((o) => selectedRows.has(o.orderId));
+            const groupSomeSelected =
+              group.orders.some((o) => selectedRows.has(o.orderId)) && !groupAllSelected;
+
+            return (
+              <div
+                key={group.designCode}
+                className="rounded-lg border border-border overflow-hidden"
+              >
+                {/* Group header */}
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/40 hover:bg-muted/60 transition-colors">
+                  <Checkbox
+                    checked={groupAllSelected}
+                    data-state={groupSomeSelected ? "indeterminate" : undefined}
+                    onCheckedChange={() => toggleGroupSelection(group)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <button
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    onClick={() => toggleGroup(group.designCode)}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    <button
+                      className="font-semibold text-sm text-foreground hover:text-gold hover:underline transition-colors shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDesignCode(group.designCode);
+                      }}
+                      title="View design image"
+                    >
+                      {group.designCode}
+                    </button>
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold shrink-0 ${getOrderTypeBadgeClass(group.orderType)}`}
+                    >
+                      {group.orderType}
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate hidden sm:block">
+                      {group.karigarName}
+                    </span>
+                  </button>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0 ml-auto">
+                    <span className="hidden xs:inline">{group.orders.length} orders</span>
+                    <span>{group.totalQty} qty</span>
+                    <span>{group.totalWeight.toFixed(2)}g</span>
+                    <Image
+                      className="h-3.5 w-3.5 text-muted-foreground/60 cursor-pointer hover:text-gold transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDesignCode(group.designCode);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Sub-orders */}
+                {isExpanded && (
+                  <div className="divide-y divide-border/50">
+                    {group.orders.map((order) => (
+                      <div
+                        key={order.orderId}
+                        className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors cursor-pointer ${
+                          selectedRows.has(order.orderId)
+                            ? "bg-gold/5"
+                            : "hover:bg-muted/20"
+                        }`}
+                        onClick={() => toggleRow(order.orderId)}
+                      >
+                        <div className="w-5 shrink-0" />
+                        <Checkbox
+                          checked={selectedRows.has(order.orderId)}
+                          onCheckedChange={() => toggleRow(order.orderId)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-foreground">{order.orderNo}</span>
+                            {order.genericName && (
+                              <span className="text-xs text-muted-foreground">{order.genericName}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                            <span>Qty: {Number(order.quantity)}</span>
+                            <span>Wt: {(order.weight * Number(order.quantity)).toFixed(2)}g</span>
+                            {order.orderDate && (
+                              <span>
+                                {new Date(Number(order.orderDate) / 1_000_000).toLocaleDateString(
+                                  "en-GB",
+                                  { day: "2-digit", month: "short", year: "2-digit" }
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <AgeingBadge orderDate={order.orderDate} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <AlertDialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark Orders as Returned?</AlertDialogTitle>
+            <AlertDialogTitle>Mark as Returned from Hallmark?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will move {selectedRows.size} order(s) from Hallmark back to Total Orders tab with "Returned" status.
+              This will mark {selectedRows.size} order(s) as Returned from Hallmark. This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={batchUpdateOrderStatusMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmMarkAsReturned}
-              disabled={batchUpdateOrderStatusMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gold hover:bg-gold-hover text-white"
             >
-              {batchUpdateOrderStatusMutation.isPending ? "Updating..." : "Confirm"}
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {selectedDesignCode && (
+        <DesignImageModal
+          designCode={selectedDesignCode}
+          open={!!selectedDesignCode}
+          onClose={() => setSelectedDesignCode(null)}
+        />
+      )}
     </div>
   );
 }

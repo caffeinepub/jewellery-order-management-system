@@ -1,14 +1,12 @@
 import Time "mo:core/Time";
 import List "mo:core/List";
 import Map "mo:core/Map";
-import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
+import Float "mo:core/Float";
+import Runtime "mo:core/Runtime";
+import Iter "mo:core/Iter";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Iter "mo:core/Iter";
-import Text "mo:core/Text";
-
-
 
 actor {
   type OrderType = {
@@ -44,6 +42,22 @@ actor {
     orderDate : ?Time.Time;
   };
 
+  let orders = Map.empty<Text, Order>();
+  let designMappings = Map.empty<Text, DesignMapping>();
+  let designImages = Map.empty<Text, Storage.ExternalBlob>();
+  let karigars = Map.empty<Text, Karigar>();
+  let masterDesignKarigars = Map.empty<Text, Nat>();
+  var masterDesignExcel : ?Storage.ExternalBlob = null;
+  var activeKarigar : ?Text = null;
+  let rbStateBackup = Map.empty<Time.Time, RBSummary>();
+  let rbSummary : RBSummary = {
+    var totalQty = 0;
+    var totalWeight = 0.0;
+    var totalOrders = 0;
+    var totalReadyQty = 0;
+    var totalReadyWeight = 0.0;
+  };
+
   type DesignMapping = {
     designCode : Text;
     genericName : Text;
@@ -54,32 +68,32 @@ actor {
     updatedAt : Time.Time;
   };
 
-  type ReturnRequest = {
-    orderNo : Text;
-    totalQuantity : Nat;
+  type ReturnRequest = { orderNo : Text; totalQuantity : Nat };
+  type Karigar = { name : Text; createdBy : Text; createdAt : Time.Time };
+  type MappingRecord = { designCode : Text; genericName : Text; karigarName : Text };
+  type RBSummary = {
+    var totalQty : Nat;
+    var totalWeight : Float;
+    var totalOrders : Nat;
+    var totalReadyQty : Nat;
+    var totalReadyWeight : Float;
   };
-
-  type Karigar = {
-    name : Text;
-    createdBy : Text;
-    createdAt : Time.Time;
-  };
-
-  type MappingRecord = {
-    designCode : Text;
-    genericName : Text;
-    karigarName : Text;
-  };
-
-  var orders = Map.empty<Text, Order>();
-  var designMappings = Map.empty<Text, DesignMapping>();
-  var designImages = Map.empty<Text, Storage.ExternalBlob>();
-  var karigars = Map.empty<Text, Karigar>();
-  var masterDesignKarigars = Map.empty<Text, Nat>();
-  var masterDesignExcel : ?Storage.ExternalBlob = null;
-  var activeKarigar : ?Text = null;
 
   include MixinStorage();
+
+  public shared ({ caller }) func registerKarigar(name : Text) : async () {
+    switch (karigars.get(name)) {
+      case (?_) { Runtime.trap("Karigar already exists") };
+      case (null) {
+        let karigar : Karigar = {
+          name;
+          createdBy = "system";
+          createdAt = Time.now();
+        };
+        karigars.add(name, karigar);
+      };
+    };
+  };
 
   public shared ({ caller }) func saveOrder(
     orderNo : Text,
@@ -121,6 +135,7 @@ actor {
     };
 
     orders.add(orderId, order);
+    updateRBSummaryCountForPendingOrder(?order, null);
   };
 
   public query ({ caller }) func getOrder(orderId : Text) : async ?Order {
@@ -144,7 +159,7 @@ actor {
           };
           orders.add(orderId, readyOrder);
         };
-        let remainingQuantity = Nat.sub(originalOrder.quantity, suppliedQuantity);
+        let remainingQuantity = originalOrder.quantity - suppliedQuantity;
         if (remainingQuantity > 0) {
           let pendingOrder : Order = {
             originalOrder with
@@ -176,15 +191,17 @@ actor {
   };
 
   public shared ({ caller }) func addKarigar(name : Text) : async () {
-    if (karigars.containsKey(name)) {
-      Runtime.trap("Karigar already exists");
+    switch (karigars.get(name)) {
+      case (?_) { Runtime.trap("Karigar already exists") };
+      case (null) {
+        let karigar : Karigar = {
+          name;
+          createdBy = "system";
+          createdAt = Time.now();
+        };
+        karigars.add(name, karigar);
+      };
     };
-    let karigar : Karigar = {
-      name;
-      createdBy = "system";
-      createdAt = Time.now();
-    };
-    karigars.add(name, karigar);
   };
 
   public query ({ caller }) func getKarigars() : async [Karigar] {
@@ -326,12 +343,25 @@ actor {
   };
 
   public shared ({ caller }) func deleteOrder(orderId : Text) : async () {
-    orders.remove(orderId);
+    switch (orders.get(orderId)) {
+      case (null) { Runtime.trap("Order not found") };
+      case (?order) {
+        // Before removal, update the RB summary if the order is of type RB and status is Pending
+        updateRBSummaryCountForPendingOrder(null, ?order); // old -> null
+        orders.remove(orderId);
+      };
+    };
   };
 
   public shared ({ caller }) func batchDeleteOrders(orderIds : [Text]) : async () {
     for (orderId in orderIds.values()) {
-      orders.remove(orderId);
+      switch (orders.get(orderId)) {
+        case (null) {};
+        case (?order) {
+          updateRBSummaryCountForPendingOrder(null, ?order);
+          orders.remove(orderId);
+        };
+      };
     };
   };
 
@@ -448,7 +478,10 @@ actor {
         order.status != #ReturnFromHallmark
       }
     );
-    orders := remainingOrders;
+    orders.clear();
+    for ((orderId, order) in remainingOrders.entries()) {
+      orders.add(orderId, order);
+    };
   };
 
   public shared ({ caller }) func deleteReadyOrder(orderId : Text) : async () {
@@ -505,9 +538,6 @@ actor {
           Runtime.trap("Order with id " # code # " not found");
         };
         case (?order) {
-          if (order.status != #Ready) {
-            Runtime.trap("Order must be in Ready state to be marked as Hallmark");
-          };
           let updatedOrder : Order = {
             order with
             status = #Hallmark;
@@ -539,47 +569,6 @@ actor {
         order.status == #Hallmark;
       }
     );
-  };
-
-  public shared ({ caller }) func batchSupplyRBOrders(orderQuantities : [(Text, Nat)]) : async () {
-    let timestamp = Time.now();
-
-    for ((orderId, suppliedQuantity) in orderQuantities.values()) {
-      switch (orders.get(orderId)) {
-        case (null) {
-          Runtime.trap("Order with id " # orderId # " not found");
-        };
-        case (?originalOrder) {
-          if (originalOrder.orderType != #RB) {
-            Runtime.trap("Order " # orderId # " is not an RB order");
-          };
-
-          if (suppliedQuantity > 0) {
-            let readyOrder : Order = {
-              originalOrder with
-              quantity = suppliedQuantity;
-              status = #Ready;
-              updatedAt = timestamp;
-              readyDate = ?timestamp;
-              originalOrderId = ?orderId;
-            };
-
-            let newOrderId = orderId # "_ready_" # suppliedQuantity.toText();
-            orders.add(newOrderId, readyOrder);
-          };
-
-          let remainingQuantity = Nat.sub(originalOrder.quantity, suppliedQuantity);
-          if (remainingQuantity > 0) {
-            let pendingOrder : Order = {
-              originalOrder with
-              quantity = remainingQuantity;
-              updatedAt = timestamp;
-            };
-            orders.add(orderId, pendingOrder);
-          };
-        };
-      };
-    };
   };
 
   public query ({ caller }) func getDesignCountByKarigar(_karigarName : Text) : async ?Nat {
@@ -617,6 +606,14 @@ actor {
     );
   };
 
+  func sumQuantities(ordersArray : [Order]) : Nat {
+    var sum = 0;
+    for (order in ordersArray.values()) {
+      sum += order.quantity;
+    };
+    sum;
+  };
+
   public shared ({ caller }) func returnOrdersToPending(orderNo : Text, returnedQty : Nat) : async () {
     let readyOrders = orders.filter(
       func(_, order) {
@@ -635,7 +632,10 @@ actor {
         order.status != #Ready or order.orderNo != orderNo
       }
     );
-    orders := remainingOrders;
+    orders.clear();
+    for ((orderId, order) in remainingOrders.entries()) {
+      orders.add(orderId, order);
+    };
 
     var found = false;
     var firstReadyOrder : ?Order = null;
@@ -669,73 +669,6 @@ actor {
     };
   };
 
-  public shared ({ caller }) func batchSupplyNewRBOrders(orderQuantities : [(Text, Nat)]) : async () {
-    let timestamp = Time.now();
-
-    for ((orderId, suppliedQuantity) in orderQuantities.values()) {
-      switch (orders.get(orderId)) {
-        case (null) {
-          Runtime.trap("Order with id " # orderId # " not found");
-        };
-        case (?originalOrder) {
-          if (originalOrder.orderType != #RB) {
-            Runtime.trap("Order " # orderId # " is not an RB order");
-          };
-
-          supplyRbOrder(orderId, suppliedQuantity, originalOrder, timestamp);
-        };
-      };
-    };
-  };
-
-  func supplyRbOrder(orderId : Text, suppliedQuantity : Nat, originalOrder : Order, timestamp : Time.Time) {
-    if (suppliedQuantity > 0) {
-      let readyOrder : Order = {
-        originalOrder with
-        quantity = suppliedQuantity;
-        status = #Ready;
-        updatedAt = timestamp;
-        readyDate = ?timestamp;
-        originalOrderId = ?orderId;
-      };
-      let newOrderId = orderId # "_ready_" # suppliedQuantity.toText();
-      orders.add(newOrderId, readyOrder);
-    };
-
-    let remainingQuantity = Nat.sub(originalOrder.quantity, suppliedQuantity);
-    if (remainingQuantity > 0) {
-      let pendingOrder : Order = {
-        originalOrder with
-        quantity = remainingQuantity;
-        updatedAt = timestamp;
-      };
-      orders.add(orderId, pendingOrder);
-    };
-  };
-
-  public shared ({ caller }) func returnReadyOrderToPending(orderId : Text, returnedQty : Nat) : async () {
-    switch (orders.get(orderId)) {
-      case (null) {
-        Runtime.trap("Order with id " # orderId # " not found");
-      };
-      case (?readyOrder) {
-        let newPendingOrder : Order = {
-          readyOrder with quantity = returnedQty; status = #Pending; updatedAt = Time.now()
-        };
-
-        orders.add(orderId, newPendingOrder);
-      };
-    };
-  };
-
-  func sumQuantities(orders : [Order]) : Nat {
-    var sum = 0;
-    for (order in orders.values()) {
-      sum += order.quantity;
-    };
-    sum;
-  };
-
   type MasterDataRow = {
     orderNo : Text;
     designCode : Text;
@@ -745,7 +678,7 @@ actor {
     orderDate : ?Time.Time;
   };
 
-  type ReconciliationResult = {
+  type MasterReconciliationResult = {
     newLines : [MasterDataRow];
     missingInMaster : [Order];
     totalUploadedRows : Nat;
@@ -754,16 +687,7 @@ actor {
     missingInMasterCount : Nat;
   };
 
-  public type MasterReconciliationResult = {
-    newLines : [MasterDataRow];
-    missingInMaster : [Order];
-    totalUploadedRows : Nat;
-    alreadyExistingRows : Nat;
-    newLinesCount : Nat;
-    missingInMasterCount : Nat;
-  };
-
-  public type MasterPersistedResponse = {
+  type MasterPersistedResponse = {
     persisted : [Order];
   };
 
@@ -856,8 +780,26 @@ actor {
     };
 
     let persisted = persistedRows.toArray();
-    {
-      persisted;
+    { persisted };
+  };
+
+  public query ({ caller }) func getRBSummary() : async {
+    totalQty : Nat;
+    totalWeight : Float;
+    totalOrders : Nat;
+  } {
+    { totalQty = rbSummary.totalQty; totalWeight = rbSummary.totalWeight; totalOrders = rbSummary.totalOrders };
+  };
+
+  func updateRBSummaryCountForPendingOrder(newOrder : ?Order, oldOrder : ?Order) {
+    func isRbPending(o : Order) : Bool {
+      o.orderType == #RB and o.status == #Pending
     };
+
+    let currentCount = orders.toArray().filter(
+      func((_, o)) { isRbPending(o) }
+    ).size();
+
+    rbSummary.totalOrders := if (currentCount > 0) { currentCount } else { 0 };
   };
 };

@@ -135,16 +135,6 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
-  'batchSupplyNewRBOrders' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-      [],
-      [],
-    ),
-  'batchSupplyRBOrders' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-      [],
-      [],
-    ),
   'batchUpdateOrderStatus' : IDL.Func([IDL.Vec(IDL.Text), OrderStatus], [], []),
   'batchUploadDesignImages' : IDL.Func(
       [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
@@ -187,6 +177,17 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getRBSummary' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'totalOrders' : IDL.Nat,
+          'totalQty' : IDL.Nat,
+          'totalWeight' : IDL.Float64,
+        }),
+      ],
+      ['query'],
+    ),
   'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getReadyOrdersByDateRange' : IDL.Func(
       [Time, Time],
@@ -217,9 +218,9 @@ export const idlService = IDL.Service({
       [MasterReconciliationResult],
       [],
     ),
+  'registerKarigar' : IDL.Func([IDL.Text], [], []),
   'resetActiveOrders' : IDL.Func([], [], []),
   'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-  'returnReadyOrderToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
   'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'saveOrder' : IDL.Func(
       [
@@ -375,16 +376,6 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
-    'batchSupplyNewRBOrders' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-        [],
-        [],
-      ),
-    'batchSupplyRBOrders' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-        [],
-        [],
-      ),
     'batchUpdateOrderStatus' : IDL.Func(
         [IDL.Vec(IDL.Text), OrderStatus],
         [],
@@ -431,6 +422,17 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getRBSummary' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'totalOrders' : IDL.Nat,
+            'totalQty' : IDL.Nat,
+            'totalWeight' : IDL.Float64,
+          }),
+        ],
+        ['query'],
+      ),
     'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getReadyOrdersByDateRange' : IDL.Func(
         [Time, Time],
@@ -461,9 +463,9 @@ export const idlFactory = ({ IDL }) => {
         [MasterReconciliationResult],
         [],
       ),
+    'registerKarigar' : IDL.Func([IDL.Text], [], []),
     'resetActiveOrders' : IDL.Func([], [], []),
     'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-    'returnReadyOrderToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
     'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'saveOrder' : IDL.Func(
         [

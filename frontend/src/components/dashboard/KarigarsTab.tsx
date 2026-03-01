@@ -13,11 +13,12 @@ export default function KarigarsTab() {
 
   const enrichedOrders = useMemo(() => {
     if (!masterDesigns) return orders;
-    
+
     return orders.map((order) => {
       const normalizedDesign = order.design.toUpperCase().trim();
+      // masterDesigns is a Map<string, { genericName, karigarName }>
       const mapping = masterDesigns.get(normalizedDesign);
-      
+
       return {
         ...order,
         genericName: mapping?.genericName || order.genericName,
@@ -28,9 +29,9 @@ export default function KarigarsTab() {
 
   const karigarGroups = useMemo(() => {
     const pendingOrders = enrichedOrders.filter((order) => order.status === OrderStatus.Pending);
-    
-    const groups: Record<string, any[]> = {};
-    
+
+    const groups: Record<string, typeof pendingOrders> = {};
+
     pendingOrders.forEach((order) => {
       const karigar = order.karigarName || 'Unmapped';
       if (!groups[karigar]) {
@@ -40,11 +41,11 @@ export default function KarigarsTab() {
     });
 
     return Object.entries(groups)
-      .map(([name, orders]) => ({
+      .map(([name, groupOrders]) => ({
         name,
-        orders,
-        totalOrders: orders.length,
-        totalWeight: orders.reduce((sum, o) => sum + o.weight, 0),
+        orders: groupOrders,
+        totalOrders: groupOrders.length,
+        totalWeight: groupOrders.reduce((sum, o) => sum + o.weight, 0),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [enrichedOrders]);
