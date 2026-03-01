@@ -1,68 +1,122 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T19:30:26.343Z",
+  "generatedAt": "2026-03-01T06:01:29.065Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 4,
-    "implemented": 4,
+    "total": 7,
+    "implemented": 6,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix date parsing in `frontend/src/utils/excelParser.ts` so that Order Date is always interpreted and stored as DD/MM/YYYY. The parser must not swap day and month (no MM/DD/YYYY treatment). It must correctly handle dates from any year, including 2025 and 2026. Both string-format dates (e.g. '19/02/2026') and Excel serial numbers must resolve to the correct DD/MM/YYYY value. Dates currently showing as 'No date' on the dashboard because of failed parsing (e.g. dates like 13/02/2026, 16/02/2026 shown in the uploaded screenshots) must be displayed correctly after the fix.",
+        "summary": "When one or more RB-type orders are selected in the Total Orders tab and the user clicks 'Mark as Ready', display a popup dialog (one RB order at a time) prompting the user to enter the supplied quantity for that order. The dialog must show the order details (order number, design code, total ordered quantity) and an input field for supplied quantity. The supplied quantity must be validated to be greater than 0 and not exceed the total ordered quantity.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/excelParser.ts"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/utils/excelParser.ts"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "In the Total Orders tab (`frontend/src/components/dashboard/TotalOrdersTab.tsx`), add or extend the search bar so that it filters orders by Order Number, Generic Name, and Design Code. The search must be case-insensitive and filter across all design groups simultaneously, showing only matching rows (and their parent design group header if at least one row matches).",
+        "summary": "When the supplied quantity entered in the popup equals the full ordered quantity for an RB order, mark the entire order as Ready and move it fully to the Ready tab. No splitting should occur. The Total Orders tab removes the order and the Ready tab gains it as a single row.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "In the Total Orders tab, under every design group, make each order row fully clickable — clicking anywhere on the row (not just the checkbox) should toggle the row's selection state. This must work consistently across all design groups rendered in the tab.",
+        "summary": "When the supplied quantity entered in the popup is less than the full ordered quantity for an RB order (partial supply), split the order logically: move the supplied portion to the Ready tab as a new ready row, and keep the remaining (pending) portion in the Total Orders tab with the reduced quantity and weight. Both rows must share the same original order identifier so they can be merged later.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ],
         "matchedFiles": [
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ]
       },
       {
         "id": "REQ-4",
-        "summary": "In the Total Orders tab, add a 'Mark Ready' button inside each design group header/footer. Clicking it marks all currently selected rows within that design group as Ready. Additionally, when the top-level 'Select All' checkbox is checked, a bulk 'Mark Ready' button must appear at the top of the tab to mark all selected orders (across all design groups) as Ready at once.",
+        "summary": "When the remaining pending portion of a previously split RB order is subsequently marked as ready (via the same popup flow), merge the two portions into a single row in the Ready tab showing the combined full quantity and weight. The bracket indicator in Total Orders must disappear and the order must be fully removed from Total Orders. The merged Ready row must appear as one single order, not two.",
         "status": "implemented",
         "plannedFiles": [
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-5",
+        "summary": "When a supplied (ready) portion of a split RB order is returned to pending from the Ready tab, and a pending portion of that same order already exists in Total Orders, merge the returned quantity back with the existing pending row to restore the original full order. The order count, qty, and weight in Total Orders must be restored to their original values and the bracket indicator must disappear.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
         ],
         "matchedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ]
+      },
+      {
+        "id": "REQ-6",
+        "summary": "When a fully supplied RB order (no prior split) is returned from the Ready tab to pending, treat it as a normal single row re-added to Total Orders with its full quantity and weight. No merging logic is required in this case.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-7",
+        "summary": "Ensure that all summary cards (total orders count, total weight, total quantity) in both the Total Orders tab and Ready tab accurately reflect the RB split/merge state at all times. Order counts must treat a split RB order as one logical order (not two), weights and quantities must be proportionally recalculated based on supplied vs pending portions, and no double-counting must occur.",
+        "status": "missing",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": []
       }
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/utils/excelParser.ts",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

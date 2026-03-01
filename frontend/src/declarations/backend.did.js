@@ -135,6 +135,11 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'batchSupplyNewRBOrders' : IDL.Func(
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+      [],
+      [],
+    ),
   'batchSupplyRBOrders' : IDL.Func(
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
       [],
@@ -214,6 +219,7 @@ export const idlService = IDL.Service({
     ),
   'resetActiveOrders' : IDL.Func([], [], []),
   'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
+  'returnReadyOrderToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
   'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'saveOrder' : IDL.Func(
       [
@@ -369,6 +375,11 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'batchSupplyNewRBOrders' : IDL.Func(
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+        [],
+        [],
+      ),
     'batchSupplyRBOrders' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
         [],
@@ -452,6 +463,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'resetActiveOrders' : IDL.Func([], [], []),
     'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
+    'returnReadyOrderToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
     'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'saveOrder' : IDL.Func(
         [

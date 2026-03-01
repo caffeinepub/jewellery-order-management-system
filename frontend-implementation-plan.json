@@ -1,78 +1,202 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix date format to DD/MM/YYYY and add Total Orders tab enhancements",
+  "title": "RB Order Partial Supply Popup & Split/Merge Logic",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix date parsing in excelParser.ts to always interpret and store dates as DD/MM/YYYY format, handling both string dates and Excel serial numbers correctly for any year including 2025 and 2026",
+      "summary": "Display supplied quantity dialog for selected RB orders with validation",
       "acceptanceCriteria": [
-        "A date string '19/02/2026' in the Excel file is parsed and displayed as '19 Feb 26' (or equivalent DD/MM/YYYY display), not '02/19/2026' or 'No date'.",
-        "A date string '17/12/2025' is parsed and displayed correctly as a December 2025 date.",
-        "Excel serial number dates are converted correctly without day/month swapping.",
-        "No valid DD/MM/YYYY date from any year results in 'No date' after the fix.",
-        "All dates in the dashboard order rows display in DD/MM/YYYY (or equivalent readable) format."
+        "Selecting one or more RB orders and clicking Mark as Ready opens the SuppliedQtyDialog popup",
+        "The dialog steps through each selected RB order one at a time",
+        "Each dialog step shows the order number, design code, and total ordered quantity",
+        "A numeric input field accepts the supplied quantity",
+        "Supplied quantity is validated: must be > 0 and ≤ total ordered quantity",
+        "Non-RB orders selected alongside RB orders bypass the dialog and are marked ready directly",
+        "User can cancel the dialog without any state change"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/excelParser.ts",
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "operation": "modify",
-          "description": "Refactor the parseDate function to correctly handle DD/MM/YYYY format without swapping day and month. Remove or correct any MM/DD/YYYY logic. Ensure Excel serial numbers are converted to DD/MM/YYYY format. Handle dates from any year (2025, 2026, etc.) correctly. Update both string date parsing and Excel serial number conversion to use DD/MM/YYYY ordering consistently. Verify that dates like '19/02/2026', '13/02/2026', '16/02/2026' parse correctly and do not result in 'No date' or incorrect month/day swaps."
+          "description": "Enhance the existing SuppliedQtyDialog component to display comprehensive order details including order number, design code, and total ordered quantity in the dialog header or body. Ensure the numeric input field has clear labeling and validation messages. Add validation logic that checks supplied quantity is greater than 0 and does not exceed the total ordered quantity, displaying appropriate error messages below the input field. Ensure the dialog shows one RB order at a time and allows the user to cancel without triggering any backend mutations."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Update the mark-as-ready handler to filter selected orders by type: separate RB orders from non-RB orders. For non-RB orders, invoke the existing batchUpdateOrderStatus mutation directly to mark them ready. For RB orders, open the SuppliedQtyDialog and pass the list of RB orders to it. Ensure the dialog is only opened when at least one RB order is selected. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Update the OrderTable component to support the new RB split/merge flow. Ensure the mark-as-ready action handler can differentiate between RB and non-RB orders and invoke the appropriate flow (direct status update for non-RB, dialog for RB). If the component includes inline mark-ready buttons, update those handlers as well to follow the same RB vs non-RB logic."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Add search functionality in TotalOrdersTab to filter orders by Order Number, Generic Name, and Design Code across all design groups simultaneously",
+      "summary": "Mark full RB order as ready when supplied quantity equals total ordered quantity",
       "acceptanceCriteria": [
-        "Typing a partial or full Order Number in the search bar filters the displayed rows to only those matching.",
-        "Typing a partial or full Generic Name filters rows accordingly.",
-        "Typing a partial or full Design Code filters rows accordingly.",
-        "Design group headers with no matching rows are hidden when a search term is active.",
-        "Clearing the search bar restores all groups and rows.",
-        "Search is case-insensitive."
+        "Full quantity supplied: the order disappears from Total Orders tab",
+        "The order appears in the Ready tab with the full quantity and weight",
+        "Summary cards in Total Orders decrease by 1 order, full qty, and full weight",
+        "Summary cards in Ready tab increase by 1 order, full qty, and full weight"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "operation": "modify",
-          "description": "Add or extend the search bar to filter orders by Order Number (orderNo field), Generic Name (genericName field), and Design Code (design field). Implement case-insensitive filtering logic that checks all three fields simultaneously. Update the rendering logic to hide design group headers when no rows in that group match the search term. Ensure clearing the search input restores all groups and rows. The search must work across all design groups (designGroups state) and filter the orders array within each group before rendering."
+          "description": "When the user submits a supplied quantity that equals the full ordered quantity for an RB order, call the batchSupplyRBOrders backend method with the order ID and full quantity. After successful mutation, invalidate the orders query to refresh both Total Orders and Ready tabs. Ensure the dialog advances to the next RB order or closes if all orders are processed."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Ensure the summary cards logic correctly recalculates total orders, quantities, and weights when an RB order is moved from Pending to Ready. The card calculations should treat a fully supplied RB order as one complete order moving from Total Orders to Ready, decrementing Total Orders count by 1 and incrementing Ready count by 1, with corresponding weight and quantity updates. Verify calculations are reactive and update immediately after query invalidation."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Make each order row fully clickable in TotalOrdersTab so clicking anywhere on the row toggles its selection state",
+      "summary": "Split RB order when supplied quantity is less than total ordered quantity",
       "acceptanceCriteria": [
-        "Clicking anywhere on a row (outside the checkbox itself) toggles that row's checkbox selection.",
-        "Clicking the checkbox directly also still toggles selection.",
-        "The row shows a visual selected state (e.g. highlighted background) when selected.",
-        "Multiple rows can be selected by clicking on different rows."
+        "Partial supply: supplied portion appears in the Ready tab with supplied qty and proportional weight",
+        "Remaining pending portion stays in Total Orders tab with reduced qty and proportional weight",
+        "Total Orders summary card shows reduced total qty, reduced weight, and a bracket indicator such as '(1 pending RB line)' against the affected order",
+        "Total Orders order count decreases by 1 for the split order (treated as one logical order)",
+        "Ready tab summary shows the supplied portion as 1 order",
+        "The two split rows are linked by the original order ID for future merging"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "operation": "modify",
+          "description": "When the user submits a supplied quantity that is less than the full ordered quantity for an RB order, call the batchSupplyRBOrders backend method with the order ID and partial quantity. The backend will handle the split logic (creating a ready portion and retaining a pending portion). After successful mutation, invalidate the orders query to refresh both tabs. Ensure the dialog continues to the next RB order or closes when complete."
+        },
+        {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Add an onClick handler to each order row element in the design groups rendering. When the row is clicked, toggle the selection state for that order ID in the selectedOrders state. Ensure clicking the checkbox itself does not trigger the row click handler (use stopPropagation). Add visual styling (e.g., background color change) to indicate when a row is selected. This must work for all orders within all design groups rendered in the tab."
+          "description": "Update the order row rendering logic to detect when an order has been partially supplied (check if the order has an originalOrderId field or is linked to a split). Display a visual indicator (e.g., a small badge or bracket text like '(pending portion)') next to the order number or design code for split pending orders. Ensure the displayed quantity and weight reflect the remaining pending amount."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Update the summary card logic to correctly handle split RB orders. When an order is split, the Total Orders count should decrease by 1 (the original order is now split), the Ready count should increase by 1 (the supplied portion), and the quantities and weights should be recalculated proportionally. Add logic to display a bracket indicator count in the Total Orders summary card showing how many pending RB lines exist (e.g., '5 orders (1 pending RB line)'). Ensure the calculations do not double-count split orders."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Update the ReadyTab to correctly display split RB order portions. Each split ready portion should appear as a distinct row with its supplied quantity and proportional weight. Ensure the row includes a visual indicator (e.g., badge or icon) that this order is a partial supply and links to the original order ID. Ensure the Ready tab summary cards count each split portion correctly."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Add 'Mark Ready' button inside each design group and a top-level bulk 'Mark Ready' button when 'Select All' is checked in TotalOrdersTab",
+      "summary": "Merge split RB order portions when remaining pending quantity is marked ready",
       "acceptanceCriteria": [
-        "Each design group displays a 'Mark Ready' button within the group.",
-        "Clicking a group's 'Mark Ready' button marks only the selected rows within that group as Ready.",
-        "If no rows are selected in a group, the group-level 'Mark Ready' button is disabled or shows an appropriate state.",
-        "When the top-level 'Select All' checkbox is checked, a 'Mark Ready' button appears at the top of the Total Orders tab.",
-        "Clicking the top-level 'Mark Ready' button marks all selected orders across all design groups as Ready.",
-        "After marking as ready, the affected rows are removed from the Pending list and appear in the Ready tab."
+        "Supplying the remaining pending qty merges both portions into one row in the Ready tab",
+        "Merged row shows full original qty and combined weight",
+        "Order count in Ready tab shows 1 (not 2) for the merged order",
+        "The order is fully removed from Total Orders",
+        "Bracket indicator disappears from Total Orders summary",
+        "Total Orders summary recalculates to reflect full removal"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "operation": "modify",
+          "description": "When the user supplies the remaining pending quantity for a previously split RB order, call the batchSupplyRBOrders backend method. The backend will merge the two portions into a single Ready order. After successful mutation, invalidate the orders query. The frontend should then display the merged order as one row in the Ready tab with the full original quantity and weight."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Update the ReadyTab rendering logic to detect when two split portions of the same RB order have been merged (by checking if the backend returns a single merged order with the full quantity). Remove any split indicators and display the order as a single complete row. Ensure the order count in the Ready tab reflects 1 order, not 2."
+        },
+        {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Add a 'Mark Ready' button to each design group's header or footer section. Implement logic to determine which selected orders belong to that specific design group and call the markOrdersAsReady mutation for those order IDs. Disable the group-level button if no orders in that group are selected. Add a top-level 'Mark Ready' button that appears conditionally when the 'Select All' checkbox (selectAll state) is checked. This top-level button should call markOrdersAsReady with all selected order IDs from selectedOrders state across all design groups. After successful mutation, invalidate the orders query to refresh the view and remove marked orders from Pending status."
+          "description": "When the remaining pending portion is supplied and merged, ensure the order is fully removed from the Total Orders tab. Update the rendering logic to stop displaying the pending portion and remove any bracket indicators associated with that order."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Update the summary card logic to correctly handle the merge. When the pending portion is supplied, the Total Orders count should not change (it was already decremented when the first split occurred), but the Total Orders quantity and weight should decrease by the remaining amount. The Ready tab count should remain 1 (not increase to 2) since the two portions merge into one order. Remove the bracket indicator from the Total Orders summary card when the order is fully removed."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Merge returned ready portion back with existing pending portion in Total Orders",
+      "acceptanceCriteria": [
+        "Returning a split ready portion when a pending portion exists merges both back into one row in Total Orders",
+        "Restored row shows original full qty and original weight",
+        "Order count in Total Orders is restored (no duplicate count)",
+        "Bracket indicator disappears from Total Orders summary",
+        "The returned row no longer appears in the Ready tab"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Update the return-to-pending handler to detect when the order being returned is a split RB order portion (check for originalOrderId or split indicator). When returning a split ready portion, call the appropriate backend method (e.g., returnReadyOrderToPending with the order ID and returned quantity). The backend will merge the returned quantity with the existing pending portion. After successful mutation, invalidate the orders query to refresh both tabs."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Update the rendering logic to detect when a returned ready portion has been merged back with the pending portion. The order should now appear as a single complete row with the full original quantity and weight. Remove any split indicators or bracket labels from the order row."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Update the summary card logic to correctly handle the return-and-merge flow. When a split ready portion is returned and merged, the Total Orders count should remain unchanged (it already included the pending portion), but the quantity and weight should increase to reflect the restored full amount. The Ready tab count should decrease by 1, and the bracket indicator in the Total Orders summary should disappear."
+        }
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "summary": "Return fully supplied RB order to pending as a single row",
+      "acceptanceCriteria": [
+        "Returning a non-split RB order re-adds it to Total Orders as a single row with full qty and weight",
+        "Order count in Total Orders increases by 1",
+        "No bracket indicator is shown",
+        "Summary cards update correctly"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the return-to-pending handler correctly identifies when the order being returned is a fully supplied RB order (not a split portion). Call the returnReadyOrderToPending backend method with the order ID and full quantity. After successful mutation, invalidate the orders query. The order should reappear in the Total Orders tab as a single complete row."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the rendering logic correctly displays a returned fully supplied RB order as a single complete row with no split indicators or bracket labels."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Update the summary card logic to correctly handle the return of a fully supplied RB order. The Total Orders count should increase by 1, and the quantity and weight should increase by the full order amount. The Ready tab count should decrease by 1. No bracket indicator should be shown."
+        }
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "summary": "Ensure summary cards accurately reflect RB split/merge state at all times",
+      "acceptanceCriteria": [
+        "Total Orders summary count does not double-count a split RB order",
+        "Ready tab summary count does not double-count a merged RB order",
+        "Weight and quantity in summary cards match the sum of all displayed rows",
+        "Summary cards update reactively whenever an RB order is supplied, merged, or returned"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "operation": "modify",
+          "description": "Refactor the summary card calculation logic to correctly handle all RB split/merge scenarios. Implement logic that: (1) treats a split RB order as one logical order (not two) in the Total Orders count, (2) treats a merged RB order in Ready as one order (not two), (3) correctly sums quantities and weights proportionally for split portions, (4) displays a bracket indicator count for pending RB lines in the Total Orders summary, (5) updates reactively when the orders query is invalidated. Add unit test comments or inline documentation explaining the calculation logic for split/merge scenarios."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Ensure the orders query hook (e.g., useOrdersQuery or similar) correctly fetches and caches order data including any split/merge metadata (originalOrderId, split indicators). Verify that query invalidation after RB supply/return mutations triggers immediate re-fetching and re-calculation of summary cards. Add a query key that includes order status and type filters to ensure proper cache invalidation."
         }
       ]
     }

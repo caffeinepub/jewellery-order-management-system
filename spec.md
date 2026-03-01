@@ -1,13 +1,16 @@
 # Specification
 
 ## Summary
-**Goal:** Fix date parsing to always use DD/MM/YYYY format, and enhance the Total Orders tab with improved search, clickable rows, and per-group Mark Ready buttons.
+**Goal:** Add a partial supply popup dialog and split/merge logic for RB-type orders in the Total Orders tab, so users can supply partial quantities and have the system correctly track pending vs. ready portions.
 
 **Planned changes:**
-- Fix `excelParser.ts` so Order Date is always parsed as DD/MM/YYYY (not MM/DD/YYYY), correctly handling string dates like "19/02/2026", "13/02/2026", "16/02/2026", and Excel serial numbers — eliminating "No date" display for valid dates
-- Extend the search bar in the Total Orders tab to filter by Order Number, Generic Name, and Design Code (case-insensitive); hide design group headers when no rows in that group match the search term
-- Make entire order rows clickable in the Total Orders tab to toggle selection (not just the checkbox), with a highlighted selected state
-- Add a "Mark Ready" button inside each design group that marks all currently selected rows in that group as Ready (disabled if none selected)
-- When the top-level "Select All" checkbox is checked, show a bulk "Mark Ready" button at the top of the Total Orders tab to mark all selected orders across all groups as Ready at once
+- When one or more RB orders are selected and "Mark as Ready" is clicked, display a `SuppliedQtyDialog` popup that steps through each RB order one at a time, showing order number, design code, total ordered quantity, and an input for supplied quantity (validated > 0 and ≤ total ordered qty)
+- Non-RB orders selected alongside RB orders bypass the dialog and are marked ready directly
+- If supplied quantity equals the full ordered quantity, move the entire order to the Ready tab as a single row and remove it from Total Orders
+- If supplied quantity is less than the full ordered quantity (partial supply), move the supplied portion to the Ready tab and keep the remaining portion in Total Orders with reduced qty and proportional weight; both rows are linked by the original order ID; Total Orders summary shows a bracket indicator (e.g. "1 pending RB line")
+- When the remaining pending portion of a split RB order is subsequently marked as ready, merge both portions into a single row in the Ready tab showing full combined qty and weight, and fully remove the order from Total Orders (bracket indicator disappears)
+- When a ready portion of a split RB order is returned to pending and a pending portion already exists in Total Orders, merge both back into one restored row in Total Orders with original full qty and weight (bracket indicator disappears)
+- When a fully supplied (non-split) RB order is returned from the Ready tab, re-add it to Total Orders as a normal single row with no merging logic
+- Ensure all summary cards (order count, total qty, total weight) in both tabs accurately reflect split/merge state at all times, treating a split RB order as one logical order with no double-counting
 
-**User-visible outcome:** Dates from the Excel file (including 2025 and 2026 dates) display correctly in DD/MM/YYYY format instead of showing "No date". In the Total Orders tab, users can search by order number, generic name, or design code; select rows by clicking anywhere on them; and mark orders as ready per design group or in bulk from the top.
+**User-visible outcome:** Users can partially supply RB orders, with the system automatically splitting, tracking, merging, and restoring order portions across the Total Orders and Ready tabs while keeping all summary counts and weights accurate.

@@ -1,6 +1,7 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
-import Float "mo:core/Float";
+import Text "mo:core/Text";
+import Storage "blob-storage/Storage";
 import Time "mo:core/Time";
 
 module {
@@ -17,7 +18,7 @@ module {
     #ReturnFromHallmark;
   };
 
-  type OldOrder = {
+  type Order = {
     orderNo : Text;
     orderType : OrderType;
     product : Text;
@@ -34,56 +35,38 @@ module {
     updatedAt : Time.Time;
     readyDate : ?Time.Time;
     originalOrderId : ?Text;
+    orderDate : ?Time.Time;
   };
 
-  type NewOrder = {
-    orderNo : Text;
-    orderType : OrderType;
-    product : Text;
-    design : Text;
-    weightPerUnit : Float;
-    size : Float;
-    quantity : Nat;
-    remarks : Text;
-    genericName : ?Text;
-    karigarName : ?Text;
-    status : OrderStatus;
-    orderId : Text;
+  type DesignMapping = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
+    createdBy : Text;
+    updatedBy : ?Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
-    readyDate : ?Time.Time;
-    originalOrderId : ?Text;
   };
 
-  public type Summary = {
-    totalOrders : Nat;
-    totalWeight : Float;
-    totalQuantity : Nat;
-    totalCO : Nat;
+  type Karigar = {
+    name : Text;
+    createdBy : Text;
+    createdAt : Time.Time;
   };
 
   type OldActor = {
-    orders : Map.Map<Text, OldOrder>;
-    originalSummary : ?Summary;
+    orders : Map.Map<Text, Order>;
+    designMappings : Map.Map<Text, DesignMapping>;
+    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    karigars : Map.Map<Text, Karigar>;
+    masterDesignKarigars : Map.Map<Text, Nat>;
+    masterDesignExcel : ?Storage.ExternalBlob;
+    activeKarigar : ?Text;
   };
 
-  type NewActor = {
-    orders : Map.Map<Text, NewOrder>;
-    originalSummary : ?Summary;
-  };
+  type NewActor = OldActor;
 
   public func run(old : OldActor) : NewActor {
-    let newOrders = old.orders.map<Text, OldOrder, NewOrder>(
-      func(_id, oldOrder) {
-        {
-          oldOrder with
-          weightPerUnit = oldOrder.weight;
-        };
-      }
-    );
-    {
-      old with
-      orders = newOrders;
-    };
+    old;
   };
 };

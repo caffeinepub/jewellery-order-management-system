@@ -60,39 +60,6 @@ function getOrderTypeLabel(type: OrderType): string {
   }
 }
 
-/**
- * For an RB Pending order that has an originalOrderId (meaning it was a ready-split
- * that got reverted), find sibling pending orders with the same orderNo and sum
- * their quantities to show the full combined outstanding amount.
- */
-function getDisplayQuantity(order: Order, allOrders: Order[]): number {
-  const qty = Number(order.quantity);
-
-  // Only apply special logic for RB orders in Pending status with originalOrderId
-  if (
-    order.orderType !== OrderType.RB ||
-    order.status !== OrderStatus.Pending ||
-    !order.originalOrderId
-  ) {
-    return qty;
-  }
-
-  // Find sibling pending orders with the same orderNo
-  const siblings = allOrders.filter(
-    (o) =>
-      o.orderNo === order.orderNo &&
-      o.status === OrderStatus.Pending &&
-      o.orderId !== order.orderId
-  );
-
-  if (siblings.length > 0) {
-    const siblingQty = siblings.reduce((sum, s) => sum + Number(s.quantity), 0);
-    return qty + siblingQty;
-  }
-
-  return qty;
-}
-
 function getOverdueBadge(days: number | null) {
   if (days === null) return null;
   if (days === 0) {
@@ -145,8 +112,9 @@ export default function TotalOrdersTab() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [supplyDialogOrders, setSupplyDialogOrders] = useState<Order[]>([]);
+  // Non-RB orders waiting to be marked ready after the RB dialog closes
+  const [pendingNonRbIds, setPendingNonRbIds] = useState<string[]>([]);
   const [imageModalDesign, setImageModalDesign] = useState<string | null>(null);
-  // Track which group-level mark-ready is pending
   const [pendingGroupMarkReady, setPendingGroupMarkReady] = useState<string | null>(null);
 
   /* filtered orders: Pending + ReturnFromHallmark */
@@ -167,7 +135,7 @@ export default function TotalOrdersTab() {
     return Array.from(set).sort();
   }, [visibleOrders]);
 
-  /* search + filter — searches order number, generic name, and design code */
+  /* search + filter */
   const filteredOrders = useMemo(() => {
     let orders = visibleOrders;
     if (typeFilter !== 'all') {
@@ -205,7 +173,6 @@ export default function TotalOrdersTab() {
       map.get(key)!.orders.push(order);
     }
 
-    // Sort orders within each group: most overdue first, no-date last
     for (const group of map.values()) {
       group.orders.sort((a, b) => {
         const daysA = calcOverdueDays(a.orderDate);
@@ -276,28 +243,32 @@ export default function TotalOrdersTab() {
 
   /* shared mark-ready logic */
   async function executeMarkReady(orderIds: string[]) {
-    const selectedOrders = filteredOrders.filter((o) => orderIds.includes(o.orderId));
+    // Use allOrders (not just filteredOrders) to find the full order objects
+    const selectedOrders = allOrders.filter((o) => orderIds.includes(o.orderId));
     const rbOrders = selectedOrders.filter((o) => o.orderType === OrderType.RB);
     const nonRbOrders = selectedOrders.filter((o) => o.orderType !== OrderType.RB);
 
-    // Handle RB orders via supply dialog
-    if (rbOrders.length > 0) {
-      setSupplyDialogOrders(rbOrders);
-      return;
+    // Process non-RB orders immediately
+    if (nonRbOrders.length > 0) {
+      try {
+        await markReadyMutation.mutateAsync(nonRbOrders.map((o) => o.orderId));
+        toast.success(`${nonRbOrders.length} order(s) marked as Ready`);
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          nonRbOrders.forEach((o) => next.delete(o.orderId));
+          return next;
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Failed to mark non-RB orders: ${msg}`);
+      }
     }
 
-    // Handle non-RB orders directly
-    try {
-      await markReadyMutation.mutateAsync(nonRbOrders.map((o) => o.orderId));
-      toast.success(`${nonRbOrders.length} order(s) marked as Ready`);
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        nonRbOrders.forEach((o) => next.delete(o.orderId));
-        return next;
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed: ${msg}`);
+    // Open supply dialog for RB orders (one at a time)
+    if (rbOrders.length > 0) {
+      // Store any remaining non-RB ids that weren't processed (shouldn't happen, but safety)
+      setPendingNonRbIds([]);
+      setSupplyDialogOrders(rbOrders);
     }
   }
 
@@ -347,6 +318,7 @@ export default function TotalOrdersTab() {
 
   function handleSupplyDialogClose() {
     setSupplyDialogOrders([]);
+    setPendingNonRbIds([]);
     setSelectedIds(new Set());
   }
 
@@ -439,7 +411,6 @@ export default function TotalOrdersTab() {
           {selectedIds.size > 0 && (
             <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
           )}
-          {/* Top-level Mark Ready: always visible when any selection exists, prominent when Select All is active */}
           {selectedIds.size > 0 && (
             <Button
               size="sm"
@@ -526,22 +497,21 @@ export default function TotalOrdersTab() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span>{group.orders.length} order{group.orders.length !== 1 ? 's' : ''}</span>
-                      <span>Qty: {totalQty}</span>
-                      <span>Wt: {totalWeight.toFixed(2)}g</span>
+                      <span>{totalQty} qty</span>
+                      <span>{totalWeight.toFixed(2)}g</span>
                     </div>
-                    {/* Per-group Mark Ready button */}
                     {groupSelectedCount > 0 && (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-xs px-2 ml-1"
-                        onClick={(e) => handleGroupMarkReady(group, e)}
+                        className="h-7 text-xs"
                         disabled={isGroupMarkReadyPending || markReadyMutation.isPending}
+                        onClick={(e) => handleGroupMarkReady(group, e)}
                       >
                         {isGroupMarkReadyPending ? (
-                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                         ) : (
-                          <CheckCheck className="h-3 w-3 mr-1" />
+                          <CheckCheck className="mr-1 h-3 w-3" />
                         )}
                         Mark Ready ({groupSelectedCount})
                       </Button>
@@ -549,91 +519,81 @@ export default function TotalOrdersTab() {
                   </div>
                 </div>
 
-                {/* Order rows */}
+                {/* Group rows */}
                 {isExpanded && (
                   <div className="divide-y">
-                    {group.orders.map((order, idx) => {
-                      const overdueDays = calcOverdueDays(order.orderDate);
-                      const displayQty = getDisplayQuantity(order, allOrders);
+                    {group.orders.map((order) => {
                       const isSelected = selectedIds.has(order.orderId);
+                      const overdueDays = calcOverdueDays(order.orderDate);
+                      const isRB = order.orderType === OrderType.RB;
 
                       return (
                         <div
                           key={order.orderId}
-                          className={`flex items-start gap-3 px-4 py-3 text-sm cursor-pointer transition-colors ${
+                          className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
                             isSelected
                               ? 'bg-primary/5 hover:bg-primary/10'
                               : 'hover:bg-muted/20'
                           }`}
                           onClick={() => toggleSelectOrder(order.orderId)}
                         >
-                          <span className="text-muted-foreground text-xs w-5 flex-shrink-0 pt-0.5">
-                            {idx + 1}
-                          </span>
-                          <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 mt-0.5">
+                          <div onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleSelectOrder(order.orderId)}
-                              aria-label={`Select ${order.orderNo}`}
+                              aria-label={`Select order ${order.orderNo}`}
                             />
                           </div>
-                          <div className="flex-1 min-w-0 grid grid-cols-2 gap-x-4 gap-y-1">
-                            <div>
-                              <p className="text-xs text-muted-foreground">Order No</p>
-                              <p className="font-mono text-xs font-medium">{order.orderNo}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Product</p>
-                              <p className="text-xs">{order.product || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Wt / Size / Qty</p>
-                              <p className="text-xs">
-                                {order.weight.toFixed(3)}g / {order.size} /{' '}
-                                <span
-                                  className={
-                                    displayQty !== Number(order.quantity)
-                                      ? 'font-semibold text-primary'
-                                      : ''
-                                  }
+                          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-medium font-mono truncate">
+                                {order.orderNo}
+                              </span>
+                              {isRB && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1 py-0 h-4 border-amber-400 text-amber-600 dark:text-amber-400"
                                 >
-                                  {displayQty}
-                                </span>
-                              </p>
+                                  RB
+                                </Badge>
+                              )}
                             </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">Order Date</p>
-                              <p className={`text-xs ${!order.orderDate ? 'italic text-muted-foreground' : ''}`}>
+                            <div className="text-xs text-muted-foreground">
+                              {order.product || '—'}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">Qty:</span>
+                              <span className="font-medium">{Number(order.quantity)}</span>
+                              <span className="text-muted-foreground">Wt:</span>
+                              <span className="font-medium">
+                                {(order.weight * Number(order.quantity)).toFixed(2)}g
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">
                                 {formatOrderDate(order.orderDate)}
-                              </p>
+                              </span>
+                              {getOverdueBadge(overdueDays)}
                             </div>
-                            {order.remarks && (
-                              <div className="col-span-2">
-                                <p className="text-xs text-muted-foreground">Remarks</p>
-                                <p className="text-xs truncate">{order.remarks}</p>
-                              </div>
-                            )}
                           </div>
-                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                            <Badge variant="outline" className="text-xs">
-                              {getOrderTypeLabel(order.orderType)}
-                            </Badge>
-                            {getOverdueBadge(overdueDays)}
-                            <button
-                              className="text-xs text-destructive hover:text-destructive/80 mt-1 p-1"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(order.orderId);
-                              }}
-                              aria-label="Delete order"
+                          <div
+                            className="flex-shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                               disabled={deleteOrderMutation.isPending}
+                              onClick={() => handleDelete(order.orderId)}
+                              aria-label="Delete order"
                             >
                               {deleteOrderMutation.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
                                 <span className="text-xs">✕</span>
                               )}
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       );

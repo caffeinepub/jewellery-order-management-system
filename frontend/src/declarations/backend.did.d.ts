@@ -113,6 +113,7 @@ export interface _SERVICE {
     [Array<[string, DesignMapping]>],
     undefined
   >,
+  'batchSupplyNewRBOrders' : ActorMethod<[Array<[string, bigint]>], undefined>,
   'batchSupplyRBOrders' : ActorMethod<[Array<[string, bigint]>], undefined>,
   'batchUpdateOrderStatus' : ActorMethod<
     [Array<string>, OrderStatus],
@@ -162,6 +163,7 @@ export interface _SERVICE {
   >,
   'resetActiveOrders' : ActorMethod<[], undefined>,
   'returnOrdersToPending' : ActorMethod<[string, bigint], undefined>,
+  'returnReadyOrderToPending' : ActorMethod<[string, bigint], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'saveOrder' : ActorMethod<
     [

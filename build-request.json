@@ -1,100 +1,166 @@
 {
   "kind": "build_request",
-  "title": "Fix date format to DD/MM/YYYY and add Total Orders tab enhancements",
+  "title": "RB Order Partial Supply Popup & Split/Merge Logic",
+  "projectName": "Jewellery Order Management",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix date parsing in `frontend/src/utils/excelParser.ts` so that Order Date is always interpreted and stored as DD/MM/YYYY. The parser must not swap day and month (no MM/DD/YYYY treatment). It must correctly handle dates from any year, including 2025 and 2026. Both string-format dates (e.g. '19/02/2026') and Excel serial numbers must resolve to the correct DD/MM/YYYY value. Dates currently showing as 'No date' on the dashboard because of failed parsing (e.g. dates like 13/02/2026, 16/02/2026 shown in the uploaded screenshots) must be displayed correctly after the fix.",
+      "text": "When one or more RB-type orders are selected in the Total Orders tab and the user clicks 'Mark as Ready', display a popup dialog (one RB order at a time) prompting the user to enter the supplied quantity for that order. The dialog must show the order details (order number, design code, total ordered quantity) and an input field for supplied quantity. The supplied quantity must be validated to be greater than 0 and not exceed the total ordered quantity.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-recent-7"
         ],
         "quotes": [
-          "you're updating the data as MM/DD/YYYY but it should only be in standard DD/MM/YYY and it can be any year even 2025 or 2026"
+          "Once a RB order type is selected and clicked on *Mark as ready* a pop up box appears where supplied qty against such order is entered"
         ]
       },
       "acceptanceCriteria": [
-        "A date string '19/02/2026' in the Excel file is parsed and displayed as '19 Feb 26' (or equivalent DD/MM/YYYY display), not '02/19/2026' or 'No date'.",
-        "A date string '17/12/2025' is parsed and displayed correctly as a December 2025 date.",
-        "Excel serial number dates are converted correctly without day/month swapping.",
-        "No valid DD/MM/YYYY date from any year results in 'No date' after the fix.",
-        "All dates in the dashboard order rows display in DD/MM/YYYY (or equivalent readable) format."
+        "Selecting one or more RB orders and clicking Mark as Ready opens the SuppliedQtyDialog popup",
+        "The dialog steps through each selected RB order one at a time",
+        "Each dialog step shows the order number, design code, and total ordered quantity",
+        "A numeric input field accepts the supplied quantity",
+        "Supplied quantity is validated: must be > 0 and ≤ total ordered quantity",
+        "Non-RB orders selected alongside RB orders bypass the dialog and are marked ready directly",
+        "User can cancel the dialog without any state change"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "In the Total Orders tab (`frontend/src/components/dashboard/TotalOrdersTab.tsx`), add or extend the search bar so that it filters orders by Order Number, Generic Name, and Design Code. The search must be case-insensitive and filter across all design groups simultaneously, showing only matching rows (and their parent design group header if at least one row matches).",
-      "target": "frontend",
+      "text": "When the supplied quantity entered in the popup equals the full ordered quantity for an RB order, mark the entire order as Ready and move it fully to the Ready tab. No splitting should occur. The Total Orders tab removes the order and the Ready tab gains it as a single row.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-recent-7"
         ],
         "quotes": [
-          "Search bar in total orders tab should be able to search ( Order number, generic name, design code)"
+          "Once a RB order type is selected and clicked on *Mark as ready* a pop up box appears where supplied qty against such order is entered"
         ]
       },
       "acceptanceCriteria": [
-        "Typing a partial or full Order Number in the search bar filters the displayed rows to only those matching.",
-        "Typing a partial or full Generic Name filters rows accordingly.",
-        "Typing a partial or full Design Code filters rows accordingly.",
-        "Design group headers with no matching rows are hidden when a search term is active.",
-        "Clearing the search bar restores all groups and rows.",
-        "Search is case-insensitive."
+        "Full quantity supplied: the order disappears from Total Orders tab",
+        "The order appears in the Ready tab with the full quantity and weight",
+        "Summary cards in Total Orders decrease by 1 order, full qty, and full weight",
+        "Summary cards in Ready tab increase by 1 order, full qty, and full weight"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "In the Total Orders tab, under every design group, make each order row fully clickable — clicking anywhere on the row (not just the checkbox) should toggle the row's selection state. This must work consistently across all design groups rendered in the tab.",
-      "target": "frontend",
+      "text": "When the supplied quantity entered in the popup is less than the full ordered quantity for an RB order (partial supply), split the order logically: move the supplied portion to the Ready tab as a new ready row, and keep the remaining (pending) portion in the Total Orders tab with the reduced quantity and weight. Both rows must share the same original order identifier so they can be merged later.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-recent-7"
         ],
         "quotes": [
-          "Under every design group, selection of rows can be done by clicking on any part of the row."
+          "Once a RB order type is selected and clicked on *Mark as ready* a pop up box appears where supplied qty against such order is entered"
         ]
       },
       "acceptanceCriteria": [
-        "Clicking anywhere on a row (outside the checkbox itself) toggles that row's checkbox selection.",
-        "Clicking the checkbox directly also still toggles selection.",
-        "The row shows a visual selected state (e.g. highlighted background) when selected.",
-        "Multiple rows can be selected by clicking on different rows."
+        "Partial supply: supplied portion appears in the Ready tab with supplied qty and proportional weight",
+        "Remaining pending portion stays in Total Orders tab with reduced qty and proportional weight",
+        "Total Orders summary card shows reduced total qty, reduced weight, and a bracket indicator such as '(1 pending RB line)' against the affected order",
+        "Total Orders order count decreases by 1 for the split order (treated as one logical order)",
+        "Ready tab summary shows the supplied portion as 1 order",
+        "The two split rows are linked by the original order ID for future merging"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "In the Total Orders tab, add a 'Mark Ready' button inside each design group header/footer. Clicking it marks all currently selected rows within that design group as Ready. Additionally, when the top-level 'Select All' checkbox is checked, a bulk 'Mark Ready' button must appear at the top of the tab to mark all selected orders (across all design groups) as Ready at once.",
-      "target": "frontend",
+      "text": "When the remaining pending portion of a previously split RB order is subsequently marked as ready (via the same popup flow), merge the two portions into a single row in the Ready tab showing the combined full quantity and weight. The bracket indicator in Total Orders must disappear and the order must be fully removed from Total Orders. The merged Ready row must appear as one single order, not two.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-recent-3"
         ],
         "quotes": [
-          "Give the *Mark Ready* button in each design group so that it could be marked from there itself and On the top when *select all* is checked then *mark ready* on top shows to do it in bulk for all design codes"
+          "When Remaining Pending Quantity Also Moves to Ready — System must: Merge the two parts into one single row"
         ]
       },
       "acceptanceCriteria": [
-        "Each design group displays a 'Mark Ready' button within the group.",
-        "Clicking a group's 'Mark Ready' button marks only the selected rows within that group as Ready.",
-        "If no rows are selected in a group, the group-level 'Mark Ready' button is disabled or shows an appropriate state.",
-        "When the top-level 'Select All' checkbox is checked, a 'Mark Ready' button appears at the top of the Total Orders tab.",
-        "Clicking the top-level 'Mark Ready' button marks all selected orders across all design groups as Ready.",
-        "After marking as ready, the affected rows are removed from the Pending list and appear in the Ready tab."
+        "Supplying the remaining pending qty merges both portions into one row in the Ready tab",
+        "Merged row shows full original qty and combined weight",
+        "Order count in Ready tab shows 1 (not 2) for the merged order",
+        "The order is fully removed from Total Orders",
+        "Bracket indicator disappears from Total Orders summary",
+        "Total Orders summary recalculates to reflect full removal"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "When a supplied (ready) portion of a split RB order is returned to pending from the Ready tab, and a pending portion of that same order already exists in Total Orders, merge the returned quantity back with the existing pending row to restore the original full order. The order count, qty, and weight in Total Orders must be restored to their original values and the bracket indicator must disappear.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-recent-3"
+        ],
+        "quotes": [
+          "When 'Returned to Pending' (Partial Case) — System must: Merge returned qty with existing pending line, Restore original full row"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Returning a split ready portion when a pending portion exists merges both back into one row in Total Orders",
+        "Restored row shows original full qty and original weight",
+        "Order count in Total Orders is restored (no duplicate count)",
+        "Bracket indicator disappears from Total Orders summary",
+        "The returned row no longer appears in the Ready tab"
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "When a fully supplied RB order (no prior split) is returned from the Ready tab to pending, treat it as a normal single row re-added to Total Orders with its full quantity and weight. No merging logic is required in this case.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-recent-3"
+        ],
+        "quotes": [
+          "When Fully Supplied Line Is Returned — Returned line: Comes back as a normal single row, Treated as a new re-added line, No merging required"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Returning a non-split RB order re-adds it to Total Orders as a single row with full qty and weight",
+        "Order count in Total Orders increases by 1",
+        "No bracket indicator is shown",
+        "Summary cards update correctly"
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "text": "Ensure that all summary cards (total orders count, total weight, total quantity) in both the Total Orders tab and Ready tab accurately reflect the RB split/merge state at all times. Order counts must treat a split RB order as one logical order (not two), weights and quantities must be proportionally recalculated based on supplied vs pending portions, and no double-counting must occur.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-recent-3"
+        ],
+        "quotes": [
+          "Correct summary calculations",
+          "Order count consistency",
+          "Weight & qty recalculation accuracy"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Total Orders summary count does not double-count a split RB order",
+        "Ready tab summary count does not double-count a merged RB order",
+        "Weight and quantity in summary cards match the sum of all displayed rows",
+        "Summary cards update reactively whenever an RB order is supplied, merged, or returned"
       ]
     }
   ],
   "constraints": [
-    "Do not change the overall dashboard layout or any other tab's behaviour.",
-    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
-    "Backend data model and API must not change."
+    "Do not change row selection logic or status update workflow",
+    "Do not change the layout, tab structure, or any UI structure",
+    "Do not change the backend database schema or data types",
+    "Do not create new order records for split portions — use logical splitting within the existing order model",
+    "Build on top of Version 112 as the base"
   ],
   "nonGoals": [
-    "Changing the design or layout of any tab other than Total Orders.",
-    "Adding search functionality to tabs other than Total Orders.",
-    "Modifying the Ready, Hallmark, Customer Orders, Karigars, or Unmapped tabs.",
-    "Adding new backend endpoints or modifying the Motoko actor."
+    "Adding new tabs or changing tab structure",
+    "Changing the Mark as Ready flow for non-RB order types",
+    "Modifying the Hallmark, Customer Orders, or Karigars tabs",
+    "Any changes to export (Excel, PDF, JPEG) functionality",
+    "Any changes to the ingest orders or master designs workflows"
   ],
   "imageRequirements": {
     "required": [],
