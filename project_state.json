@@ -1,51 +1,85 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management dashboard with multiple tabs including Ready, Hallmark, Reconciliation, and Total Orders. Project involves fixing UI layout to match design reference, RB partial supply display in Ready tab, Hallmark-to-Total Orders status flow, and reconciliation order type parsing preservation.",
-  "architectural_notes": [
-    "RB partial supply: supplied portion rows must appear in the Ready tab",
-    "Hallmark 'Mark as Returned' moves order to Total Orders with status Pending",
-    "Reconciliation page must preserve parsed order type (RB/SO/CO) when adding rows to Total Orders — not default to CO"
-  ],
+  "summary": "New project",
+  "architectural_notes": [],
   "known_issues": [],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-update-the-order-row-layout-in-totalorderstab-and-any-other-tabs-using-the-same-row-structure-to-exactly-match-img-6511-2-each-child-row-must-show-the-order-number-on-the-left-with-qty-and-wt-below-it-the-generic-design-type-label-e-g-chain-ipl-displayed-to-the-right-of-the-order-number-on-a-separate-column-in-the-middle-the-date-and-ageing-badge-side-by-side-to-the-right-and-a-red-delete-icon-on-the-far-right-remove-the-standalone-checkbox-column-that-currently-appears-on-the-left-of-each-child-row-and-instead-make-the-entire-row-clickable-to-toggle-row-selection-the-group-header-row-must-retain-its-checkbox-collapse-arrow-design-code-karigar-name-badge-order-count-qty-and-weight-the-design-code-in-the-group-header-must-remain-clickable-to-open-the-designimagemodal-popup-showing-the-design-image",
-      "title": "Update the order row layout in TotalOrdersTab (and any other tabs using the same row structure) to exactly match IMG_6511-2: each child row must show the order number on the left with Qty and Wt below it, the generic/design type label (e.g. CHAIN, IPL) displayed to the right of the order number on a separate column in the middle, the date and ageing badge side by side to the right, and a red × delete icon on the far right. Remove the standalone checkbox column that currently appears on the left of each child row and instead make the entire row clickable to toggle row selection. The group header row must retain its checkbox, collapse arrow, design code, karigar name badge, order count, qty, and weight. The design code in the group header must remain clickable to open the DesignImageModal popup showing the design image.",
+      "id": "feature-restore-the-summary-tab-value-computation-logic-to-match-v158-behaviour-so-that-metric-values-order-counts-weight-quantity-co-orders-update-correctly-and-reflect-the-appropriate-subset-of-orders-when-switching-between-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
+      "title": "Restore the summary tab value computation logic to match v158 behaviour so that metric values (order counts, weight, quantity, CO orders) update correctly and reflect the appropriate subset of orders when switching between dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars).",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-ready-tab-so-that-when-an-rb-order-is-partially-supplied-the-newly-created-supplied-portion-order-row-is-displayed-in-the-ready-tab-currently-the-supplied-rows-do-not-appear-in-the-ready-tab-after-a-partial-supply-operation",
-      "title": "Fix the Ready tab so that when an RB order is partially supplied, the newly created supplied-portion order row is displayed in the Ready tab. Currently the supplied rows do not appear in the Ready tab after a partial supply operation.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-hallmark-tab-s-mark-as-returned-action-so-that-when-an-order-with-status-hallmark-is-marked-as-returned-that-order-row-is-moved-to-the-total-orders-page-with-status-set-to-pending-currently-such-orders-do-not-appear-in-total-orders-after-being-marked-as-returned-from-the-hallmark-tab",
-      "title": "Fix the Hallmark tab's 'Mark as Returned' action so that when an order with status Hallmark is marked as returned, that order row is moved to the Total Orders page with status set to Pending. Currently such orders do not appear in Total Orders after being marked as returned from the Hallmark tab.",
+      "id": "feature-within-each-design-group-in-the-total-orders-tab-sort-the-rows-from-longest-due-oldest-order-date-to-least-due-most-recent-order-date-top-to-bottom-grouped-by-weight",
+      "title": "Within each design group in the Total Orders tab, sort the rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-fix-the-reconciliation-page-so-that-the-per-row-parsed-order-type-rb-so-or-co-is-correctly-preserved-when-rows-are-added-to-total-orders-currently-all-reconciliation-rows-are-saved-with-type-co-regardless-of-their-parsed-type",
-      "title": "Fix the Reconciliation page so that the per-row parsed order type (RB, SO, or CO) is correctly preserved when rows are added to Total Orders. Currently all reconciliation rows are saved with type CO regardless of their parsed type.",
+      "id": "feature-in-the-design-group-header-row-in-the-total-orders-tab-display-the-design-code-text-in-bold-orange-color",
+      "title": "In the design group header row in the Total Orders tab, display the design code text in bold orange color.",
       "reqIds": [
         "REQ-4"
       ],
       "version": 1
+    },
+    {
+      "id": "feature-remove-the-image-icon-from-the-design-group-header-row-in-the-total-orders-tab",
+      "title": "Remove the image icon from the design group header row in the Total Orders tab.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
     }
   ],
-  "new_feature_requests": [],
-  "gameProjectType": "none",
-  "projectName": "Jewellery Order Dashboard",
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Fix summary tabs not changing values across tabs (restore v158 supply logic behaviour)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Fix RB partial supplied row not showing in Ready tab",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Sort rows within each design group in Total Orders tab from longest due to least due, grouped by weight",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Display design codes in design group header in bold orange color",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Remove image icon from design group header in Totals tab",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Fix the RB partial supplied row so it appears in the Ready tab after a partial supply action is performed. When an RB order is partially supplied, the supplied portion must be visible as a row in the Ready tab.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    }
+  ],
+  "projectName": "Jewellery Order Manager",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

@@ -1,121 +1,99 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix UI layout, RB partial supply display, Hallmark return flow, and Reconciliation order type preservation",
+  "title": "Fix summary tabs, RB partial supply row, total orders sorting, bold orange design codes, remove image icon",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Update order row layout in TotalOrdersTab to match IMG_6511-2: display order number + sub-info on left, generic/type label in centre, date + ageing badge on right, red × delete icon far right; make entire child row clickable for selection; retain group header checkbox and design code click-to-open-modal",
+      "summary": "Restore summary tab value computation logic to match v158 behaviour so metric values update correctly when switching between dashboard tabs",
       "acceptanceCriteria": [
-        "Child rows display: order number + sub-info on left, generic/type label in centre column, date + ageing badge on right, red × delete icon far right",
-        "Clicking anywhere on a child row toggles its selection (no dedicated checkbox column on child rows)",
-        "Group header checkbox still works for bulk select of all children",
-        "Clicking the design code in the group header opens the DesignImageModal with the correct design image",
-        "Layout matches IMG_6511-2 visually"
+        "Switching to the Ready tab shows summary card values computed only from Ready-status orders.",
+        "Switching to the Hallmark tab shows summary card values computed from Hallmark-status orders.",
+        "Switching to the Total Orders tab shows summary card values for all Pending orders.",
+        "Summary card values visibly change when navigating between tabs, matching v158 behaviour.",
+        "No regression in supply logic or ghost-row filtering in SummaryCards.tsx."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
           "operation": "modify",
-          "description": "Refactor child row rendering to match IMG_6511-2 layout: remove standalone checkbox column from child rows, display order number + Qty/Wt on left, generic/type label (e.g. CHAIN, IPL) in a separate centre column, date + ageing badge side by side on right, red × delete icon far right. Make entire child row clickable to toggle selection state. Retain group header checkbox for bulk selection and ensure design code in group header opens DesignImageModal on click."
+          "description": "Update the SummaryCards component to accept a tab-specific filtered orders array instead of computing metrics from all orders. Ensure the component filters out ghost rows (orders with originalOrderId) and computes metrics (order counts, weight, quantity, CO orders) only from the provided orders array. Remove any internal filtering by status that overrides the parent's filtering intent."
         },
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "path": "frontend/src/pages/Dashboard.tsx",
           "operation": "modify",
-          "description": "Apply the same child row layout update as TotalOrdersTab to match IMG_6511-2: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Apply the same child row layout update as TotalOrdersTab to match IMG_6511-2: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
-        },
-        {
-          "path": "frontend/src/pages/AgeingStock.tsx",
-          "operation": "modify",
-          "description": "Apply the same child row layout update to match IMG_6511-2 if this page uses the same grouped row structure: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
-        },
-        {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
-          "operation": "modify",
-          "description": "Apply the same child row layout update to match IMG_6511-2 if this page uses the same grouped row structure: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
-        },
-        {
-          "path": "frontend/src/pages/TagPrinting.tsx",
-          "operation": "modify",
-          "description": "Apply the same child row layout update to match IMG_6511-2 if this page uses the same grouped row structure: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
+          "description": "Update the Dashboard component to pass tab-specific filtered order arrays to the SummaryCards component. For the Total Orders tab, pass only Pending orders. For the Ready tab, pass only Ready-status orders. For the Hallmark tab, pass only Hallmark-status orders. For the Customer Orders tab, pass only CO-type Pending orders. For the Karigars tab, pass only Pending orders. Ensure each tab receives the correct subset of orders so SummaryCards computes metrics accordingly."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Fix Ready tab so that after a partial supply on an RB order, the supplied portion order row appears in the Ready tab with status Ready",
+      "summary": "Fix RB partial supplied row so it appears in the Ready tab after a partial supply action",
       "acceptanceCriteria": [
-        "After performing a partial supply on an RB order, the supplied portion row appears in the Ready tab with status Ready",
-        "The remaining unsupplied portion continues to appear in Total Orders with Pending status",
-        "No other tabs or order rows are affected"
+        "After submitting a partial supply for an RB order via SuppliedQtyDialog, the supplied portion appears as a row in the Ready tab.",
+        "The remaining un-supplied portion stays in the Pending/Total Orders tab.",
+        "No other rows are affected or hidden in the Ready tab."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Review the query or filter logic used to fetch Ready-status orders and ensure that newly supplied-portion orders (created by partial supply on RB orders) are correctly included when their status is Ready. Verify no additional frontend filter is excluding these rows."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Review the supply flow (SuppliedQtyDialog and related mutations) to ensure that when a partial supply is performed on an RB order, the frontend correctly invalidates queries so that the supplied portion (now Ready) appears in the Ready tab and the remaining portion (still Pending) remains in Total Orders."
-        },
-        {
           "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
           "operation": "modify",
-          "description": "Ensure that after calling the supply mutation for a partial RB order, the query invalidation includes both the Ready tab query and Total Orders query so that the UI reflects the supplied portion in Ready and the remaining portion in Total Orders immediately."
+          "description": "Update the SuppliedQtyDialog component to ensure that when a partial supply is submitted for an RB order, the mutation correctly invokes the backend capability that creates a Ready-status row for the supplied quantity. Verify that the remaining quantity stays as a Pending order. After mutation success, invalidate the orders query to force a refetch so the Ready tab displays the newly supplied row immediately."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the ReadyTab component correctly displays all orders with Ready status, including partial supply rows that have an originalOrderId. Verify that no filtering logic inadvertently hides these rows. If ghost-row filtering is present, confirm it only applies to summary metrics and not to the displayed table rows."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Fix Hallmark tab 'Mark as Returned' action so that orders with status Hallmark are moved to Total Orders with status Pending after being marked as returned",
+      "summary": "Within each design group in the Total Orders tab, sort rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight",
       "acceptanceCriteria": [
-        "Clicking 'Mark as Returned' on a Hallmark-status order removes it from the Hallmark tab",
-        "The returned order appears in the Total Orders tab with status Pending",
-        "No other status transitions or tab behaviours are changed"
+        "Inside each expanded design group in TotalOrdersTab, rows are sorted so the oldest due date appears at the top and the most recent at the bottom.",
+        "Rows with the same weight are grouped together within this sort order.",
+        "The sort applies consistently to all design groups.",
+        "No other tab ordering is affected."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Review the 'Mark as Returned' button handler to ensure it calls the correct backend method (batchReturnOrdersToPending or equivalent) and that the mutation invalidates both the Hallmark tab query and the Total Orders query so that returned orders immediately disappear from Hallmark and reappear in Total Orders with status Pending."
-        },
-        {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Verify that the query used in TotalOrdersTab includes orders with status Pending returned from Hallmark, and that query invalidation after the Hallmark return mutation causes these orders to appear correctly."
+          "description": "Update the TotalOrdersTab component to sort orders within each design group. After grouping orders by design code, sort each group's orders by order date ascending (oldest first) and then by weight to group same-weight items together. Ensure this sort logic applies consistently to all design groups and does not affect other tabs."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Fix Reconciliation page so that each row's parsed order type (RB, SO, or CO) is correctly preserved when rows are added to Total Orders",
+      "summary": "Display design code text in bold orange color in the design group header row in the Total Orders tab",
       "acceptanceCriteria": [
-        "Each reconciliation row carries its correctly parsed order type (RB, SO, or CO) when saved to the backend",
-        "Orders added from reconciliation appear in Total Orders with their correct type (RB rows show RB, SO rows show SO, CO rows show CO)",
-        "No other reconciliation behaviour or parsing logic is changed"
+        "Every design group header in TotalOrdersTab renders the design code in bold font weight.",
+        "The design code text color is orange (matching the app's orange accent, e.g., Tailwind orange-500 or equivalent).",
+        "The styling applies to all design group headers, not just selected ones.",
+        "No other text in the header is unintentionally changed."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/Reconciliation.tsx",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Review the code that parses order type from the master file rows and ensure that when calling persistMasterDataRows, each MasterDataRow object includes the correctly parsed orderType (RB, SO, or CO). Verify that the frontend is not overriding the parsed type to CO before sending the data to the backend."
-        },
-        {
-          "path": "frontend/src/utils/excelParser.ts",
-          "operation": "modify",
-          "description": "Review the master file parsing logic to confirm that the order type is correctly extracted and set on each MasterDataRow object, and that no default CO override is applied during parsing."
-        },
+          "description": "Update the design group header row rendering in TotalOrdersTab to apply bold font weight (font-bold) and orange text color (text-orange-500 or equivalent) to the design code text. Ensure this styling applies to all design group headers consistently without affecting other header elements."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Remove the image icon from the design group header row in the Total Orders tab",
+      "acceptanceCriteria": [
+        "No image icon is rendered in any design group header row in TotalOrdersTab.",
+        "The rest of the header layout (design code, counts, expand/collapse control) remains intact.",
+        "No other tabs or components have their image icons removed."
+      ],
+      "file_operations": [
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Verify that after reconciliation rows are persisted to the backend, the Total Orders tab query refresh correctly displays each order with its parsed type (RB, SO, or CO) as set in the MasterDataRow."
+          "description": "Remove the image icon element from the design group header row rendering in TotalOrdersTab. Locate the icon component or element in the header and delete it, ensuring the rest of the header layout (design code text, counts, expand/collapse control) remains intact and properly aligned. Do not remove image icons from other tabs or components."
         }
       ]
     }

@@ -11,14 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, ChevronDown, ChevronRight, Image as ImageIcon, X } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, X } from "lucide-react";
 import { AgeingBadge } from "@/utils/ageingBadge";
 import DesignImageModal from "./DesignImageModal";
 import SuppliedQtyDialog from "./SuppliedQtyDialog";
 import {
   useDeleteOrder,
   useMarkOrdersAsReady,
-  useGetAllOrders,
 } from "../../hooks/useQueries";
 
 interface TotalOrdersTabProps {
@@ -54,6 +53,17 @@ function groupOrders(orders: Order[]): GroupedOrders[] {
     group.totalQty += Number(order.quantity);
     group.totalWeight += order.weight;
   }
+
+  // Sort orders within each group: oldest orderDate first (ascending), then by weight
+  for (const group of map.values()) {
+    group.orders.sort((a, b) => {
+      const dateA = a.orderDate ? Number(a.orderDate) : 0;
+      const dateB = b.orderDate ? Number(b.orderDate) : 0;
+      if (dateA !== dateB) return dateA - dateB; // oldest first
+      return a.weight - b.weight; // then by weight ascending
+    });
+  }
+
   return Array.from(map.values());
 }
 
@@ -306,9 +316,9 @@ const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
                     <ChevronRight className="h-4 w-4" />
                   )}
                 </span>
-                {/* Design code - clickable for image */}
+                {/* Design code — bold orange, clickable for image */}
                 <button
-                  className="font-bold text-sm text-foreground hover:text-gold transition-colors"
+                  className="font-bold text-sm text-orange-500 hover:text-orange-400 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     setDesignModalCode(group.designCode);
@@ -328,13 +338,6 @@ const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
                   <span>{group.orders.length} orders</span>
                   <span>{group.totalQty} qty</span>
                   <span>{group.totalWeight.toFixed(2)}g</span>
-                  <ImageIcon
-                    className="h-4 w-4 text-muted-foreground hover:text-gold cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDesignModalCode(group.designCode);
-                    }}
-                  />
                 </div>
               </div>
 

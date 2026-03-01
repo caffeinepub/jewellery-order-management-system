@@ -1,95 +1,115 @@
 {
   "kind": "build_request",
-  "title": "Fix UI layout, RB partial supply display, Hallmark return flow, and Reconciliation order type preservation",
-  "projectName": "Jewellery Order Dashboard",
+  "title": "Fix summary tabs, RB partial supply row, total orders sorting, bold orange design codes, remove image icon",
+  "projectName": "Jewellery Order Manager",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Update the order row layout in TotalOrdersTab (and any other tabs using the same row structure) to exactly match IMG_6511-2: each child row must show the order number on the left with Qty and Wt below it, the generic/design type label (e.g. CHAIN, IPL) displayed to the right of the order number on a separate column in the middle, the date and ageing badge side by side to the right, and a red × delete icon on the far right. Remove the standalone checkbox column that currently appears on the left of each child row and instead make the entire row clickable to toggle row selection. The group header row must retain its checkbox, collapse arrow, design code, karigar name badge, order count, qty, and weight. The design code in the group header must remain clickable to open the DesignImageModal popup showing the design image.",
+      "text": "Restore the summary tab value computation logic to match v158 behaviour so that metric values (order counts, weight, quantity, CO orders) update correctly and reflect the appropriate subset of orders when switching between dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars).",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-4"
         ],
         "quotes": [
-          "Exactly match the display as shown in IMG_6511 ( with selecting the row by clicking anywhere on row & pop up display of design image when clicked on design code)"
+          "The summary tabs are not changing values across tabs. It was working fine with all supply logic behaviour in v158"
         ]
       },
       "acceptanceCriteria": [
-        "Child rows display: order number + sub-info on left, generic/type label in centre column, date + ageing badge on right, red × delete icon far right",
-        "Clicking anywhere on a child row toggles its selection (no dedicated checkbox column on child rows)",
-        "Group header checkbox still works for bulk select of all children",
-        "Clicking the design code in the group header opens the DesignImageModal with the correct design image",
-        "Layout matches IMG_6511-2 visually"
+        "Switching to the Ready tab shows summary card values computed only from Ready-status orders.",
+        "Switching to the Hallmark tab shows summary card values computed from Hallmark-status orders.",
+        "Switching to the Total Orders tab shows summary card values for all Pending orders.",
+        "Summary card values visibly change when navigating between tabs, matching v158 behaviour.",
+        "No regression in supply logic or ghost-row filtering in SummaryCards.tsx."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the Ready tab so that when an RB order is partially supplied, the newly created supplied-portion order row is displayed in the Ready tab. Currently the supplied rows do not appear in the Ready tab after a partial supply operation.",
-      "target": "both",
+      "text": "Fix the RB partial supplied row so it appears in the Ready tab after a partial supply action is performed. When an RB order is partially supplied, the supplied portion must be visible as a row in the Ready tab.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-4"
         ],
         "quotes": [
-          "When a RB order is partial supplied, the supplied order row isn't displaying in ready tab."
+          "RB partial supplied row doesn't show yet in the ready tab"
         ]
       },
       "acceptanceCriteria": [
-        "After performing a partial supply on an RB order, the supplied portion row appears in the Ready tab with status Ready",
-        "The remaining unsupplied portion continues to appear in Total Orders with Pending status",
-        "No other tabs or order rows are affected"
+        "After submitting a partial supply for an RB order via SuppliedQtyDialog, the supplied portion appears as a row in the Ready tab.",
+        "The remaining un-supplied portion stays in the Pending/Total Orders tab.",
+        "No other rows are affected or hidden in the Ready tab."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Fix the Hallmark tab's 'Mark as Returned' action so that when an order with status Hallmark is marked as returned, that order row is moved to the Total Orders page with status set to Pending. Currently such orders do not appear in Total Orders after being marked as returned from the Hallmark tab.",
-      "target": "both",
+      "text": "Within each design group in the Total Orders tab, sort the rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-4"
         ],
         "quotes": [
-          "When an order with status *Hallmark* in hallmark tab is selected and *marked as returned* such order rows be moved and get displayed in the total orders page with status *pending*"
+          "inside each design group in total orders tab, show data from longest due to least due from top to bottom & weight wise together"
         ]
       },
       "acceptanceCriteria": [
-        "Clicking 'Mark as Returned' on a Hallmark-status order removes it from the Hallmark tab",
-        "The returned order appears in the Total Orders tab with status Pending",
-        "No other status transitions or tab behaviours are changed"
+        "Inside each expanded design group in TotalOrdersTab, rows are sorted so the oldest due date appears at the top and the most recent at the bottom.",
+        "Rows with the same weight are grouped together within this sort order.",
+        "The sort applies consistently to all design groups.",
+        "No other tab ordering is affected."
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Fix the Reconciliation page so that the per-row parsed order type (RB, SO, or CO) is correctly preserved when rows are added to Total Orders. Currently all reconciliation rows are saved with type CO regardless of their parsed type.",
-      "target": "both",
+      "text": "In the design group header row in the Total Orders tab, display the design code text in bold orange color.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-4"
         ],
         "quotes": [
-          "reconciliation page is able to parse order type now, but still after being able to parse between RB/SO/CO for each row, when such rows is added to total orders it tends to display all such rows with type *CO*"
+          "In design group header where design code is showed, can u display all such design codes in bold orange color"
         ]
       },
       "acceptanceCriteria": [
-        "Each reconciliation row carries its correctly parsed order type (RB, SO, or CO) when saved to the backend",
-        "Orders added from reconciliation appear in Total Orders with their correct type (RB rows show RB, SO rows show SO, CO rows show CO)",
-        "No other reconciliation behaviour or parsing logic is changed"
+        "Every design group header in TotalOrdersTab renders the design code in bold font weight.",
+        "The design code text color is orange (matching the app's orange accent, e.g., Tailwind orange-500 or equivalent).",
+        "The styling applies to all design group headers, not just selected ones.",
+        "No other text in the header is unintentionally changed."
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Remove the image icon from the design group header row in the Total Orders tab.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "remove that image icon on the design group in the totals tab"
+        ]
+      },
+      "acceptanceCriteria": [
+        "No image icon is rendered in any design group header row in TotalOrdersTab.",
+        "The rest of the header layout (design code, counts, expand/collapse control) remains intact.",
+        "No other tabs or components have their image icons removed."
       ]
     }
   ],
   "constraints": [
-    "Do not change any other tabs, features, or status update logic beyond the four issues specified",
-    "Do not alter any existing working functionality in the Ready, Hallmark, Total Orders, Karigar, Customer Orders, or Tag Printing tabs beyond what is explicitly required",
-    "Do not modify files listed in frontend.immutablePaths"
+    "Only modify code directly related to the 5 specified fixes. All other app behaviour, logic, and UI must remain exactly as-is.",
+    "Do not alter backend/main.mo or backend/migration.mo unless strictly required by one of the 5 fixes.",
+    "Do not modify any immutable frontend paths: useInternetIdentity.ts, useActor.ts, main.tsx, or components/ui.",
+    "The draft deployment must not fail — ensure no TypeScript errors, import issues, or build-breaking changes are introduced."
   ],
   "nonGoals": [
-    "Redesigning any tab other than adjusting row layout to match IMG_6511-2",
-    "Adding new tabs or pages",
-    "Changing the backend data schema beyond what is needed to preserve order type from reconciliation",
-    "Modifying export (Excel/PDF/JPEG) functionality",
-    "Changing authentication or identity flows"
+    "Any new features or UI changes beyond the 5 specified fixes.",
+    "Changes to the Hallmark, Customer Orders, Karigars, or Ready tab layouts beyond what is needed for REQ-1 and REQ-2.",
+    "Backend schema or data model changes.",
+    "Changes to export utilities, barcode scanning, tag printing, or any other page not involved in the fixes."
   ],
   "imageRequirements": {
     "required": [],
