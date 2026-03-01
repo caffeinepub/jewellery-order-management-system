@@ -7,11 +7,13 @@ import HallmarkTab from "@/components/dashboard/HallmarkTab";
 import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
 import KarigarsTab from "@/components/dashboard/KarigarsTab";
 import UnmappedSection from "@/components/dashboard/UnmappedSection";
+import { useGetAllOrders } from "@/hooks/useQueries";
 
 type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("total");
+  const { data: orders = [], isLoading, isError } = useGetAllOrders();
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -24,9 +26,18 @@ export default function Dashboard() {
 
       <UnmappedSection />
 
-      <SummaryCards activeTab={activeTab} />
+      <SummaryCards
+        orders={orders}
+        isLoading={isLoading}
+        isError={isError}
+        activeTab={activeTab}
+      />
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ActiveTab)} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ActiveTab)}
+        className="space-y-4"
+      >
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="total">Total Orders</TabsTrigger>
           <TabsTrigger value="ready">Ready</TabsTrigger>
@@ -36,11 +47,11 @@ export default function Dashboard() {
         </TabsList>
 
         <TabsContent value="total" className="space-y-4">
-          <TotalOrdersTab />
+          <TotalOrdersTab orders={orders} isLoading={isLoading} />
         </TabsContent>
 
         <TabsContent value="ready" className="space-y-4">
-          <ReadyTab />
+          <ReadyTab orders={orders} isLoading={isLoading} />
         </TabsContent>
 
         <TabsContent value="hallmark" className="space-y-4">

@@ -1,84 +1,48 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management system with Regional Buffer (RB) order handling. Built on Version 112. RB orders can partially split across tabs (Total Orders and Ready) when a partial quantity is supplied via a popup on 'Mark as Ready'. The system must treat split RB lines as one logical order, correctly merging/splitting summary calculations, order counts, and weights without changing UI, database structure, or workflows.",
+  "summary": "Order management system with SO/CO/RB order types ingested via order type column. Features partial RB (Regional Buffer Order) supply flow with supplied quantity popup, summary card recalculation, and mandatory row consolidation. Includes Total Orders and Ready tabs with correct filtering.",
   "architectural_notes": [
-    "RB (Regional Buffer) orders are one logical unit even when split across tabs; supplied qty moves to Ready, pending qty stays in Total Orders",
-    "Mark as Ready popup on RB orders accepts a supplied quantity, triggering a logical split if less than full order qty",
-    "When remaining pending RB qty also moves to Ready, both parts must merge into a single row (qty, weight, order count = 1)",
-    "When a supplied RB line is returned while a pending portion exists, merge back into the original full row and restore original qty/weight/count",
-    "Do NOT change: row selection logic, status update workflow, layout, database structure, tab structure, UI, or any existing feature behavior"
+    "RB (Regional Buffer Order) must be treated as one logical order at all times — split fragments must auto-merge before any 'Mark as Ready' action",
+    "Summary cards (Total Orders, Total Weight, Total Qty, Customer Order) must recalculate immediately after RB partial supply confirmation",
+    "When partial RB is returned to Pending, all totals must fully restore and the row must consolidate back into a single line",
+    "Supplied qty popup must appear only once per logical RB order, not per split fragment"
   ],
-  "known_issues": [],
-  "isFixRequest": false,
+  "known_issues": [
+    "RB partial supply: Total Orders summary card does not recalculate after partial Mark as Ready (qty/weight/count not updating)",
+    "RB Return to Pending: totals not fully restoring to original values",
+    "RB consolidation missing: returning partial RB to pending creates split rows instead of merging into one"
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-when-one-or-more-rb-type-orders-are-selected-in-the-total-orders-tab-and-the-user-clicks-mark-as-ready-display-a-popup-dialog-one-rb-order-at-a-time-prompting-the-user-to-enter-the-supplied-quantity-for-that-order-the-dialog-must-show-the-order-details-order-number-design-code-total-ordered-quantity-and-an-input-field-for-supplied-quantity-the-supplied-quantity-must-be-validated-to-be-greater-than-0-and-not-exceed-the-total-ordered-quantity",
-      "title": "When one or more RB-type orders are selected in the Total Orders tab and the user clicks 'Mark as Ready', display a popup dialog (one RB order at a time) prompting the user to enter the supplied quantity for that order. The dialog must show the order details (order number, design code, total ordered quantity) and an input field for supplied quantity. The supplied quantity must be validated to be greater than 0 and not exceed the total ordered quantity.",
+      "id": "feature-when-an-rb-order-is-partially-marked-as-ready-via-the-supplied-quantity-popup-the-total-orders-summary-card-must-immediately-recalculate-decrement-total-orders-count-by-1-and-display-a-1-rb-pending-indicator-reduce-total-qty-by-the-supplied-quantity-reduce-total-weight-by-the-corresponding-supplied-weight-and-leave-customer-order-count-unchanged-this-recalculation-must-happen-at-the-data-and-state-level-only-with-no-ui-workflow-or-structural-changes",
+      "title": "When an RB order is partially marked as Ready via the supplied quantity popup, the Total Orders summary card must immediately recalculate: decrement Total Orders count by 1 and display a '1 RB Pending' indicator, reduce Total Qty by the supplied quantity, reduce Total Weight by the corresponding supplied weight, and leave Customer Order count unchanged. This recalculation must happen at the data and state level only with no UI, workflow, or structural changes.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-when-the-supplied-quantity-entered-in-the-popup-equals-the-full-ordered-quantity-for-an-rb-order-mark-the-entire-order-as-ready-and-move-it-fully-to-the-ready-tab-no-splitting-should-occur-the-total-orders-tab-removes-the-order-and-the-ready-tab-gains-it-as-a-single-row",
-      "title": "When the supplied quantity entered in the popup equals the full ordered quantity for an RB order, mark the entire order as Ready and move it fully to the Ready tab. No splitting should occur. The Total Orders tab removes the order and the Ready tab gains it as a single row.",
+      "id": "feature-when-a-partially-supplied-rb-order-is-marked-return-to-pending-from-the-ready-tab-the-total-orders-summary-card-totals-must-fully-restore-to-their-pre-supply-original-values-total-orders-count-increases-back-by-1-total-qty-increases-by-the-previously-supplied-quantity-total-weight-increases-by-the-previously-supplied-weight-and-customer-order-count-remains-unchanged",
+      "title": "When a partially supplied RB order is marked Return to Pending from the Ready tab, the Total Orders summary card totals must fully restore to their pre-supply original values: Total Orders count increases back by 1, Total Qty increases by the previously supplied quantity, Total Weight increases by the previously supplied weight, and Customer Order count remains unchanged.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-when-the-supplied-quantity-entered-in-the-popup-is-less-than-the-full-ordered-quantity-for-an-rb-order-partial-supply-split-the-order-logically-move-the-supplied-portion-to-the-ready-tab-as-a-new-ready-row-and-keep-the-remaining-pending-portion-in-the-total-orders-tab-with-the-reduced-quantity-and-weight-both-rows-must-share-the-same-original-order-identifier-so-they-can-be-merged-later",
-      "title": "When the supplied quantity entered in the popup is less than the full ordered quantity for an RB order (partial supply), split the order logically: move the supplied portion to the Ready tab as a new ready row, and keep the remaining (pending) portion in the Total Orders tab with the reduced quantity and weight. Both rows must share the same original order identifier so they can be merged later.",
+      "id": "feature-implement-mandatory-rb-row-consolidation-logic-when-a-partially-supplied-rb-order-is-returned-to-pending-the-remaining-pending-fragment-and-any-other-pending-fragments-of-the-same-logical-rb-order-must-automatically-merge-into-a-single-consolidated-row-with-combined-quantity-and-weight-before-being-displayed-or-before-any-further-mark-as-ready-action-is-allowed-the-supplied-quantity-popup-must-appear-only-once-per-logical-rb-order-not-separately-for-each-split-fragment-no-ui-structural-or-workflow-changes-are-permitted-only-the-data-consolidation-and-merge-logic-must-change",
+      "title": "Implement mandatory RB row consolidation logic: when a partially supplied RB order is returned to Pending, the remaining pending fragment and any other pending fragments of the same logical RB order must automatically merge into a single consolidated row with combined quantity and weight before being displayed or before any further Mark as Ready action is allowed. The supplied quantity popup must appear only once per logical RB order, not separately for each split fragment. No UI, structural, or workflow changes are permitted - only the data consolidation and merge logic must change.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
-    },
-    {
-      "id": "feature-when-the-remaining-pending-portion-of-a-previously-split-rb-order-is-subsequently-marked-as-ready-via-the-same-popup-flow-merge-the-two-portions-into-a-single-row-in-the-ready-tab-showing-the-combined-full-quantity-and-weight-the-bracket-indicator-in-total-orders-must-disappear-and-the-order-must-be-fully-removed-from-total-orders-the-merged-ready-row-must-appear-as-one-single-order-not-two",
-      "title": "When the remaining pending portion of a previously split RB order is subsequently marked as ready (via the same popup flow), merge the two portions into a single row in the Ready tab showing the combined full quantity and weight. The bracket indicator in Total Orders must disappear and the order must be fully removed from Total Orders. The merged Ready row must appear as one single order, not two.",
-      "reqIds": [
-        "REQ-4"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-when-a-supplied-ready-portion-of-a-split-rb-order-is-returned-to-pending-from-the-ready-tab-and-a-pending-portion-of-that-same-order-already-exists-in-total-orders-merge-the-returned-quantity-back-with-the-existing-pending-row-to-restore-the-original-full-order-the-order-count-qty-and-weight-in-total-orders-must-be-restored-to-their-original-values-and-the-bracket-indicator-must-disappear",
-      "title": "When a supplied (ready) portion of a split RB order is returned to pending from the Ready tab, and a pending portion of that same order already exists in Total Orders, merge the returned quantity back with the existing pending row to restore the original full order. The order count, qty, and weight in Total Orders must be restored to their original values and the bracket indicator must disappear.",
-      "reqIds": [
-        "REQ-5"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-when-a-fully-supplied-rb-order-no-prior-split-is-returned-from-the-ready-tab-to-pending-treat-it-as-a-normal-single-row-re-added-to-total-orders-with-its-full-quantity-and-weight-no-merging-logic-is-required-in-this-case",
-      "title": "When a fully supplied RB order (no prior split) is returned from the Ready tab to pending, treat it as a normal single row re-added to Total Orders with its full quantity and weight. No merging logic is required in this case.",
-      "reqIds": [
-        "REQ-6"
-      ],
-      "version": 1
     }
   ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "RB order split/merge logic: when partial qty is supplied via Mark as Ready popup, split order across Total Orders and Ready tabs, merge back when remaining qty is supplied or returned, with correct summary calculations and order counts",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-8",
-      "summary": "Ensure that all summary cards (total orders count, total weight, total quantity) in both the Total Orders tab and Ready tab accurately reflect the RB split/merge state at all times. Order counts must treat a split RB order as one logical order (not two), weights and quantities must be proportionally recalculated based on supplied vs pending portions, and no double-counting must occur.",
-      "reqIds": [
-        "REQ-7"
-      ],
-      "status": "pending"
-    }
-  ],
+  "new_feature_requests": [],
   "gameProjectType": "none",
-  "projectName": "Order Management System",
+  "projectName": "Fix RB partial supply calculation and consolidation logic",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

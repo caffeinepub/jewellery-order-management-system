@@ -1,122 +1,72 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-03-01T06:01:29.065Z",
+  "generatedAt": "2026-03-01T06:56:30.711Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 7,
-    "implemented": 6,
+    "total": 3,
+    "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "When one or more RB-type orders are selected in the Total Orders tab and the user clicks 'Mark as Ready', display a popup dialog (one RB order at a time) prompting the user to enter the supplied quantity for that order. The dialog must show the order details (order number, design code, total ordered quantity) and an input field for supplied quantity. The supplied quantity must be validated to be greater than 0 and not exceed the total ordered quantity.",
+        "summary": "When an RB order is partially marked as Ready via the supplied quantity popup, the Total Orders summary card must immediately recalculate: decrement Total Orders count by 1 and display a '1 RB Pending' indicator, reduce Total Qty by the supplied quantity, reduce Total Weight by the corresponding supplied weight, and leave Customer Order count unchanged. This recalculation must happen at the data and state level only with no UI, workflow, or structural changes.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/OrderTable.tsx"
+          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-2",
-        "summary": "When the supplied quantity entered in the popup equals the full ordered quantity for an RB order, mark the entire order as Ready and move it fully to the Ready tab. No splitting should occur. The Total Orders tab removes the order and the Ready tab gains it as a single row.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
-        ],
-        "matchedFiles": [
+          "frontend/src/components/dashboard/SummaryCards.tsx",
           "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
         ]
       },
       {
-        "id": "REQ-3",
-        "summary": "When the supplied quantity entered in the popup is less than the full ordered quantity for an RB order (partial supply), split the order logically: move the supplied portion to the Ready tab as a new ready row, and keep the remaining (pending) portion in the Total Orders tab with the reduced quantity and weight. Both rows must share the same original order identifier so they can be merged later.",
+        "id": "REQ-2",
+        "summary": "When a partially supplied RB order is marked Return to Pending from the Ready tab, the Total Orders summary card totals must fully restore to their pre-supply original values: Total Orders count increases back by 1, Total Qty increases by the previously supplied quantity, Total Weight increases by the previously supplied weight, and Customer Order count remains unchanged.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/SummaryCards.tsx"
+        ]
+      },
+      {
+        "id": "REQ-3",
+        "summary": "Implement mandatory RB row consolidation logic: when a partially supplied RB order is returned to Pending, the remaining pending fragment and any other pending fragments of the same logical RB order must automatically merge into a single consolidated row with combined quantity and weight before being displayed or before any further Mark as Ready action is allowed. The supplied quantity popup must appear only once per logical RB order, not separately for each split fragment. No UI, structural, or workflow changes are permitted - only the data consolidation and merge logic must change.",
+        "status": "implemented",
+        "plannedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx",
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/pages/AgeingStock.tsx",
           "frontend/src/components/dashboard/ReadyTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-4",
-        "summary": "When the remaining pending portion of a previously split RB order is subsequently marked as ready (via the same popup flow), merge the two portions into a single row in the Ready tab showing the combined full quantity and weight. The bracket indicator in Total Orders must disappear and the order must be fully removed from Total Orders. The merged Ready row must appear as one single order, not two.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
-        ],
-        "matchedFiles": [
           "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/pages/AgeingStock.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ]
-      },
-      {
-        "id": "REQ-5",
-        "summary": "When a supplied (ready) portion of a split RB order is returned to pending from the Ready tab, and a pending portion of that same order already exists in Total Orders, merge the returned quantity back with the existing pending row to restore the original full order. The order count, qty, and weight in Total Orders must be restored to their original values and the bracket indicator must disappear.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-6",
-        "summary": "When a fully supplied RB order (no prior split) is returned from the Ready tab to pending, treat it as a normal single row re-added to Total Orders with its full quantity and weight. No merging logic is required in this case.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SummaryCards.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-7",
-        "summary": "Ensure that all summary cards (total orders count, total weight, total quantity) in both the Total Orders tab and Ready tab accurately reflect the RB split/merge state at all times. Order counts must treat a split RB order as one logical order (not two), weights and quantities must be proportionally recalculated based on supplied vs pending portions, and no double-counting must occur.",
-        "status": "missing",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx",
-          "frontend/src/hooks/useQueries.ts"
-        ],
-        "matchedFiles": []
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/components/dashboard/SummaryCards.tsx",
     "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
+    "frontend/src/pages/AgeingStock.tsx",
+    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/pages/KarigarDetail.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

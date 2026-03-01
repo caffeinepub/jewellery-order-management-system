@@ -24,6 +24,7 @@ export default function KarigarDetail() {
   const { data: orders = [], isLoading } = useGetOrdersByKarigar(name);
   const { actor } = useActor();
   const [isExporting, setIsExporting] = useState(false);
+  const [rbDialogOpen, setRbDialogOpen] = useState(false);
   const [selectedRBOrdersForSupply, setSelectedRBOrdersForSupply] = useState<Order[]>([]);
   const markOrdersAsReadyMutation = useMarkOrdersAsReady();
 
@@ -95,6 +96,14 @@ export default function KarigarDetail() {
 
     if (rbPendingOrders.length > 0) {
       setSelectedRBOrdersForSupply(rbPendingOrders);
+      setRbDialogOpen(true);
+    }
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setRbDialogOpen(open);
+    if (!open) {
+      setSelectedRBOrdersForSupply([]);
     }
   };
 
@@ -190,12 +199,11 @@ export default function KarigarDetail() {
         onMarkAsReady={handleMarkAsReady}
       />
 
-      {selectedRBOrdersForSupply.length > 0 && (
-        <SuppliedQtyDialog
-          orders={selectedRBOrdersForSupply}
-          onClose={() => setSelectedRBOrdersForSupply([])}
-        />
-      )}
+      <SuppliedQtyDialog
+        open={rbDialogOpen}
+        onOpenChange={handleDialogOpenChange}
+        orders={selectedRBOrdersForSupply}
+      />
     </div>
   );
 }

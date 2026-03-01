@@ -7,9 +7,9 @@ import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 import Iter "mo:core/Iter";
 import Text "mo:core/Text";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   type OrderType = {
     #CO;

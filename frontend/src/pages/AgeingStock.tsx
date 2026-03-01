@@ -85,6 +85,7 @@ export default function AgeingStock() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [rbDialogOpen, setRbDialogOpen] = useState(false);
   const [rbOrdersForDialog, setRbOrdersForDialog] = useState<Order[]>([]);
 
   // ── Derive pending orders enriched with age data ──────────────────────────
@@ -205,12 +206,16 @@ export default function AgeingStock() {
 
     if (rbOrders.length > 0) {
       setRbOrdersForDialog(rbOrders);
+      setRbDialogOpen(true);
     }
   };
 
-  const handleDialogClose = () => {
-    setRbOrdersForDialog([]);
-    setSelectedIds(new Set());
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setRbOrdersForDialog([]);
+      setSelectedIds(new Set());
+      setRbDialogOpen(false);
+    }
   };
 
   // ── Derived counts ────────────────────────────────────────────────────────
@@ -451,33 +456,25 @@ export default function AgeingStock() {
                               <span className="truncate text-foreground">{order.product || '—'}</span>
                             </div>
                             <div>
-                              <span className="text-xs text-muted-foreground block">Wt / Size / Qty</span>
-                              <span className="text-foreground">{order.weight}g / {order.size || '—'} / {String(order.quantity)}</span>
+                              <span className="text-xs text-muted-foreground block">Qty</span>
+                              <span className="text-foreground">{Number(order.quantity)}</span>
                             </div>
                             <div>
-                              <span className="text-xs text-muted-foreground block">Order Date</span>
-                              {order.ageMs !== null ? (
-                                <span className="text-foreground">
-                                  {new Date(order.ageMs).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground italic text-xs">No date</span>
-                              )}
+                              <span className="text-xs text-muted-foreground block">Weight</span>
+                              <span className="text-foreground">{(order.weight * Number(order.quantity)).toFixed(2)}g</span>
                             </div>
                           </div>
 
                           {/* Age badge */}
-                          <div className="flex-shrink-0">
-                            {order.ageDays !== null ? (
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ageBandBadgeClasses[band]}`}>
-                                {order.ageDays}d
-                              </span>
-                            ) : (
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ageBandBadgeClasses['none']}`}>
-                                —
-                              </span>
-                            )}
-                          </div>
+                          {order.ageDays !== null ? (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ageBandBadgeClasses[band]}`}>
+                              {order.ageDays}d
+                            </span>
+                          ) : (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ageBandBadgeClasses['none']}`}>
+                              —
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -489,13 +486,12 @@ export default function AgeingStock() {
         })}
       </div>
 
-      {/* RB supply dialog */}
-      {rbOrdersForDialog.length > 0 && (
-        <SuppliedQtyDialog
-          orders={rbOrdersForDialog}
-          onClose={handleDialogClose}
-        />
-      )}
+      {/* RB Supply Dialog */}
+      <SuppliedQtyDialog
+        open={rbDialogOpen}
+        onOpenChange={handleDialogClose}
+        orders={rbOrdersForDialog}
+      />
     </div>
   );
 }

@@ -1,77 +1,29 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-03-01T06:01:29.062Z",
-  "summary": "The diff introduces a SuppliedQtyDialog frontend component, backend supplyOrder/batchSupplyRBOrders logic, and modifications to TotalOrdersTab to route RB orders through the dialog. Core REQ-1, REQ-2, and REQ-3 foundations are partially visible. However, several critical requirements around split/merge logic for REQ-3 through REQ-7 show incomplete or missing implementation evidence in the truncated diff. The backend supplyOrder logic appears to update the same orderId for both ready and pending rows using orders.add(orderId, ...) for both, which would overwrite rather than create two linked records. Summary card logic for split/merge state, ReadyTab merge logic, and return-to-pending merge logic are not clearly evidenced.",
-  "missing_requirements": [
-    {
-      "id": "REQ-3",
-      "requirement": "Partial supply splits the order: supplied portion to Ready tab, remaining to Total Orders, both linked by original order ID. Total Orders shows a bracket indicator like '(1 pending RB line)'. Order count treats split as one logical order.",
-      "reason": "The backend supplyOrder function calls orders.add(orderId, readyOrder) and then orders.add(orderId, pendingOrder) using the same key, meaning the pending record would overwrite the ready record. There is no evidence of two separate linked records with originalOrderId referencing the original. The bracket indicator UI logic is not visible in the truncated TotalOrdersTab diff.",
-      "evidence": [
-        "backend/main.mo",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "requirement": "When the remaining pending portion of a split RB order is marked ready, merge both portions into a single row in Ready tab with combined full qty and weight. Bracket indicator disappears, order fully removed from Total Orders.",
-      "reason": "No merge logic is visible in the diff for combining a previously split ready portion with a newly supplied pending portion into one Ready row. The backend supplyOrder and batchSupplyRBOrders functions do not show logic to detect an existing ready sibling and merge it.",
-      "evidence": [
-        "backend/main.mo",
-        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "requirement": "When a split ready portion is returned to pending and a pending portion already exists, merge both back into one Total Orders row restoring original qty and weight. Bracket indicator disappears.",
-      "reason": "The ReadyTab file summary mentions useBatchReturnReadyOrders and return logic, but no merge-on-return logic for split RB orders is evidenced in the diff content. The backend supplyAndReturnOrder function is referenced but truncated and its merge logic is not confirmed.",
-      "evidence": [
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-6",
-      "requirement": "Returning a fully supplied non-split RB order from Ready tab re-adds it to Total Orders as a single row with full qty and weight, no bracket indicator.",
-      "reason": "While return-to-pending functionality is referenced in the ReadyTab summary, there is no explicit evidence that the non-split RB return path is handled distinctly from the split case, nor that it correctly produces a single row without a bracket indicator.",
-      "evidence": [
-        "frontend/src/components/dashboard/ReadyTab.tsx"
-      ]
-    },
-    {
-      "id": "REQ-7",
-      "requirement": "Summary cards in both Total Orders and Ready tabs must accurately reflect split/merge state: no double-counting of split RB orders, proportional weights and quantities, reactive updates.",
-      "reason": "SummaryCards.tsx is listed in the file summary but no changes to its split/merge counting logic are evidenced in the diff content. The bracket indicator and logical order count treating split as 1 for Total Orders summary is not shown implemented in TotalOrdersTab.",
-      "evidence": [
-        "frontend/src/components/dashboard/SummaryCards.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ]
-    }
-  ],
+  "generatedAt": "2026-03-01T06:56:30.709Z",
+  "summary": "The diff implements all three requirements. REQ-1 is addressed in SummaryCards.tsx by excluding partially-supplied RB pending rows (via originalOrderId linkage), deduplicating RB rows by orderNo, and showing an 'N RB Pending' amber indicator. REQ-2 is addressed by the same SummaryCards logic restoring totals when the Ready fragment is removed (return-to-pending). REQ-3 is addressed in TotalOrdersTab.tsx via the consolidateRBOrders function that merges pending RB fragments by orderNo into a single row before display and before the SuppliedQtyDialog is shown. All changes are data/state level only with no UI/workflow/structural changes.",
+  "missing_requirements": [],
   "hallucinated_features": [
     {
-      "description": "The SuppliedQtyDialog defaults the supplied quantity input to the full order quantity on load by pre-filling the field with maxQty.",
-      "reason": "The build request does not specify a default value for the supplied quantity input field. It only requires an input field and validation. Pre-filling with the full quantity is an added behavior not requested.",
+      "description": "AgeingStock page and sidebar navigation item added",
+      "reason": "The build request only asks for fixes to RB partial supply calculation and consolidation logic. Adding an entirely new AgeingStock page with age-band logic, design groups, and a new sidebar route was not requested.",
       "evidence": [
-        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
-      ]
-    },
-    {
-      "description": "A migration module migration.mo was added that defines an identity migration from old actor state to new actor state.",
-      "reason": "The build request states Do not change the backend database schema or data types and does not request a migration module. A separate migration.mo file was not requested.",
-      "evidence": [
-        "backend/migration.mo"
+        "frontend/src/pages/AgeingStock.tsx",
+        "frontend-file-summaries.txt"
       ]
     }
   ],
-  "confidence": 0.52,
+  "confidence": 0.82,
   "changed_files": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/components/dashboard/SummaryCards.tsx",
     "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+    "frontend/src/pages/AgeingStock.tsx",
+    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/pages/KarigarDetail.tsx",
     "project_state.json"
   ]
 }

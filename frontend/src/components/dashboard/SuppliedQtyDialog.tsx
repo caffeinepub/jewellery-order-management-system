@@ -1,249 +1,224 @@
 import { useState, useEffect } from "react";
+import { Order, OrderType } from "@/backend";
+import { useBatchSupplyRBOrders } from "@/hooks/useQueries";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Order } from "@/backend";
-import { useActor } from "@/hooks/useActor";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { Loader2, Package, Hash, Weight, AlertCircle } from "lucide-react";
+import { Loader2, Package } from "lucide-react";
+
+interface ConsolidatedOrder extends Order {
+  _fragmentIds?: string[];
+}
 
 interface SuppliedQtyDialogProps {
-  orders: Order[];
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  orders: ConsolidatedOrder[];
+}
+
+interface OrderEntry {
+  order: ConsolidatedOrder;
+  suppliedQty: string;
+  error: string;
 }
 
 export default function SuppliedQtyDialog({
+  open,
+  onOpenChange,
   orders,
-  onClose,
 }: SuppliedQtyDialogProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [suppliedQty, setSuppliedQty] = useState<string>("");
-  const [validationError, setValidationError] = useState<string>("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
+  const [entries, setEntries] = useState<OrderEntry[]>([]);
+  const supplyMutation = useBatchSupplyRBOrders();
 
-  const currentOrder = orders[currentIndex];
-  const maxQty = currentOrder ? Number(currentOrder.quantity) : 0;
-
-  // Reset supplied qty whenever we move to a new order — default to full quantity
+  // Initialise entries whenever the dialog opens with new orders
   useEffect(() => {
-    if (currentOrder) {
-      setSuppliedQty(String(Number(currentOrder.quantity)));
-      setValidationError("");
+    if (open && orders.length > 0) {
+      setEntries(
+        orders.map((o) => ({
+          order: o,
+          suppliedQty: String(Number(o.quantity)),
+          error: "",
+        }))
+      );
     }
-  }, [currentIndex, currentOrder]);
+  }, [open, orders]);
 
-  const validateQty = (value: string): string => {
-    const num = Number(value);
-    if (!value || value.trim() === "") return "Supplied quantity is required";
-    if (isNaN(num) || !Number.isInteger(num)) return "Please enter a whole number";
-    if (num <= 0) return "Supplied quantity must be greater than 0";
-    if (num > maxQty) return `Supplied quantity cannot exceed order quantity (${maxQty})`;
-    return "";
-  };
+  function updateQty(index: number, value: string) {
+    setEntries((prev) =>
+      prev.map((e, i) =>
+        i === index ? { ...e, suppliedQty: value, error: "" } : e
+      )
+    );
+  }
 
-  const handleQtyChange = (value: string) => {
-    setSuppliedQty(value);
-    if (validationError) {
-      setValidationError(validateQty(value));
-    }
-  };
+  function validate(): boolean {
+    let valid = true;
+    setEntries((prev) =>
+      prev.map((e) => {
+        const qty = parseInt(e.suppliedQty, 10);
+        const max = Number(e.order.quantity);
+        if (isNaN(qty) || qty <= 0) {
+          valid = false;
+          return { ...e, error: "Enter a valid quantity greater than 0" };
+        }
+        if (qty > max) {
+          valid = false;
+          return {
+            ...e,
+            error: `Cannot exceed ordered quantity (${max})`,
+          };
+        }
+        return e;
+      })
+    );
+    return valid;
+  }
 
-  const invalidateQueries = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["orders"] });
-    await queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-    await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-  };
+  async function handleConfirm() {
+    if (!validate()) return;
 
-  const processCurrentOrder = async () => {
-    if (!actor) {
-      toast.error("Actor not initialized");
-      return;
-    }
+    // Build the payload: for each consolidated RB order, we supply against
+    // the representative orderId (first fragment). The backend's batchSupplyRBOrders
+    // will create a Ready fragment and update/remove the pending remainder.
+    //
+    // If the consolidated row has multiple fragment IDs (returned-to-pending scenario),
+    // we need to supply against the representative and the backend handles the rest.
+    // We use the representative orderId (order.orderId) which is the first fragment.
+    const payload: Array<[string, bigint]> = entries.map((e) => [
+      e.order.orderId,
+      BigInt(parseInt(e.suppliedQty, 10)),
+    ]);
 
-    const error = validateQty(suppliedQty);
-    if (error) {
-      setValidationError(error);
-      return;
-    }
+    supplyMutation.mutate(payload, {
+      onSuccess: () => {
+        onOpenChange(false);
+      },
+    });
+  }
 
-    const qty = Number(suppliedQty);
-
-    setIsProcessing(true);
-    try {
-      await actor.batchSupplyRBOrders([[currentOrder.orderId, BigInt(qty)]]);
-
-      if (qty === maxQty) {
-        toast.success(`Order ${currentOrder.orderNo} fully marked as Ready (${qty} qty)`);
-      } else {
-        const remaining = maxQty - qty;
-        toast.success(
-          `Order ${currentOrder.orderNo} split: ${qty} qty → Ready, ${remaining} qty → Pending`
-        );
-      }
-
-      if (currentIndex < orders.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-      } else {
-        await invalidateQueries();
-        onClose();
-      }
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to supply order";
-      toast.error(errorMessage);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleCancel = async () => {
-    if (currentIndex > 0) {
-      await invalidateQueries();
-    }
-    onClose();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !isProcessing) {
-      processCurrentOrder();
-    }
-  };
-
-  if (!currentOrder) return null;
-
-  const isLastOrder = currentIndex === orders.length - 1;
-  const totalOrders = orders.length;
-  const suppliedNum = Number(suppliedQty);
-  const isPartialSupply =
-    !isNaN(suppliedNum) && suppliedNum > 0 && suppliedNum < maxQty;
-  const isFullSupply =
-    !isNaN(suppliedNum) && suppliedNum === maxQty;
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleConfirm();
+  }
 
   return (
-    <Dialog open={orders.length > 0} onOpenChange={handleCancel}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-base font-semibold">
-              Supply RB Order
-            </DialogTitle>
-            {totalOrders > 1 && (
-              <Badge variant="secondary" className="text-xs font-normal">
-                {currentIndex + 1} of {totalOrders}
-              </Badge>
-            )}
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-amber-500" />
+            Supply RB Orders
+          </DialogTitle>
+          <DialogDescription>
+            Enter the quantity being supplied for each Regional Buffer order.
+          </DialogDescription>
         </DialogHeader>
 
-        {/* Order Details Card */}
-        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Hash className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground">Order No</span>
-            <span className="ml-auto font-semibold text-sm font-mono">
-              {currentOrder.orderNo}
-            </span>
-          </div>
-          <Separator />
-          <div className="flex items-center gap-2">
-            <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground">Design Code</span>
-            <span className="ml-auto font-semibold text-sm font-mono">
-              {currentOrder.design}
-            </span>
-          </div>
-          {currentOrder.genericName && (
-            <>
-              <Separator />
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground pl-5">Generic Name</span>
-                <span className="ml-auto text-sm text-foreground">
-                  {currentOrder.genericName}
-                </span>
+        <div className="space-y-4 py-2">
+          {entries.map((entry, index) => {
+            const max = Number(entry.order.quantity);
+            const supplied = parseInt(entry.suppliedQty, 10);
+            const isPartial = !isNaN(supplied) && supplied > 0 && supplied < max;
+            const isFull = !isNaN(supplied) && supplied === max;
+
+            return (
+              <div
+                key={entry.order.orderId}
+                className="rounded-lg border bg-muted/30 p-3 space-y-3"
+              >
+                {/* Order details */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Order No: </span>
+                    <span className="font-medium">{entry.order.orderNo}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Design: </span>
+                    <span className="font-medium">{entry.order.design}</span>
+                  </div>
+                  {entry.order.genericName && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">
+                        Generic Name:{" "}
+                      </span>
+                      <span className="font-medium">
+                        {entry.order.genericName}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-muted-foreground">
+                      Total Ordered:{" "}
+                    </span>
+                    <span className="font-medium">{max}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Weight: </span>
+                    <span className="font-medium">
+                      {entry.order.weight.toFixed(2)} gm
+                    </span>
+                  </div>
+                </div>
+
+                {/* Qty input */}
+                <div className="space-y-1">
+                  <Label htmlFor={`qty-${index}`} className="text-sm">
+                    Supplied Quantity
+                  </Label>
+                  <Input
+                    id={`qty-${index}`}
+                    type="number"
+                    min={1}
+                    max={max}
+                    value={entry.suppliedQty}
+                    onChange={(e) => updateQty(index, e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className={entry.error ? "border-destructive" : ""}
+                  />
+                  {entry.error && (
+                    <p className="text-xs text-destructive">{entry.error}</p>
+                  )}
+                  {isPartial && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Partial supply: {supplied} of {max} — {max - supplied}{" "}
+                      will remain pending
+                    </p>
+                  )}
+                  {isFull && (
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      Full supply: all {max} units will be marked ready
+                    </p>
+                  )}
+                </div>
               </div>
-            </>
-          )}
-          <Separator />
-          <div className="flex items-center gap-2">
-            <Weight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground">Total Ordered Qty</span>
-            <span className="ml-auto font-bold text-sm text-primary">
-              {maxQty}
-            </span>
-          </div>
+            );
+          })}
         </div>
 
-        {/* Supplied Quantity Input */}
-        <div className="space-y-2">
-          <Label htmlFor="supplied-qty" className="text-sm font-medium">
-            Supplied Quantity
-          </Label>
-          <Input
-            id="supplied-qty"
-            type="number"
-            min="1"
-            max={maxQty}
-            value={suppliedQty}
-            onChange={(e) => handleQtyChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className={validationError ? "border-destructive focus-visible:ring-destructive" : ""}
-            placeholder={`Enter qty (max ${maxQty})`}
-            autoFocus
-          />
-          {validationError && (
-            <div className="flex items-center gap-1.5 text-destructive text-xs">
-              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-              <span>{validationError}</span>
-            </div>
-          )}
-          {!validationError && isPartialSupply && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Partial supply: {suppliedNum} qty → Ready, {maxQty - suppliedNum} qty → stays Pending
-            </p>
-          )}
-          {!validationError && isFullSupply && (
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">
-              Full supply: entire order will move to Ready
-            </p>
-          )}
-        </div>
-
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button
             variant="outline"
-            onClick={handleCancel}
-            disabled={isProcessing}
+            onClick={() => onOpenChange(false)}
+            disabled={supplyMutation.isPending}
           >
             Cancel
           </Button>
           <Button
-            onClick={processCurrentOrder}
-            disabled={isProcessing || !suppliedQty}
-            className="bg-gold hover:bg-gold-hover"
+            onClick={handleConfirm}
+            disabled={supplyMutation.isPending}
+            className="gap-1.5"
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing…
-              </>
-            ) : isLastOrder ? (
-              "Confirm"
-            ) : (
-              "Confirm & Next"
+            {supplyMutation.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin" />
             )}
+            Confirm Supply
           </Button>
         </DialogFooter>
       </DialogContent>

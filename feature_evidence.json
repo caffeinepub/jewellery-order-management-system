@@ -2,11 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-when-one-or-more-rb-type-orders-are-selected-in-the-total-orders-tab-and-the-user-clicks-mark-as-ready-display-a-popup-dialog-one-rb-order-at-a-time-prompting-the-user-to-enter-the-supplied-quantity-for-that-order-the-dialog-must-show-the-order-details-order-number-design-code-total-ordered-quantity-and-an-input-field-for-supplied-quantity-the-supplied-quantity-must-be-validated-to-be-greater-than-0-and-not-exceed-the-total-ordered-quantity",
-      "featureTitle": "When one or more RB-type orders are selected in the Total Orders tab and the user clicks 'Mark as Ready', display a popup dialog (one RB order at a time) prompting the user to enter the supplied quantity for that order. The dialog must show the order details (order number, design code, total ordered quantity) and an input field for supplied quantity. The supplied quantity must be validated to be greater than 0 and not exceed the total ordered quantity.",
+      "featureId": "feature-when-an-rb-order-is-partially-marked-as-ready-via-the-supplied-quantity-popup-the-total-orders-summary-card-must-immediately-recalculate-decrement-total-orders-count-by-1-and-display-a-1-rb-pending-indicator-reduce-total-qty-by-the-supplied-quantity-reduce-total-weight-by-the-corresponding-supplied-weight-and-leave-customer-order-count-unchanged-this-recalculation-must-happen-at-the-data-and-state-level-only-with-no-ui-workflow-or-structural-changes",
+      "featureTitle": "When an RB order is partially marked as Ready via the supplied quantity popup, the Total Orders summary card must immediately recalculate: decrement Total Orders count by 1 and display a '1 RB Pending' indicator, reduce Total Qty by the supplied quantity, reduce Total Weight by the corresponding supplied weight, and leave Customer Order count unchanged. This recalculation must happen at the data and state level only with no UI, workflow, or structural changes.",
       "files": [
-        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        "frontend/src/components/dashboard/SummaryCards.tsx",
+        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -24,10 +24,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-when-the-supplied-quantity-entered-in-the-popup-equals-the-full-ordered-quantity-for-an-rb-order-mark-the-entire-order-as-ready-and-move-it-fully-to-the-ready-tab-no-splitting-should-occur-the-total-orders-tab-removes-the-order-and-the-ready-tab-gains-it-as-a-single-row",
-      "featureTitle": "When the supplied quantity entered in the popup equals the full ordered quantity for an RB order, mark the entire order as Ready and move it fully to the Ready tab. No splitting should occur. The Total Orders tab removes the order and the Ready tab gains it as a single row.",
+      "featureId": "feature-when-a-partially-supplied-rb-order-is-marked-return-to-pending-from-the-ready-tab-the-total-orders-summary-card-totals-must-fully-restore-to-their-pre-supply-original-values-total-orders-count-increases-back-by-1-total-qty-increases-by-the-previously-supplied-quantity-total-weight-increases-by-the-previously-supplied-weight-and-customer-order-count-remains-unchanged",
+      "featureTitle": "When a partially supplied RB order is marked Return to Pending from the Ready tab, the Total Orders summary card totals must fully restore to their pre-supply original values: Total Orders count increases back by 1, Total Qty increases by the previously supplied quantity, Total Weight increases by the previously supplied weight, and Customer Order count remains unchanged.",
       "files": [
-        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx"
+        "frontend/src/components/dashboard/ReadyTab.tsx",
+        "frontend/src/components/dashboard/SummaryCards.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -45,11 +46,13 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-when-the-supplied-quantity-entered-in-the-popup-is-less-than-the-full-ordered-quantity-for-an-rb-order-partial-supply-split-the-order-logically-move-the-supplied-portion-to-the-ready-tab-as-a-new-ready-row-and-keep-the-remaining-pending-portion-in-the-total-orders-tab-with-the-reduced-quantity-and-weight-both-rows-must-share-the-same-original-order-identifier-so-they-can-be-merged-later",
-      "featureTitle": "When the supplied quantity entered in the popup is less than the full ordered quantity for an RB order (partial supply), split the order logically: move the supplied portion to the Ready tab as a new ready row, and keep the remaining (pending) portion in the Total Orders tab with the reduced quantity and weight. Both rows must share the same original order identifier so they can be merged later.",
+      "featureId": "feature-implement-mandatory-rb-row-consolidation-logic-when-a-partially-supplied-rb-order-is-returned-to-pending-the-remaining-pending-fragment-and-any-other-pending-fragments-of-the-same-logical-rb-order-must-automatically-merge-into-a-single-consolidated-row-with-combined-quantity-and-weight-before-being-displayed-or-before-any-further-mark-as-ready-action-is-allowed-the-supplied-quantity-popup-must-appear-only-once-per-logical-rb-order-not-separately-for-each-split-fragment-no-ui-structural-or-workflow-changes-are-permitted-only-the-data-consolidation-and-merge-logic-must-change",
+      "featureTitle": "Implement mandatory RB row consolidation logic: when a partially supplied RB order is returned to Pending, the remaining pending fragment and any other pending fragments of the same logical RB order must automatically merge into a single consolidated row with combined quantity and weight before being displayed or before any further Mark as Ready action is allowed. The supplied quantity popup must appear only once per logical RB order, not separately for each split fragment. No UI, structural, or workflow changes are permitted - only the data consolidation and merge logic must change.",
       "files": [
+        "frontend/src/components/dashboard/ReadyTab.tsx",
         "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+        "frontend/src/pages/AgeingStock.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -63,70 +66,6 @@
       ],
       "testIds": [
         "REQ-3"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-when-the-remaining-pending-portion-of-a-previously-split-rb-order-is-subsequently-marked-as-ready-via-the-same-popup-flow-merge-the-two-portions-into-a-single-row-in-the-ready-tab-showing-the-combined-full-quantity-and-weight-the-bracket-indicator-in-total-orders-must-disappear-and-the-order-must-be-fully-removed-from-total-orders-the-merged-ready-row-must-appear-as-one-single-order-not-two",
-      "featureTitle": "When the remaining pending portion of a previously split RB order is subsequently marked as ready (via the same popup flow), merge the two portions into a single row in the Ready tab showing the combined full quantity and weight. The bracket indicator in Total Orders must disappear and the order must be fully removed from Total Orders. The merged Ready row must appear as one single order, not two.",
-      "files": [
-        "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-4"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-when-a-supplied-ready-portion-of-a-split-rb-order-is-returned-to-pending-from-the-ready-tab-and-a-pending-portion-of-that-same-order-already-exists-in-total-orders-merge-the-returned-quantity-back-with-the-existing-pending-row-to-restore-the-original-full-order-the-order-count-qty-and-weight-in-total-orders-must-be-restored-to-their-original-values-and-the-bracket-indicator-must-disappear",
-      "featureTitle": "When a supplied (ready) portion of a split RB order is returned to pending from the Ready tab, and a pending portion of that same order already exists in Total Orders, merge the returned quantity back with the existing pending row to restore the original full order. The order count, qty, and weight in Total Orders must be restored to their original values and the bracket indicator must disappear.",
-      "files": [
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-5"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-when-a-fully-supplied-rb-order-no-prior-split-is-returned-from-the-ready-tab-to-pending-treat-it-as-a-normal-single-row-re-added-to-total-orders-with-its-full-quantity-and-weight-no-merging-logic-is-required-in-this-case",
-      "featureTitle": "When a fully supplied RB order (no prior split) is returned from the Ready tab to pending, treat it as a normal single row re-added to Total Orders with its full quantity and weight. No merging logic is required in this case.",
-      "files": [
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-6"
       ],
       "confidence": "high"
     }
