@@ -23,6 +23,7 @@ export interface MasterDataRow {
     weight: number;
     karigar: string;
     orderDate?: Time;
+    orderType: OrderType;
     orderNo: string;
     quantity: bigint;
     designCode: string;
@@ -86,9 +87,9 @@ export enum OrderType {
 export interface backendInterface {
     addKarigar(name: string): Promise<void>;
     assignOrdersToKarigar(mappings: Array<MappingRecord>): Promise<void>;
-    batchDeleteOrders(orderIds: Array<string>): Promise<void>;
+    batchDeleteOrders(_orderIds: Array<string>): Promise<void>;
     batchGetByStatus(ids: Array<string>, compareStatus: OrderStatus): Promise<Array<string>>;
-    batchReturnOrdersToPending(orderRequests: Array<[string, bigint]>): Promise<void>;
+    batchReturnOrdersToPending(_orderRequests: Array<[string, bigint]>): Promise<void>;
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
     batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
@@ -108,11 +109,6 @@ export interface backendInterface {
     getOrder(orderId: string): Promise<Order | null>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
-    getRBSummary(): Promise<{
-        totalOrders: bigint;
-        totalQty: bigint;
-        totalWeight: number;
-    }>;
     getReadyOrders(): Promise<Array<Order>>;
     getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
@@ -125,8 +121,9 @@ export interface backendInterface {
     reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
     registerKarigar(name: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
-    returnOrdersToPending(orderNo: string, returnedQty: bigint): Promise<void>;
+    returnOrdersToPending(_orderNo: string, _returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
+    saveModifiedOrder(_count: bigint, _startQty: bigint, order: Order): Promise<void>;
     saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;

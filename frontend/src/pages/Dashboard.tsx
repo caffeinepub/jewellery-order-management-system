@@ -1,86 +1,66 @@
-import { useState } from "react";
-import { useGetAllOrders } from "../hooks/useQueries";
+import React, { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SummaryCards from "../components/dashboard/SummaryCards";
+import { Skeleton } from "@/components/ui/skeleton";
 import TotalOrdersTab from "../components/dashboard/TotalOrdersTab";
 import ReadyTab from "../components/dashboard/ReadyTab";
 import HallmarkTab from "../components/dashboard/HallmarkTab";
 import CustomerOrdersTab from "../components/dashboard/CustomerOrdersTab";
 import KarigarsTab from "../components/dashboard/KarigarsTab";
+import SummaryCards from "../components/dashboard/SummaryCards";
 import UnmappedSection from "../components/dashboard/UnmappedSection";
+import { useGetAllOrders } from "../hooks/useQueries";
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("total");
-  const { data: orders = [], isLoading, isError } = useGetAllOrders();
+const Dashboard: React.FC = () => {
+  const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
 
   return (
-    <div className="flex flex-col gap-4 p-3 sm:p-4 max-w-full overflow-x-hidden">
-      {/* Summary Cards */}
-      <SummaryCards
-        orders={orders}
-        isLoading={isLoading}
-        isError={isError}
-        activeTab={activeTab}
-      />
+    <div className="flex flex-col gap-4 p-4">
+      {/* Summary cards */}
+      <SummaryCards orders={allOrders} isError={isError} />
 
-      {/* Unmapped Section — fetches its own data internally */}
+      {/* Unmapped section */}
       <UnmappedSection />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full flex overflow-x-auto h-auto p-1 gap-0.5 bg-muted rounded-lg">
-          <TabsTrigger
-            value="total"
-            className="flex-shrink-0 text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Total Orders
-          </TabsTrigger>
-          <TabsTrigger
-            value="ready"
-            className="flex-shrink-0 text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Ready
-          </TabsTrigger>
-          <TabsTrigger
-            value="hallmark"
-            className="flex-shrink-0 text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Hallmark
-          </TabsTrigger>
-          <TabsTrigger
-            value="customer"
-            className="flex-shrink-0 text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Customer Orders
-          </TabsTrigger>
-          <TabsTrigger
-            value="karigars"
-            className="flex-shrink-0 text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-          >
-            Karigars
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="total-orders">
+        <div className="overflow-x-auto">
+          <TabsList className="w-max min-w-full">
+            <TabsTrigger value="total-orders">Total Orders</TabsTrigger>
+            <TabsTrigger value="ready">Ready</TabsTrigger>
+            <TabsTrigger value="hallmark">Hallmark</TabsTrigger>
+            <TabsTrigger value="customer-orders">Customer Orders</TabsTrigger>
+            <TabsTrigger value="karigars">Karigars</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="total" className="mt-3">
-          <TotalOrdersTab orders={orders} isLoading={isLoading} />
-        </TabsContent>
-
-        <TabsContent value="ready" className="mt-3">
-          <ReadyTab orders={orders} isLoading={isLoading} isError={isError} />
-        </TabsContent>
-
-        <TabsContent value="hallmark" className="mt-3">
-          <HallmarkTab />
-        </TabsContent>
-
-        <TabsContent value="customer" className="mt-3">
-          <CustomerOrdersTab />
-        </TabsContent>
-
-        <TabsContent value="karigars" className="mt-3">
-          <KarigarsTab />
-        </TabsContent>
+        {isLoading ? (
+          <div className="flex flex-col gap-3 mt-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <TabsContent value="total-orders">
+              <TotalOrdersTab orders={allOrders} isError={isError} />
+            </TabsContent>
+            <TabsContent value="ready">
+              <ReadyTab orders={allOrders} isError={isError} />
+            </TabsContent>
+            <TabsContent value="hallmark">
+              <HallmarkTab orders={allOrders} isError={isError} />
+            </TabsContent>
+            <TabsContent value="customer-orders">
+              <CustomerOrdersTab />
+            </TabsContent>
+            <TabsContent value="karigars">
+              <KarigarsTab />
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   );
-}
+};
+
+export default Dashboard;

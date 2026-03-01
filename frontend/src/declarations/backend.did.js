@@ -74,6 +74,7 @@ export const MasterDataRow = IDL.Record({
   'weight' : IDL.Float64,
   'karigar' : IDL.Text,
   'orderDate' : IDL.Opt(Time),
+  'orderType' : OrderType,
   'orderNo' : IDL.Text,
   'quantity' : IDL.Nat,
   'designCode' : IDL.Text,
@@ -177,17 +178,6 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'getRBSummary' : IDL.Func(
-      [],
-      [
-        IDL.Record({
-          'totalOrders' : IDL.Nat,
-          'totalQty' : IDL.Nat,
-          'totalWeight' : IDL.Float64,
-        }),
-      ],
-      ['query'],
-    ),
   'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getReadyOrdersByDateRange' : IDL.Func(
       [Time, Time],
@@ -222,6 +212,7 @@ export const idlService = IDL.Service({
   'resetActiveOrders' : IDL.Func([], [], []),
   'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
   'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
+  'saveModifiedOrder' : IDL.Func([IDL.Nat, IDL.Nat, Order], [], []),
   'saveOrder' : IDL.Func(
       [
         IDL.Text,
@@ -317,6 +308,7 @@ export const idlFactory = ({ IDL }) => {
     'weight' : IDL.Float64,
     'karigar' : IDL.Text,
     'orderDate' : IDL.Opt(Time),
+    'orderType' : OrderType,
     'orderNo' : IDL.Text,
     'quantity' : IDL.Nat,
     'designCode' : IDL.Text,
@@ -422,17 +414,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'getRBSummary' : IDL.Func(
-        [],
-        [
-          IDL.Record({
-            'totalOrders' : IDL.Nat,
-            'totalQty' : IDL.Nat,
-            'totalWeight' : IDL.Float64,
-          }),
-        ],
-        ['query'],
-      ),
     'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getReadyOrdersByDateRange' : IDL.Func(
         [Time, Time],
@@ -467,6 +448,7 @@ export const idlFactory = ({ IDL }) => {
     'resetActiveOrders' : IDL.Func([], [], []),
     'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
     'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
+    'saveModifiedOrder' : IDL.Func([IDL.Nat, IDL.Nat, Order], [], []),
     'saveOrder' : IDL.Func(
         [
           IDL.Text,

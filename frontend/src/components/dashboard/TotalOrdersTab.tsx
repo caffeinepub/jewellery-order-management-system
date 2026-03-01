@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
-import { CheckCircle, Package, ChevronDown, ChevronRight, Search, Image } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Order, OrderStatus, OrderType } from "../../backend";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,109 +11,115 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Order, OrderType, OrderStatus } from "@/backend";
-import { useMarkOrdersAsReady, useBatchSupplyRBOrders } from "@/hooks/useQueries";
-import { toast } from "sonner";
-import SuppliedQtyDialog from "./SuppliedQtyDialog";
-import DesignImageModal from "./DesignImageModal";
+import { Search, ChevronDown, ChevronRight, Image as ImageIcon, X } from "lucide-react";
 import { AgeingBadge } from "@/utils/ageingBadge";
+import DesignImageModal from "./DesignImageModal";
+import SuppliedQtyDialog from "./SuppliedQtyDialog";
+import {
+  useDeleteOrder,
+  useMarkOrdersAsReady,
+  useGetAllOrders,
+} from "../../hooks/useQueries";
 
 interface TotalOrdersTabProps {
   orders: Order[];
-  isLoading: boolean;
+  isError?: boolean;
 }
 
-interface DesignGroup {
+interface GroupedOrders {
   designCode: string;
+  genericName: string;
+  karigarName: string;
   orders: Order[];
   totalQty: number;
   totalWeight: number;
-  orderType: OrderType;
-  karigarName: string;
 }
 
-function getOrderTypeBadgeClass(type: OrderType): string {
-  switch (type) {
-    case OrderType.RB:
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-    case OrderType.SO:
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-    case OrderType.CO:
-    default:
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
+function groupOrders(orders: Order[]): GroupedOrders[] {
+  const map = new Map<string, GroupedOrders>();
+  for (const order of orders) {
+    const key = order.design;
+    if (!map.has(key)) {
+      map.set(key, {
+        designCode: order.design,
+        genericName: order.genericName ?? "",
+        karigarName: order.karigarName ?? "",
+        orders: [],
+        totalQty: 0,
+        totalWeight: 0,
+      });
+    }
+    const group = map.get(key)!;
+    group.orders.push(order);
+    group.totalQty += Number(order.quantity);
+    group.totalWeight += order.weight;
   }
+  return Array.from(map.values());
 }
 
-export default function TotalOrdersTab({ orders, isLoading }: TotalOrdersTabProps) {
-  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
-  const [rbOrdersForDialog, setRbOrdersForDialog] = useState<Order[]>([]);
-  const [selectedDesignCode, setSelectedDesignCode] = useState<string | null>(null);
+function formatDate(time: bigint | undefined): string {
+  if (!time) return "";
+  const ms = Number(time) / 1_000_000;
+  const d = new Date(ms);
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+}
 
-  // Filters
-  const [searchText, setSearchText] = useState("");
-  const [orderTypeFilter, setOrderTypeFilter] = useState<string>("ALL");
-  const [karigarFilter, setKarigarFilter] = useState<string>("ALL");
-
-  const markReadyMutation = useMarkOrdersAsReady();
-  const batchSupplyMutation = useBatchSupplyRBOrders();
-
-  // Exclude ghost pending entries
-  const readyOrderIds = new Set(
-    orders.filter((o) => o.status === OrderStatus.Ready).map((o) => o.orderId)
+function orderTypeBadge(type: OrderType) {
+  const colors: Record<OrderType, string> = {
+    [OrderType.RB]: "bg-blue-600 text-white",
+    [OrderType.SO]: "bg-purple-600 text-white",
+    [OrderType.CO]: "bg-green-600 text-white",
+  };
+  return (
+    <span className={`text-xs font-bold px-2 py-0.5 rounded ${colors[type]}`}>
+      {type}
+    </span>
   );
-  const pendingOrders = orders.filter(
-    (o) => o.status === OrderStatus.Pending && !readyOrderIds.has(o.orderId)
+}
+
+const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [searchText, setSearchText] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [karigarFilter, setKarigarFilter] = useState<string>("all");
+  const [designModalCode, setDesignModalCode] = useState<string | null>(null);
+  const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
+  const [supplyOrders, setSupplyOrders] = useState<Order[]>([]);
+
+  const deleteOrderMutation = useDeleteOrder();
+  const markReadyMutation = useMarkOrdersAsReady();
+
+  // Filter only Pending orders
+  const pendingOrders = useMemo(
+    () => orders.filter((o) => o.status === OrderStatus.Pending),
+    [orders]
   );
 
   // Unique karigars for filter
-  const uniqueKarigars = useMemo(() => {
+  const karigars = useMemo(() => {
     const set = new Set<string>();
-    pendingOrders.forEach((o) => {
-      if (o.karigarName) set.add(o.karigarName);
-    });
+    pendingOrders.forEach((o) => { if (o.karigarName) set.add(o.karigarName); });
     return Array.from(set).sort();
   }, [pendingOrders]);
 
   // Apply filters
   const filteredOrders = useMemo(() => {
-    let result = pendingOrders;
-    if (orderTypeFilter !== "ALL") {
-      result = result.filter((o) => o.orderType === orderTypeFilter);
-    }
-    if (karigarFilter !== "ALL") {
-      result = result.filter((o) => o.karigarName === karigarFilter);
-    }
-    if (searchText.trim()) {
-      const s = searchText.toLowerCase();
-      result = result.filter(
-        (o) =>
-          o.design.toLowerCase().includes(s) ||
-          o.orderNo.toLowerCase().includes(s) ||
-          (o.genericName && o.genericName.toLowerCase().includes(s))
-      );
-    }
-    return result;
-  }, [pendingOrders, orderTypeFilter, karigarFilter, searchText]);
-
-  // Group by design code
-  const designGroups = useMemo((): DesignGroup[] => {
-    const map = new Map<string, Order[]>();
-    filteredOrders.forEach((o) => {
-      const key = o.design;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(o);
+    return pendingOrders.filter((o) => {
+      const search = searchText.toLowerCase();
+      const matchesSearch =
+        !search ||
+        o.orderNo.toLowerCase().includes(search) ||
+        o.design.toLowerCase().includes(search) ||
+        (o.genericName ?? "").toLowerCase().includes(search) ||
+        (o.karigarName ?? "").toLowerCase().includes(search);
+      const matchesType = typeFilter === "all" || o.orderType === typeFilter;
+      const matchesKarigar = karigarFilter === "all" || o.karigarName === karigarFilter;
+      return matchesSearch && matchesType && matchesKarigar;
     });
-    return Array.from(map.entries()).map(([designCode, groupOrders]) => ({
-      designCode,
-      orders: groupOrders,
-      totalQty: groupOrders.reduce((s, o) => s + Number(o.quantity), 0),
-      totalWeight: groupOrders.reduce((s, o) => s + o.weight * Number(o.quantity), 0),
-      orderType: groupOrders[0].orderType,
-      karigarName: groupOrders[0].karigarName || "-",
-    }));
-  }, [filteredOrders]);
+  }, [pendingOrders, searchText, typeFilter, karigarFilter]);
+
+  const grouped = useMemo(() => groupOrders(filteredOrders), [filteredOrders]);
 
   const toggleGroup = (designCode: string) => {
     setExpandedGroups((prev) => {
@@ -124,7 +130,7 @@ export default function TotalOrdersTab({ orders, isLoading }: TotalOrdersTabProp
     });
   };
 
-  const toggleOrder = (orderId: string) => {
+  const toggleOrderSelection = (orderId: string) => {
     setSelectedOrders((prev) => {
       const next = new Set(prev);
       if (next.has(orderId)) next.delete(orderId);
@@ -133,257 +139,294 @@ export default function TotalOrdersTab({ orders, isLoading }: TotalOrdersTabProp
     });
   };
 
-  const toggleGroupSelection = (group: DesignGroup) => {
-    const allSelected = group.orders.every((o) => selectedOrders.has(o.orderId));
+  const toggleGroupSelection = (group: GroupedOrders, checked: boolean) => {
     setSelectedOrders((prev) => {
       const next = new Set(prev);
-      if (allSelected) {
-        group.orders.forEach((o) => next.delete(o.orderId));
-      } else {
-        group.orders.forEach((o) => next.add(o.orderId));
-      }
+      group.orders.forEach((o) => {
+        if (checked) next.add(o.orderId);
+        else next.delete(o.orderId);
+      });
       return next;
     });
   };
 
-  const toggleAll = () => {
-    if (selectedOrders.size === filteredOrders.length && filteredOrders.length > 0) {
-      setSelectedOrders(new Set());
-    } else {
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
       setSelectedOrders(new Set(filteredOrders.map((o) => o.orderId)));
+    } else {
+      setSelectedOrders(new Set());
     }
   };
+
+  const isGroupFullySelected = (group: GroupedOrders) =>
+    group.orders.every((o) => selectedOrders.has(o.orderId));
+  const isGroupPartiallySelected = (group: GroupedOrders) =>
+    group.orders.some((o) => selectedOrders.has(o.orderId)) && !isGroupFullySelected(group);
+
+  const allSelected =
+    filteredOrders.length > 0 &&
+    filteredOrders.every((o) => selectedOrders.has(o.orderId));
 
   const handleMarkReady = async () => {
-    const selected = filteredOrders.filter((o) => selectedOrders.has(o.orderId));
-    if (selected.length === 0) {
-      toast.error("No orders selected");
-      return;
-    }
-    const rbOrders = selected.filter((o) => o.orderType === OrderType.RB);
-    const nonRbOrders = selected.filter((o) => o.orderType !== OrderType.RB);
-    if (nonRbOrders.length > 0) {
-      await markReadyMutation.mutateAsync(nonRbOrders.map((o) => o.orderId));
-    }
+    const ids = Array.from(selectedOrders);
+    if (ids.length === 0) return;
+
+    // Separate RB orders for supply dialog
+    const rbOrders = filteredOrders.filter(
+      (o) => selectedOrders.has(o.orderId) && o.orderType === OrderType.RB
+    );
+    const nonRbIds = filteredOrders
+      .filter((o) => selectedOrders.has(o.orderId) && o.orderType !== OrderType.RB)
+      .map((o) => o.orderId);
+
     if (rbOrders.length > 0) {
-      setRbOrdersForDialog(rbOrders);
+      setSupplyOrders(rbOrders);
       setSupplyDialogOpen(true);
+    }
+
+    if (nonRbIds.length > 0) {
+      await markReadyMutation.mutateAsync(nonRbIds);
+      setSelectedOrders((prev) => {
+        const next = new Set(prev);
+        nonRbIds.forEach((id) => next.delete(id));
+        return next;
+      });
     }
   };
 
-  if (isLoading) {
+  const handleDeleteOrder = async (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await deleteOrderMutation.mutateAsync(orderId);
+    setSelectedOrders((prev) => {
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+  };
+
+  if (isError) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold" />
+      <div className="p-4 text-center text-destructive">
+        Failed to load orders. Please try again.
       </div>
     );
   }
 
-  const allFilteredSelected =
-    filteredOrders.length > 0 && selectedOrders.size === filteredOrders.length;
-
   return (
-    <div className="space-y-3">
-      {/* Filter bar */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+    <div className="flex flex-col gap-3">
+      {/* Search and filters */}
+      <div className="flex flex-col gap-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by order no, design code, generic name"
+            placeholder="Search by order no, generic name..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9 h-9"
+            className="pl-9"
           />
         </div>
         <div className="flex gap-2">
-          <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
-            <SelectTrigger className="h-9 w-[130px] rounded-full text-xs">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="flex-1">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All Types</SelectItem>
+              <SelectItem value="all">All Types</SelectItem>
               <SelectItem value={OrderType.RB}>RB</SelectItem>
-              <SelectItem value={OrderType.CO}>CO</SelectItem>
               <SelectItem value={OrderType.SO}>SO</SelectItem>
+              <SelectItem value={OrderType.CO}>CO</SelectItem>
             </SelectContent>
           </Select>
           <Select value={karigarFilter} onValueChange={setKarigarFilter}>
-            <SelectTrigger className="h-9 w-[140px] rounded-full text-xs">
+            <SelectTrigger className="flex-1">
               <SelectValue placeholder="All Karigars" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All Karigars</SelectItem>
-              {uniqueKarigars.map((k) => (
-                <SelectItem key={k} value={k}>
-                  {k}
-                </SelectItem>
+              <SelectItem value="all">All Karigars</SelectItem>
+              {karigars.map((k) => (
+                <SelectItem key={k} value={k}>{k}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Header row */}
+      {/* Select all + Mark Ready */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Checkbox
-            checked={allFilteredSelected}
-            onCheckedChange={toggleAll}
+            checked={allSelected}
+            onCheckedChange={(v) => toggleSelectAll(!!v)}
           />
           <span className="text-sm text-muted-foreground">
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""}
-            {selectedOrders.size > 0 && ` · ${selectedOrders.size} selected`}
+            {filteredOrders.length} orders
           </span>
         </div>
         <Button
-          onClick={handleMarkReady}
-          disabled={
-            selectedOrders.size === 0 ||
-            markReadyMutation.isPending ||
-            batchSupplyMutation.isPending
-          }
-          className="bg-gold hover:bg-gold-hover text-white"
+          variant="outline"
           size="sm"
+          onClick={handleMarkReady}
+          disabled={selectedOrders.size === 0 || markReadyMutation.isPending}
+          className="border-gold text-gold hover:bg-gold hover:text-white"
         >
-          <CheckCircle className="h-4 w-4 mr-1.5" />
-          Mark Ready ({selectedOrders.size})
+          ✓ Mark Ready ({selectedOrders.size})
         </Button>
       </div>
 
-      {filteredOrders.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No pending orders</p>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {designGroups.map((group) => {
-            const isExpanded = expandedGroups.has(group.designCode);
-            const groupAllSelected = group.orders.every((o) => selectedOrders.has(o.orderId));
-            const groupSomeSelected =
-              group.orders.some((o) => selectedOrders.has(o.orderId)) && !groupAllSelected;
+      {/* Grouped order rows */}
+      <div className="flex flex-col gap-2">
+        {grouped.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">No orders found</div>
+        )}
+        {grouped.map((group) => {
+          const isExpanded = expandedGroups.has(group.designCode);
+          const groupSelected = isGroupFullySelected(group);
+          const groupPartial = isGroupPartiallySelected(group);
 
-            return (
+          return (
+            <div key={group.designCode} className="border border-border rounded-lg overflow-hidden">
+              {/* Group header */}
               <div
-                key={group.designCode}
-                className="rounded-lg border border-border overflow-hidden"
+                className="flex items-center gap-2 px-3 py-2.5 bg-card cursor-pointer select-none"
+                onClick={() => toggleGroup(group.designCode)}
               >
-                {/* Group header */}
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-muted/40 hover:bg-muted/60 transition-colors">
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center"
+                >
                   <Checkbox
-                    checked={groupAllSelected}
-                    data-state={groupSomeSelected ? "indeterminate" : undefined}
-                    onCheckedChange={() => toggleGroupSelection(group)}
-                    onClick={(e) => e.stopPropagation()}
+                    checked={groupPartial ? "indeterminate" : groupSelected}
+                    onCheckedChange={(v) => toggleGroupSelection(group, !!v)}
                   />
-                  <button
-                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
-                    onClick={() => toggleGroup(group.designCode)}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    )}
-                    <button
-                      className="font-semibold text-sm text-foreground hover:text-gold hover:underline transition-colors shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDesignCode(group.designCode);
-                      }}
-                      title="View design image"
-                    >
-                      {group.designCode}
-                    </button>
-                    <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold shrink-0 ${getOrderTypeBadgeClass(group.orderType)}`}
-                    >
-                      {group.orderType}
-                    </span>
-                    <span className="text-xs text-muted-foreground truncate hidden sm:block">
-                      {group.karigarName}
-                    </span>
-                  </button>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0 ml-auto">
-                    <span className="hidden xs:inline">{group.orders.length} orders</span>
-                    <span>{group.totalQty} qty</span>
-                    <span>{group.totalWeight.toFixed(2)}g</span>
-                    <Image
-                      className="h-3.5 w-3.5 text-muted-foreground/60 cursor-pointer hover:text-gold transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDesignCode(group.designCode);
-                      }}
-                    />
-                  </div>
                 </div>
+                <span className="text-muted-foreground">
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </span>
+                {/* Design code - clickable for image */}
+                <button
+                  className="font-bold text-sm text-foreground hover:text-gold transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDesignModalCode(group.designCode);
+                  }}
+                >
+                  {group.designCode}
+                </button>
+                {group.genericName && (
+                  <span className="text-xs text-muted-foreground">{group.genericName}</span>
+                )}
+                {group.karigarName && (
+                  <Badge variant="outline" className="text-xs ml-1">
+                    {group.karigarName}
+                  </Badge>
+                )}
+                <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{group.orders.length} orders</span>
+                  <span>{group.totalQty} qty</span>
+                  <span>{group.totalWeight.toFixed(2)}g</span>
+                  <ImageIcon
+                    className="h-4 w-4 text-muted-foreground hover:text-gold cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDesignModalCode(group.designCode);
+                    }}
+                  />
+                </div>
+              </div>
 
-                {/* Sub-orders */}
-                {isExpanded && (
-                  <div className="divide-y divide-border/50">
-                    {group.orders.map((order) => (
+              {/* Child rows */}
+              {isExpanded && (
+                <div className="divide-y divide-border">
+                  {group.orders.map((order) => {
+                    const isSelected = selectedOrders.has(order.orderId);
+                    return (
                       <div
                         key={order.orderId}
-                        className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                          selectedOrders.has(order.orderId)
-                            ? "bg-gold/5"
-                            : "hover:bg-muted/20"
+                        className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
+                          isSelected ? "bg-gold/10" : "bg-background hover:bg-muted/30"
                         }`}
+                        onClick={() => toggleOrderSelection(order.orderId)}
                       >
-                        <div className="w-5 shrink-0" />
-                        <Checkbox
-                          checked={selectedOrders.has(order.orderId)}
-                          onCheckedChange={() => toggleOrder(order.orderId)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-foreground">{order.orderNo}</span>
-                            {order.genericName && (
-                              <span className="text-xs text-muted-foreground">{order.genericName}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                            <span>Qty: {Number(order.quantity)}</span>
-                            <span>Wt: {(order.weight * Number(order.quantity)).toFixed(2)}g</span>
-                            {order.orderDate && (
-                              <span>
-                                {new Date(Number(order.orderDate) / 1_000_000).toLocaleDateString(
-                                  "en-GB",
-                                  { day: "2-digit", month: "short", year: "2-digit" }
-                                )}
-                              </span>
-                            )}
-                          </div>
+                        {/* Checkbox */}
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center"
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleOrderSelection(order.orderId)}
+                          />
                         </div>
-                        <div className="shrink-0">
+
+                        {/* Left: order number + qty/wt */}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {order.orderNo}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Qty: {String(order.quantity)} &nbsp; Wt: {order.weight.toFixed(2)}g
+                          </span>
+                        </div>
+
+                        {/* Center: generic name / type label */}
+                        <div className="flex flex-col items-center gap-0.5 min-w-[60px]">
+                          {order.genericName && (
+                            <span className="text-xs font-medium text-foreground text-center">
+                              {order.genericName}
+                            </span>
+                          )}
+                          {orderTypeBadge(order.orderType)}
+                        </div>
+
+                        {/* Right: date + ageing badge */}
+                        <div className="flex flex-col items-end gap-0.5 min-w-[80px]">
+                          {order.orderDate && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(order.orderDate)}
+                            </span>
+                          )}
                           <AgeingBadge orderDate={order.orderDate} />
                         </div>
+
+                        {/* Far right: delete */}
+                        <button
+                          className="ml-1 text-destructive hover:text-red-400 transition-colors p-1"
+                          onClick={(e) => handleDeleteOrder(order.orderId, e)}
+                          disabled={deleteOrderMutation.isPending}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-      <SuppliedQtyDialog
-        open={supplyDialogOpen}
-        onOpenChange={(open) => {
-          setSupplyDialogOpen(open);
-          if (!open) setSelectedOrders(new Set());
-        }}
-        rbOrders={rbOrdersForDialog}
-      />
-
-      {selectedDesignCode && (
+      {/* Design Image Modal */}
+      {designModalCode && (
         <DesignImageModal
-          designCode={selectedDesignCode}
-          open={!!selectedDesignCode}
-          onClose={() => setSelectedDesignCode(null)}
+          designCode={designModalCode}
+          open={!!designModalCode}
+          onClose={() => setDesignModalCode(null)}
         />
       )}
+
+      {/* Supply Qty Dialog for RB orders */}
+      <SuppliedQtyDialog
+        open={supplyDialogOpen}
+        onOpenChange={setSupplyDialogOpen}
+        rbOrders={supplyOrders}
+      />
     </div>
   );
-}
+};
+
+export default TotalOrdersTab;

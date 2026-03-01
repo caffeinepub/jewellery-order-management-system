@@ -37,7 +37,7 @@ export default function IngestOrders() {
 
     if (file) {
       try {
-        // Quick peek to detect Order Date column using the existing parseOrdersExcel util
+        // Quick peek to detect Order Date column
         const parsed = await parseOrdersExcel(file);
         setHasOrderDateColumn(parsed.some((o) => o.orderDate !== null));
       } catch {
@@ -54,7 +54,7 @@ export default function IngestOrders() {
     setParseError(null);
 
     try {
-      // Parse the file using the existing utility (returns array of orders)
+      // Parse the file — parseOrdersExcel accepts a File directly
       const parsedOrders = await parseOrdersExcel(selectedFile);
 
       if (parsedOrders.length === 0) {
@@ -73,7 +73,6 @@ export default function IngestOrders() {
         const rowNum = i + 2; // Excel rows start at 2 (row 1 is header)
 
         try {
-          // Validate required fields before sending to avoid unnecessary canister calls
           if (!order.orderNo || order.orderNo.trim() === "") {
             throw new Error("Missing order number");
           }
@@ -81,8 +80,6 @@ export default function IngestOrders() {
             throw new Error("Missing design code");
           }
 
-          // Generate a unique orderId: orderNo + design + timestamp + index + random suffix
-          // More unique than just orderNo+timestamp to prevent duplicate key traps in the canister
           const uniqueSuffix = `${Date.now()}-${i}-${Math.random()
             .toString(36)
             .slice(2, 7)}`;
@@ -95,11 +92,8 @@ export default function IngestOrders() {
               ? OrderType.SO
               : OrderType.CO;
 
-          // Convert orderDate from epoch ms (number) to nanoseconds BigInt, or null
-          const orderDateNano: bigint | null =
-            order.orderDate !== null && order.orderDate !== undefined
-              ? BigInt(Math.round(order.orderDate)) * BigInt(1_000_000)
-              : null;
+          // orderDate is already bigint | null from parseOrdersExcel
+          const orderDateNano: bigint | null = order.orderDate ?? null;
 
           await actor.saveOrder(
             order.orderNo.trim(),
@@ -108,7 +102,7 @@ export default function IngestOrders() {
             order.design.trim(),
             order.weight ?? 0,
             order.size ?? 0,
-            order.quantity, // already BigInt from parseOrdersExcel
+            BigInt(order.quantity), // quantity is number from parseOrdersExcel, convert to bigint
             (order.remarks ?? "").trim(),
             orderId,
             orderDateNano
@@ -120,12 +114,10 @@ export default function IngestOrders() {
           let message = "Unknown error";
           if (err instanceof Error) {
             const raw = err.message;
-            // Extract the meaningful part from IC canister rejection messages
             if (raw.includes('"reject_message"')) {
               const match = raw.match(/"reject_message"\s*:\s*"([^"]+)"/);
               message = match ? match[1] : raw.slice(0, 300);
             } else if (raw.includes("Canister") && raw.length > 300) {
-              // Shorten long canister error messages to the first meaningful line
               const lines = raw.split("\n");
               message = lines[0]?.slice(0, 300) ?? raw.slice(0, 300);
             } else {
@@ -151,8 +143,7 @@ export default function IngestOrders() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Ingest Orders</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Upload an Excel file to import orders into the system. Orders with
-          unmapped design codes will fail to upload.
+          Upload an Excel file to import orders into the system.
         </p>
       </div>
 
@@ -229,9 +220,7 @@ export default function IngestOrders() {
                   <div className="text-3xl font-bold text-foreground">
                     {uploadResult.success}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Successful
-                  </div>
+                  <div className="text-sm text-muted-foreground">Successful</div>
                 </div>
               </div>
             </CardContent>

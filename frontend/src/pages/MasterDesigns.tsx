@@ -18,7 +18,7 @@ import {
   useAddKarigar,
   useUpdateDesignMapping,
 } from "@/hooks/useQueries";
-import { MappingRecord, DesignMapping } from "@/backend";
+import { MappingRecord, DesignMapping, ExternalBlob } from "@/backend";
 import { normalizeDesignCode } from "@/utils/excelParser";
 import {
   Table,
@@ -72,8 +72,8 @@ export default function MasterDesigns() {
     try {
       const arrayBuffer = await file.arrayBuffer();
 
-      // Dynamically import XLSX
-      const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
+      // Dynamically import XLSX from CDN
+      const XLSX: any = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any);
 
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];
@@ -125,17 +125,16 @@ export default function MasterDesigns() {
       // Update master design karigars list
       await updateMasterDesignKarigarsMutation.mutateAsync(Array.from(uniqueKarigars));
 
-      // Upload the raw Excel file for reference — pass Uint8Array directly,
-      // the hook wraps it in ExternalBlob internally
+      // Upload the raw Excel file for reference — wrap in ExternalBlob as required by the hook
       const uint8Data = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
-      await uploadMasterDesignExcelMutation.mutateAsync(uint8Data);
+      const externalBlob = ExternalBlob.fromBytes(uint8Data);
+      await uploadMasterDesignExcelMutation.mutateAsync(externalBlob);
 
       setUploadProgress(100);
       toast.success(`Successfully uploaded ${mappings.length} design mappings`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to upload master design";
       toast.error(message);
-      console.error("Upload error:", error);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -301,9 +300,7 @@ export default function MasterDesigns() {
       {editingMapping && (
         <EditDesignModal
           open={!!editingMapping}
-          onOpenChange={(open) => {
-            if (!open) setEditingMapping(null);
-          }}
+          onOpenChange={(open) => { if (!open) setEditingMapping(null); }}
           designCode={editingMapping.designCode}
           genericName={editingMapping.genericName}
           currentKarigar={editingMapping.karigarName}

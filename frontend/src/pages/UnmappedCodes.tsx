@@ -4,7 +4,7 @@ import {
   useUpdateDesignMapping,
   useReassignDesign,
   useGetUniqueKarigarsFromDesignMappings,
-} from '@/hooks/useQueries';
+} from "@/hooks/useQueries";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

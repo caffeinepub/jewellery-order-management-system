@@ -34,6 +34,7 @@ export interface MasterDataRow {
   'weight' : number,
   'karigar' : string,
   'orderDate' : [] | [Time],
+  'orderType' : OrderType,
   'orderNo' : string,
   'quantity' : bigint,
   'designCode' : string,
@@ -143,10 +144,6 @@ export interface _SERVICE {
     Array<Order>
   >,
   'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
-  'getRBSummary' : ActorMethod<
-    [],
-    { 'totalOrders' : bigint, 'totalQty' : bigint, 'totalWeight' : number }
-  >,
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getReadyOrdersByDateRange' : ActorMethod<[Time, Time], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
@@ -167,6 +164,7 @@ export interface _SERVICE {
   'resetActiveOrders' : ActorMethod<[], undefined>,
   'returnOrdersToPending' : ActorMethod<[string, bigint], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
+  'saveModifiedOrder' : ActorMethod<[bigint, bigint, Order], undefined>,
   'saveOrder' : ActorMethod<
     [
       string,

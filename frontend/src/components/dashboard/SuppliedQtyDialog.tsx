@@ -1,21 +1,18 @@
-import { useState, useEffect } from "react";
-import { Loader2, CheckCircle, Package, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
+import React, { useState, useEffect } from "react";
+import { Order, OrderType, OrderStatus } from "../../backend";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Order } from "@/backend";
-import { useBatchSupplyRBOrders } from "@/hooks/useQueries";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { useBatchSupplyRBOrders } from "../../hooks/useQueries";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 interface SuppliedQtyDialogProps {
   open: boolean;
@@ -23,21 +20,20 @@ interface SuppliedQtyDialogProps {
   rbOrders: Order[];
 }
 
-interface OrderEntry {
+interface SupplyEntry {
   orderId: string;
   orderNo: string;
-  design: string;
-  maxQty: number;
+  originalQty: number;
   suppliedQty: number;
 }
 
-export default function SuppliedQtyDialog({
+const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
   open,
   onOpenChange,
   rbOrders,
-}: SuppliedQtyDialogProps) {
-  const [entries, setEntries] = useState<OrderEntry[]>([]);
-  const batchSupplyMutation = useBatchSupplyRBOrders();
+}) => {
+  const [entries, setEntries] = useState<SupplyEntry[]>([]);
+  const supplyMutation = useBatchSupplyRBOrders();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -46,9 +42,8 @@ export default function SuppliedQtyDialog({
         rbOrders.map((o) => ({
           orderId: o.orderId,
           orderNo: o.orderNo,
-          design: o.design,
-          maxQty: Number(o.quantity),
-          suppliedQty: Number(o.quantity), // pre-fill with full remaining quantity
+          originalQty: Number(o.quantity),
+          suppliedQty: Number(o.quantity),
         }))
       );
     }
@@ -59,149 +54,101 @@ export default function SuppliedQtyDialog({
     setEntries((prev) =>
       prev.map((e) =>
         e.orderId === orderId
-          ? { ...e, suppliedQty: isNaN(num) ? 0 : Math.min(num, e.maxQty) }
+          ? { ...e, suppliedQty: isNaN(num) ? 0 : Math.min(num, e.originalQty) }
           : e
       )
     );
   };
 
-  const handleSubmit = async () => {
-    const validEntries = entries.filter((e) => e.suppliedQty > 0);
-    if (validEntries.length === 0) {
-      toast.error("Please enter at least one supplied quantity");
-      return;
-    }
+  const hasPartialSupply = entries.some((e) => e.suppliedQty < e.originalQty);
 
+  const handleConfirm = async () => {
     try {
-      await batchSupplyMutation.mutateAsync(
-        validEntries.map((e) => [e.orderId, BigInt(e.suppliedQty)] as [string, bigint])
+      await supplyMutation.mutateAsync(
+        entries.map((e) => ({ orderId: e.orderId, suppliedQty: e.suppliedQty }))
       );
-
-      // Force a full refetch to update all tabs with the latest split-row state
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-      await queryClient.refetchQueries({ queryKey: ["orders"] });
-
-      toast.success(`Successfully supplied ${validEntries.length} order(s)`);
+      // Invalidate all order queries so Ready tab and Total Orders both refresh
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
       onOpenChange(false);
-    } catch (error) {
-      await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      toast.error("Failed to supply orders");
+    } catch (err) {
+      // error handled by mutation
     }
   };
 
-  const totalSupplied = entries.reduce((sum, e) => sum + e.suppliedQty, 0);
-  const totalMax = entries.reduce((sum, e) => sum + e.maxQty, 0);
-
-  // Check if any entry is a partial supply
-  const hasPartialSupply = entries.some((e) => e.suppliedQty > 0 && e.suppliedQty < e.maxQty);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-gold" />
-            Supply RB Orders
-          </DialogTitle>
-          <DialogDescription>
-            Enter the quantity supplied for each order. Leave at 0 to skip.
-          </DialogDescription>
+          <DialogTitle>Supply RB Orders</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-3 max-h-80 overflow-y-auto py-1">
           {entries.map((entry) => {
-            const isPartial = entry.suppliedQty > 0 && entry.suppliedQty < entry.maxQty;
+            const remaining = entry.originalQty - entry.suppliedQty;
+            const isPartial = entry.suppliedQty < entry.originalQty;
             return (
-              <div key={entry.orderId} className="space-y-2 p-3 rounded-lg border bg-muted/30">
+              <div key={entry.orderId} className="flex flex-col gap-1 border border-border rounded p-2">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm">{entry.orderNo}</p>
-                    <p className="text-xs text-muted-foreground">{entry.design}</p>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Pending: {entry.maxQty}
-                  </div>
+                  <span className="text-sm font-medium text-foreground">{entry.orderNo}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Original: {entry.originalQty}
+                  </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Label htmlFor={`qty-${entry.orderId}`} className="text-xs w-20 shrink-0">
-                    Supplied Qty
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground w-24 shrink-0">
+                    Supplied Qty:
                   </Label>
                   <Input
-                    id={`qty-${entry.orderId}`}
                     type="number"
                     min={0}
-                    max={entry.maxQty}
+                    max={entry.originalQty}
                     value={entry.suppliedQty}
                     onChange={(e) => handleQtyChange(entry.orderId, e.target.value)}
-                    className="h-8 text-sm"
+                    className="h-7 text-sm"
                   />
                 </div>
-                {entry.maxQty > 0 && (
-                  <Progress
-                    value={(entry.suppliedQty / entry.maxQty) * 100}
-                    className="h-1.5"
-                  />
-                )}
                 {isPartial && (
-                  <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                    <Info className="h-3 w-3 shrink-0" />
-                    <span>
-                      Partial supply: {entry.suppliedQty} supplied, {entry.maxQty - entry.suppliedQty} will remain pending
-                    </span>
-                  </div>
+                  <p className="text-xs text-amber-500">
+                    {remaining} unit(s) will remain as Pending
+                  </p>
                 )}
               </div>
             );
           })}
         </div>
 
-        {entries.length > 0 && (
-          <div className="space-y-2 border-t pt-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Total supplied:</span>
-              <span className="font-semibold">
-                {totalSupplied} / {totalMax}
-              </span>
-            </div>
-            {hasPartialSupply && (
-              <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md p-2">
-                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>
-                  Orders with partial supply will stay in Total Orders with the remaining quantity. The supplied portion will appear in the Ready tab.
-                </span>
-              </div>
-            )}
+        {hasPartialSupply && (
+          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded p-2 text-xs text-amber-500">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              Some orders are partially supplied. The supplied portion will be marked as Ready and
+              the remaining will stay as Pending.
+            </span>
           </div>
         )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={batchSupplyMutation.isPending}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={supplyMutation.isPending}>
             Cancel
           </Button>
           <Button
-            onClick={handleSubmit}
-            disabled={batchSupplyMutation.isPending || entries.every((e) => e.suppliedQty === 0)}
-            className="bg-gold hover:bg-gold-hover text-white"
+            onClick={handleConfirm}
+            disabled={supplyMutation.isPending || entries.some((e) => e.suppliedQty <= 0)}
           >
-            {batchSupplyMutation.isPending ? (
+            {supplyMutation.isPending ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Supplying...
               </>
             ) : (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Confirm Supply
-              </>
+              "Confirm Supply"
             )}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default SuppliedQtyDialog;

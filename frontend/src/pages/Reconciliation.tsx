@@ -1,10 +1,9 @@
-import { useState, useRef } from 'react';
-import { toast } from 'sonner';
-import { Upload, FileCheck, AlertTriangle, CheckCircle2, Loader2, Info } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import React, { useState, useRef } from "react";
+import { OrderType, MasterDataRow } from "../backend";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -12,163 +11,138 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { useReconcileMasterFile, usePersistMasterDataRows } from '@/hooks/useQueries';
-import type { MasterDataRow, MasterReconciliationResult, Order } from '@/backend';
-import { normalizeDesignCode } from '@/utils/excelParser';
+} from "@/components/ui/table";
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { useReconcileMasterFile, usePersistMasterDataRows } from "../hooks/useQueries";
+import { toast } from "sonner";
+import type { Order } from "../backend";
 
-/**
- * Extended row type that carries the parsed Order Type alongside the
- * standard MasterDataRow fields. The orderType is used for display only
- * since MasterDataRow (backend type) does not include it.
- */
-interface ReconciliationRow extends MasterDataRow {
-  orderType: 'SO' | 'CO' | 'RB';
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ParsedRow {
+  orderNo: string;
+  designCode: string;
+  karigar: string;
+  weight: number;
+  quantity: number;
+  orderType: OrderType; // REQ-4: preserve parsed type
+  orderDate?: bigint;
 }
 
-/**
- * Normalize a header name for comparison: uppercase, remove spaces and underscores.
- * e.g. "Order T", "Order Type", "ORDERTYPE" all become "ORDERTYPE"
- * Also handles the truncated "Order T" header seen in the Excel file.
- */
-function normalizeHeaderForOrderType(name: string): boolean {
-  const normalized = name.trim().toUpperCase().replace(/[\s_]+/g, '');
-  // Match "ORDERTYPE", "ORDERT" (truncated), "ORDER T" variants
-  return normalized === 'ORDERTYPE' || normalized === 'ORDERT';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function normalizeHeader(h: unknown): string {
+  return String(h ?? "")
+    .toLowerCase()
+    .replace(/[\s_\-]/g, "");
 }
 
-/**
- * Resolve the Order Type value from a raw cell string.
- * Returns 'RB' for "RB", 'SO' for "SO", 'CO' for "CO", blank, or unrecognised.
- */
-function resolveOrderType(raw: string): 'SO' | 'CO' | 'RB' {
-  const normalized = String(raw || '').trim().toUpperCase();
-  if (normalized === 'RB') return 'RB';
-  if (normalized === 'SO') return 'SO';
-  return 'CO';
+function parseOrderType(raw: unknown): OrderType {
+  const val = String(raw ?? "").trim().toUpperCase();
+  if (val === "RB") return OrderType.RB;
+  if (val === "SO") return OrderType.SO;
+  return OrderType.CO;
 }
 
-async function parseMasterFileForReconciliation(file: File): Promise<ReconciliationRow[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = e.target?.result as ArrayBuffer;
-        const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        // ── Step 1: Scan row 1 headers to find the Order Type column key ──────
-        // sheet_to_json with header:1 gives us the first row as an array of values.
-        const headerRows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          defval: '',
-          range: 0, // only first row
-        });
-
-        let orderTypeHeaderKey: string | null = null;
-        if (headerRows.length > 0) {
-          const firstRow: any[] = headerRows[0];
-          for (const cell of firstRow) {
-            if (cell !== undefined && cell !== null && String(cell).trim() !== '') {
-              const cellStr = String(cell).trim();
-              if (normalizeHeaderForOrderType(cellStr)) {
-                orderTypeHeaderKey = cellStr;
-                break;
-              }
-            }
-          }
-        }
-
-        // ── Step 2: Parse data rows ─────────────────────────────────────────
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-        const rows: ReconciliationRow[] = [];
-        for (const row of jsonData as any[]) {
-          const orderNo = String(
-            row['Order No'] || row['OrderNo'] || row['ORDER NO'] || row['order no'] || ''
-          ).trim();
-          const designCodeRaw = String(
-            row['Design Code'] || row['DesignCode'] || row['Design'] || row['DESIGN CODE'] || row['design code'] || ''
-          ).trim();
-          const designCode = normalizeDesignCode(designCodeRaw);
-          const karigar = String(
-            row['Karigar'] || row['KARIGAR'] || row['karigar'] || row['Karigar Name'] || ''
-          ).trim();
-          const weight = Number(row['Weight'] || row['WEIGHT'] || row['weight'] || 0);
-          const quantity = BigInt(
-            Math.round(Number(row['Quantity'] || row['QUANTITY'] || row['quantity'] || row['Qty'] || 0))
-          );
-
-          // ── Read Order Type from the detected column (column B = "Order T") ──
-          let orderType: 'SO' | 'CO' | 'RB' = 'CO';
-          if (orderTypeHeaderKey !== null) {
-            const rawVal = String(row[orderTypeHeaderKey] || '').trim();
-            orderType = resolveOrderType(rawVal);
-          }
-
-          if (orderNo && designCode) {
-            rows.push({ orderNo, designCode, karigar, weight, quantity, orderType });
-          }
-        }
-        resolve(rows);
-      } catch (err) {
-        reject(err);
+function parseExcelDateSerial(XLSX: any, raw: unknown): bigint | undefined {
+  if (!raw) return undefined;
+  if (typeof raw === "number") {
+    try {
+      const date = XLSX.SSF.parse_date_code(raw);
+      if (date) {
+        const ms = Date.UTC(date.y, date.m - 1, date.d);
+        return BigInt(ms) * BigInt(1_000_000);
       }
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
-  });
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof raw === "string") {
+    const ms = Date.parse(raw);
+    if (!isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
+  }
+  return undefined;
 }
 
-function SummaryCard({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: 'default' | 'gold' | 'green' | 'red';
-}) {
-  const colorMap = {
-    default: 'bg-muted text-foreground',
-    gold: 'bg-gold/10 text-gold border border-gold/30',
-    green: 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/30',
-    red: 'bg-destructive/10 text-destructive border border-destructive/30',
+async function parseMasterFile(file: File): Promise<ParsedRow[]> {
+  // Load XLSX from CDN — not in package.json
+  const XLSX: any = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any);
+
+  const arrayBuffer = await file.arrayBuffer();
+  const data = new Uint8Array(arrayBuffer);
+  const workbook = XLSX.read(data, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: "",
+  }) as unknown[][];
+
+  if (rows.length < 2) return [];
+
+  const headerRow = rows[0] as unknown[];
+  const headers = headerRow.map(normalizeHeader);
+
+  const colIdx = (names: string[]): number => {
+    for (const name of names) {
+      const idx = headers.findIndex((h) => h === name);
+      if (idx !== -1) return idx;
+    }
+    return -1;
   };
-  return (
-    <Card className={`${colorMap[color]} rounded-xl`}>
-      <CardContent className="pt-5 pb-4 px-5">
-        <p className="text-2xl font-bold">{value}</p>
-        <p className="text-xs font-medium mt-1 opacity-80">{label}</p>
-      </CardContent>
-    </Card>
-  );
+
+  const orderNoIdx = colIdx(["orderno", "order no", "ordernumber", "order number"]);
+  const designIdx = colIdx(["designcode", "design code", "design"]);
+  const karigarIdx = colIdx(["karigar", "karigarname", "karigar name"]);
+  const weightIdx = colIdx(["weight", "wt"]);
+  const qtyIdx = colIdx(["quantity", "qty"]);
+  // REQ-4: scan for order type column
+  const orderTypeIdx = colIdx(["ordertype", "order type", "ordert", "order t", "type"]);
+  const orderDateIdx = colIdx(["orderdate", "order date", "date"]);
+
+  const parsed: ParsedRow[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] as unknown[];
+    if (!row || row.length === 0) continue;
+
+    const orderNo = String(row[orderNoIdx] ?? "").trim();
+    const designCode = String(row[designIdx] ?? "").trim().toUpperCase();
+    if (!orderNo || !designCode) continue;
+
+    const karigar = karigarIdx >= 0 ? String(row[karigarIdx] ?? "").trim() : "";
+    const weight = weightIdx >= 0 ? parseFloat(String(row[weightIdx] ?? "0")) || 0 : 0;
+    const quantity = qtyIdx >= 0 ? parseInt(String(row[qtyIdx] ?? "1"), 10) || 1 : 1;
+
+    // REQ-4: parse order type from column if present, else default CO
+    const orderType: OrderType =
+      orderTypeIdx >= 0 ? parseOrderType(row[orderTypeIdx]) : OrderType.CO;
+
+    const orderDate =
+      orderDateIdx >= 0 ? parseExcelDateSerial(XLSX, row[orderDateIdx]) : undefined;
+
+    parsed.push({ orderNo, designCode, karigar, weight, quantity, orderType, orderDate });
+  }
+
+  return parsed;
 }
 
-function OrderTypeBadge({ type }: { type: 'SO' | 'CO' | 'RB' }) {
-  const styles: Record<string, string> = {
-    SO: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/30',
-    CO: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/30',
-    RB: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30',
-  };
-  return (
-    <Badge className={`${styles[type] ?? styles['CO']} hover:opacity-80`}>
-      {type}
-    </Badge>
-  );
-}
+// ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Reconciliation() {
+const Reconciliation: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
+  const [fileName, setFileName] = useState<string>("");
   const [isParsing, setIsParsing] = useState(false);
-  const [result, setResult] = useState<MasterReconciliationResult | null>(null);
-  // Store the full parsed rows (with orderType) separately for display
-  const [parsedNewLines, setParsedNewLines] = useState<ReconciliationRow[]>([]);
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [reconcileResult, setReconcileResult] = useState<{
+    newLines: MasterDataRow[];
+    missingInMaster: Order[];
+    totalUploadedRows: bigint;
+    alreadyExistingRows: bigint;
+    newLinesCount: bigint;
+    missingInMasterCount: bigint;
+  } | null>(null);
+  const [selectedNewLines, setSelectedNewLines] = useState<Set<string>>(new Set());
 
   const reconcileMutation = useReconcileMasterFile();
   const persistMutation = usePersistMasterDataRows();
@@ -177,56 +151,77 @@ export default function Reconciliation() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setFileName(file.name);
+    setReconcileResult(null);
+    setSelectedNewLines(new Set());
     setIsParsing(true);
-    setResult(null);
-    setParsedNewLines([]);
-    setSelectedKeys(new Set());
 
     try {
-      const rows = await parseMasterFileForReconciliation(file);
-      if (rows.length === 0) {
-        toast.error('No valid rows found in the uploaded file. Please check the format.');
-        setIsParsing(false);
-        return;
-      }
-      // Pass only the MasterDataRow fields to the backend (orderType is frontend-only)
-      const masterDataRows: MasterDataRow[] = rows.map(({ orderType: _ot, ...rest }) => rest);
-      const reconciliationResult = await reconcileMutation.mutateAsync(masterDataRows);
-      setResult(reconciliationResult);
-
-      // Build a lookup map for the new lines so we can attach orderType for display
-      const newLineKeys = new Set(
-        reconciliationResult.newLines.map((r) => `${r.orderNo}__${r.designCode}`)
-      );
-      const newLinesWithType = rows.filter((r) =>
-        newLineKeys.has(`${r.orderNo}__${r.designCode}`)
-      );
-      setParsedNewLines(newLinesWithType);
+      const rows = await parseMasterFile(file);
+      setParsedRows(rows);
+      toast.success(`Parsed ${rows.length} rows from ${file.name}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Reconciliation failed: ${message}`);
+      toast.error("Failed to parse Excel file");
+      setParsedRows([]);
     } finally {
       setIsParsing(false);
-      // Reset file input so same file can be re-uploaded
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      // Reset so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const rowKey = (row: MasterDataRow) => `${row.orderNo}__${row.designCode}`;
+  const handleReconcile = async () => {
+    if (parsedRows.length === 0) return;
 
-  const allSelected =
-    parsedNewLines.length > 0 && selectedKeys.size === parsedNewLines.length;
+    // REQ-4: ensure each MasterDataRow carries the correctly parsed orderType
+    const masterDataRows: MasterDataRow[] = parsedRows.map((row) => ({
+      orderNo: row.orderNo,
+      designCode: row.designCode,
+      karigar: row.karigar,
+      weight: row.weight,
+      quantity: BigInt(row.quantity),
+      orderType: row.orderType, // preserve parsed type — NOT hardcoded CO
+      orderDate: row.orderDate,
+    }));
 
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedKeys(new Set());
-    } else {
-      setSelectedKeys(new Set(parsedNewLines.map(rowKey)));
+    try {
+      const result = await reconcileMutation.mutateAsync(masterDataRows);
+      setReconcileResult(result);
+      // Pre-select all new lines
+      setSelectedNewLines(
+        new Set(result.newLines.map((r) => `${r.orderNo}_${r.designCode}`))
+      );
+    } catch (err) {
+      toast.error("Reconciliation failed");
     }
   };
 
-  const toggleRow = (key: string) => {
-    setSelectedKeys((prev) => {
+  const handleAddToTotalOrders = async () => {
+    if (!reconcileResult) return;
+
+    const rowsToAdd = reconcileResult.newLines.filter((r) =>
+      selectedNewLines.has(`${r.orderNo}_${r.designCode}`)
+    );
+
+    if (rowsToAdd.length === 0) {
+      toast.warning("No rows selected");
+      return;
+    }
+
+    try {
+      const response = await persistMutation.mutateAsync(rowsToAdd);
+      toast.success(`Added ${response.persisted.length} orders to Total Orders`);
+      setReconcileResult(null);
+      setParsedRows([]);
+      setFileName("");
+      setSelectedNewLines(new Set());
+    } catch (err) {
+      toast.error("Failed to add orders");
+    }
+  };
+
+  const toggleNewLine = (key: string) => {
+    setSelectedNewLines((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -234,77 +229,43 @@ export default function Reconciliation() {
     });
   };
 
-  const handleAddSelected = async () => {
-    if (!result || selectedKeys.size === 0) return;
-    const selectedRows = parsedNewLines.filter((r) => selectedKeys.has(rowKey(r)));
-    // Strip orderType before sending to backend (MasterDataRow doesn't include it)
-    const masterDataRows: MasterDataRow[] = selectedRows.map(({ orderType: _ot, ...rest }) => rest);
-    try {
-      const response = await persistMutation.mutateAsync(masterDataRows);
-      const count = response.persisted.length;
-      toast.success(
-        count > 0
-          ? `${count} order${count !== 1 ? 's' : ''} added to Total Orders successfully.`
-          : 'No new orders were added (all may already exist).'
+  const toggleAllNewLines = (checked: boolean) => {
+    if (!reconcileResult) return;
+    if (checked) {
+      setSelectedNewLines(
+        new Set(reconcileResult.newLines.map((r) => `${r.orderNo}_${r.designCode}`))
       );
-      // Remove persisted rows from the new lines section
-      const persistedKeys = new Set(
-        response.persisted.map((o: Order) => `${o.orderNo}__${o.design}`)
-      );
-      const remainingParsed = parsedNewLines.filter((r) => !persistedKeys.has(rowKey(r)));
-      setParsedNewLines(remainingParsed);
-      setResult((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          newLines: remainingParsed,
-          newLinesCount: BigInt(remainingParsed.length),
-          alreadyExistingRows: BigInt(Number(prev.alreadyExistingRows) + response.persisted.length),
-        };
-      });
-      setSelectedKeys(new Set());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to add orders: ${message}`);
+    } else {
+      setSelectedNewLines(new Set());
     }
   };
 
+  function orderTypeBadgeColor(type: OrderType): string {
+    if (type === OrderType.RB) return "bg-blue-600 text-white";
+    if (type === OrderType.SO) return "bg-purple-600 text-white";
+    return "bg-green-600 text-white";
+  }
+
+  const allNewLinesSelected =
+    reconcileResult !== null &&
+    reconcileResult.newLines.length > 0 &&
+    reconcileResult.newLines.every((r) =>
+      selectedNewLines.has(`${r.orderNo}_${r.designCode}`)
+    );
+
   const isLoading = isParsing || reconcileMutation.isPending;
 
-  const noDifferences =
-    result &&
-    parsedNewLines.length === 0 &&
-    result.missingInMaster.length === 0;
-
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold/10 text-gold">
-          <FileCheck className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold">Reconciliation</h1>
-          <p className="text-sm text-muted-foreground">
-            Compare your master Excel file against existing database records
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
+      <h1 className="text-xl font-bold text-foreground">Reconciliation</h1>
 
-      <Separator />
-
-      {/* Upload Section */}
+      {/* Upload area */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Upload Master Excel File</CardTitle>
-          <CardDescription>
-            Upload the latest full master Excel file (.xlsx or .xls). The system will compare all
-            rows against existing records using Order No + Design Code as the unique key.
-            Order Type (SO, CO, RB) is read from column B.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <CardContent className="pt-4">
+          <div
+            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-border hover:border-gold/50"
+            onClick={() => !isLoading && fileInputRef.current?.click()}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -313,103 +274,98 @@ export default function Reconciliation() {
               onChange={handleFileChange}
               disabled={isLoading}
             />
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            {fileName ? (
+              <div className="flex items-center justify-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-gold" />
+                <span className="text-sm font-medium text-foreground">{fileName}</span>
+                <span className="text-xs text-muted-foreground">({parsedRows.length} rows)</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Click to upload master Excel file
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">.xlsx or .xls</p>
+              </>
+            )}
+            {isParsing && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <Loader2 className="h-4 w-4 animate-spin text-gold" />
+                <span className="text-sm text-muted-foreground">Parsing...</span>
+              </div>
+            )}
+          </div>
+
+          {parsedRows.length > 0 && (
             <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              className="gap-2"
+              className="mt-3 w-full bg-gold hover:bg-gold-hover text-white"
+              onClick={handleReconcile}
+              disabled={reconcileMutation.isPending}
             >
-              {isLoading ? (
+              {reconcileMutation.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {isParsing ? 'Parsing file…' : 'Reconciling…'}
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Reconciling...
                 </>
               ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Upload & Reconcile
-                </>
+                "Reconcile with Total Orders"
               )}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Accepted formats: .xlsx, .xls — Expected columns: Order No, Order Type, Design Code,
-              Karigar, Weight, Quantity
-            </p>
-          </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Results */}
-      {result && (
+      {reconcileResult && (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <SummaryCard
-              label="Total Uploaded Rows"
-              value={Number(result.totalUploadedRows)}
-              color="default"
-            />
-            <SummaryCard
-              label="Already Existing"
-              value={Number(result.alreadyExistingRows)}
-              color="green"
-            />
-            <SummaryCard
-              label="New Lines"
-              value={parsedNewLines.length}
-              color="gold"
-            />
-            <SummaryCard
-              label="Missing in Master"
-              value={Number(result.missingInMasterCount)}
-              color="red"
-            />
+          {/* Summary */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: "Total Uploaded", value: String(reconcileResult.totalUploadedRows) },
+              { label: "Already Existing", value: String(reconcileResult.alreadyExistingRows) },
+              { label: "New Lines", value: String(reconcileResult.newLinesCount), highlight: true },
+              { label: "Missing in Master", value: String(reconcileResult.missingInMasterCount), warn: true },
+            ].map((item) => (
+              <Card key={item.label}>
+                <CardContent className="pt-3 pb-3 text-center">
+                  <div
+                    className={`text-2xl font-bold ${
+                      item.highlight ? "text-gold" : item.warn ? "text-destructive" : "text-foreground"
+                    }`}
+                  >
+                    {item.value}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">{item.label}</div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          {/* No differences */}
-          {noDifferences && (
-            <Alert>
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>All Clear</AlertTitle>
-              <AlertDescription>No reconciliation differences found.</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Section 1: New Lines Found */}
-          {parsedNewLines.length > 0 && (
+          {/* New Lines table */}
+          {reconcileResult.newLines.length > 0 && (
             <Card>
-              <CardHeader className="pb-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      New Lines Found
-                      <Badge variant="secondary">{parsedNewLines.length}</Badge>
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      These rows exist in the uploaded file but are not found in any existing table.
-                      Select rows to add them to Total Orders.
-                    </CardDescription>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-gold" />
+                    <span className="font-semibold text-foreground">
+                      New Lines ({reconcileResult.newLines.length})
+                    </span>
                   </div>
                   <Button
-                    onClick={handleAddSelected}
-                    disabled={selectedKeys.size === 0 || persistMutation.isPending}
                     size="sm"
-                    className="gap-2 shrink-0"
+                    onClick={handleAddToTotalOrders}
+                    disabled={selectedNewLines.size === 0 || persistMutation.isPending}
+                    className="bg-gold hover:bg-gold-hover text-white"
                   >
                     {persistMutation.isPending ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Adding…
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Adding...
                       </>
                     ) : (
-                      <>
-                        <CheckCircle2 className="h-4 w-4" />
-                        Add Selected to Total Orders
-                        {selectedKeys.size > 0 && (
-                          <Badge variant="outline" className="ml-1 text-xs">
-                            {selectedKeys.size}
-                          </Badge>
-                        )}
-                      </>
+                      `Add Selected (${selectedNewLines.size})`
                     )}
                   </Button>
                 </div>
@@ -419,51 +375,50 @@ export default function Reconciliation() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-10 pl-4">
+                        <TableHead className="w-10">
                           <Checkbox
-                            checked={!!allSelected}
-                            onCheckedChange={toggleSelectAll}
-                            aria-label="Select all"
+                            checked={allNewLinesSelected}
+                            onCheckedChange={(v) => toggleAllNewLines(!!v)}
                           />
                         </TableHead>
                         <TableHead>Order No</TableHead>
-                        <TableHead>Order Type</TableHead>
-                        <TableHead>Design Code</TableHead>
+                        <TableHead>Design</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Karigar</TableHead>
-                        <TableHead className="text-right">Weight</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Qty</TableHead>
+                        <TableHead>Weight</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {parsedNewLines.map((row) => {
-                        const key = rowKey(row);
+                      {reconcileResult.newLines.map((row) => {
+                        const key = `${row.orderNo}_${row.designCode}`;
+                        const isSelected = selectedNewLines.has(key);
                         return (
                           <TableRow
                             key={key}
-                            className="cursor-pointer"
-                            onClick={() => toggleRow(key)}
+                            className={`cursor-pointer ${isSelected ? "bg-gold/10" : ""}`}
+                            onClick={() => toggleNewLine(key)}
                           >
-                            <TableCell className="pl-4" onClick={(e) => e.stopPropagation()}>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
                               <Checkbox
-                                checked={selectedKeys.has(key)}
-                                onCheckedChange={() => toggleRow(key)}
-                                aria-label={`Select ${row.orderNo}`}
+                                checked={isSelected}
+                                onCheckedChange={() => toggleNewLine(key)}
                               />
                             </TableCell>
-                            <TableCell className="font-medium">{row.orderNo}</TableCell>
+                            <TableCell className="text-sm font-medium">{row.orderNo}</TableCell>
+                            <TableCell className="text-sm">{row.designCode}</TableCell>
                             <TableCell>
-                              <OrderTypeBadge type={row.orderType} />
+                              <span
+                                className={`text-xs font-bold px-2 py-0.5 rounded ${orderTypeBadgeColor(
+                                  row.orderType
+                                )}`}
+                              >
+                                {row.orderType}
+                              </span>
                             </TableCell>
-                            <TableCell>{row.designCode}</TableCell>
-                            <TableCell>{row.karigar || '—'}</TableCell>
-                            <TableCell className="text-right">{row.weight.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">{String(row.quantity)}</TableCell>
-                            <TableCell>
-                              <Badge className="bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20">
-                                New
-                              </Badge>
-                            </TableCell>
+                            <TableCell className="text-sm">{row.karigar}</TableCell>
+                            <TableCell className="text-sm">{String(row.quantity)}</TableCell>
+                            <TableCell className="text-sm">{row.weight.toFixed(2)}g</TableCell>
                           </TableRow>
                         );
                       })}
@@ -474,82 +429,51 @@ export default function Reconciliation() {
             </Card>
           )}
 
-          {/* Section 2: Missing in Master */}
-          {result.missingInMaster.length > 0 && (
+          {/* Missing in Master table */}
+          {reconcileResult.missingInMaster.length > 0 && (
             <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      Missing in Master
-                      <Badge variant="destructive">{result.missingInMaster.length}</Badge>
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      These records exist in the database (Pending or Ready status) but were{' '}
-                      <strong>not found</strong> in the uploaded master file. This section is for
-                      review only — no records will be modified or deleted automatically.
-                    </CardDescription>
-                  </div>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <span className="font-semibold text-foreground">
+                    Missing in Master ({reconcileResult.missingInMaster.length})
+                  </span>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <Alert className="mx-4 mb-3 border-amber-500/30 bg-amber-500/5">
-                  <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  <AlertDescription className="text-xs text-amber-700 dark:text-amber-300">
-                    Informational only. No automatic changes will be made to these records.
-                  </AlertDescription>
-                </Alert>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Order No</TableHead>
-                        <TableHead>Order Type</TableHead>
-                        <TableHead>Design Code</TableHead>
-                        <TableHead>Current Status</TableHead>
-                        <TableHead>Karigar</TableHead>
-                        <TableHead className="text-right">Weight</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead>Flag</TableHead>
+                        <TableHead>Design</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Qty</TableHead>
+                        <TableHead>Weight</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {result.missingInMaster.map((order) => (
+                      {reconcileResult.missingInMaster.map((order) => (
                         <TableRow key={order.orderId}>
-                          <TableCell className="font-medium">{order.orderNo}</TableCell>
+                          <TableCell className="text-sm font-medium">{order.orderNo}</TableCell>
+                          <TableCell className="text-sm">{order.design}</TableCell>
                           <TableCell>
-                            <OrderTypeBadge
-                              type={
-                                order.orderType === 'RB'
-                                  ? 'RB'
-                                  : order.orderType === 'SO'
-                                  ? 'SO'
-                                  : 'CO'
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>{order.design}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                order.status === 'Ready'
-                                  ? 'border-blue-500/40 text-blue-600 dark:text-blue-400'
-                                  : 'border-muted-foreground/40 text-muted-foreground'
-                              }
+                            <span
+                              className={`text-xs font-bold px-2 py-0.5 rounded ${orderTypeBadgeColor(
+                                order.orderType
+                              )}`}
                             >
-                              {String(order.status)}
-                            </Badge>
+                              {order.orderType}
+                            </span>
                           </TableCell>
-                          <TableCell>{order.karigarName || '—'}</TableCell>
-                          <TableCell className="text-right">{order.weight.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{String(order.quantity)}</TableCell>
                           <TableCell>
-                            <Badge variant="destructive" className="text-xs">
-                              Missing in Master
+                            <Badge variant="outline" className="text-xs">
+                              {order.status}
                             </Badge>
                           </TableCell>
+                          <TableCell className="text-sm">{String(order.quantity)}</TableCell>
+                          <TableCell className="text-sm">{order.weight.toFixed(2)}g</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -562,4 +486,6 @@ export default function Reconciliation() {
       )}
     </div>
   );
-}
+};
+
+export default Reconciliation;

@@ -1,111 +1,121 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Batch 3 & 4: Grouped display layout with expandable rows, ageing badges, image modal, and filters/search across tabs",
+  "title": "Fix UI layout, RB partial supply display, Hallmark return flow, and Reconciliation order type preservation",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Transform Total Orders tab to display grouped, expandable design code rows with ageing badges, karigar name, order type badges, and hierarchical selection",
+      "summary": "Update order row layout in TotalOrdersTab to match IMG_6511-2: display order number + sub-info on left, generic/type label in centre, date + ageing badge on right, red × delete icon far right; make entire child row clickable for selection; retain group header checkbox and design code click-to-open-modal",
       "acceptanceCriteria": [
-        "Orders are visually grouped by design code with a collapsible group header row",
-        "Group header shows design code, order type badge (RB/CO/SO), karigar name, sub-order count, qty, and weight",
-        "Chevron icon toggles expand/collapse of sub-orders for that group",
-        "Sub-order rows show order number, qty, weight, generic name, order date, and ageing badge",
-        "Ageing badge is green for ≤14 days, amber for 15–29 days, red for ≥30 days",
-        "Group checkbox selects/deselects all sub-orders in the group",
-        "Individual sub-order checkboxes work independently",
-        "Mark as Ready action works correctly on selected sub-orders"
+        "Child rows display: order number + sub-info on left, generic/type label in centre column, date + ageing badge on right, red × delete icon far right",
+        "Clicking anywhere on a child row toggles its selection (no dedicated checkbox column on child rows)",
+        "Group header checkbox still works for bulk select of all children",
+        "Clicking the design code in the group header opens the DesignImageModal with the correct design image",
+        "Layout matches IMG_6511-2 visually"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Replace the existing OrderTable with a new grouped layout that groups orders by design code. Implement collapsible group rows with a chevron toggle. Each group header displays: design code (clickable), order type badge (RB/CO/SO derived from first order in group), karigar name, total sub-order count, aggregate qty sum, and aggregate weight sum. Include a checkbox on the group header that selects/deselects all sub-orders in that group. Sub-order rows (shown when expanded) display: order number, qty, weight, generic name, order date, and an ageing badge computed as days since order date (green ≤14d, amber 15–29d, red ≥30d). Each sub-order has its own checkbox. Preserve the existing Mark as Ready action and SuppliedQtyDialog for RB orders. Manage expansion state using React state (e.g., a Set of expanded design codes)."
+          "description": "Refactor child row rendering to match IMG_6511-2 layout: remove standalone checkbox column from child rows, display order number + Qty/Wt on left, generic/type label (e.g. CHAIN, IPL) in a separate centre column, date + ageing badge side by side on right, red × delete icon far right. Make entire child row clickable to toggle selection state. Retain group header checkbox for bulk selection and ensure design code in group header opens DesignImageModal on click."
         },
         {
-          "path": "frontend/src/utils/ageingBadge.tsx",
-          "operation": "create",
-          "description": "Create a reusable AgeingBadge component that accepts an order date (Time bigint) and computes the number of days since that date. Return a badge with the text '{days}d' and background color: green (bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300) for ≤14 days, amber (bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300) for 15–29 days, red (bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300) for ≥30 days. Use Tailwind classes and shadcn/ui Badge component for consistent styling."
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Apply the same child row layout update as TotalOrdersTab to match IMG_6511-2: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Apply the same child row layout update as TotalOrdersTab to match IMG_6511-2: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
+        },
+        {
+          "path": "frontend/src/pages/AgeingStock.tsx",
+          "operation": "modify",
+          "description": "Apply the same child row layout update to match IMG_6511-2 if this page uses the same grouped row structure: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
+        },
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Apply the same child row layout update to match IMG_6511-2 if this page uses the same grouped row structure: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
+        },
+        {
+          "path": "frontend/src/pages/TagPrinting.tsx",
+          "operation": "modify",
+          "description": "Apply the same child row layout update to match IMG_6511-2 if this page uses the same grouped row structure: remove child row checkbox column, display order number + sub-info on left, generic/type label centre, date + ageing badge right, red × delete icon far right, and make entire child row clickable for selection. Retain group header checkbox and design code modal trigger."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Apply the same grouped design code layout with expandable sub-orders, ageing badges, karigar name, and order type badges to Ready and Hallmark tabs",
+      "summary": "Fix Ready tab so that after a partial supply on an RB order, the supplied portion order row appears in the Ready tab with status Ready",
       "acceptanceCriteria": [
-        "Ready tab groups orders by design code with expandable sub-orders, ageing badges, karigar name, and order type badge",
-        "Hallmark tab groups orders by design code with expandable sub-orders, ageing badges, karigar name, and order type badge",
-        "Existing action buttons (return to pending, mark as returned) remain functional on sub-order rows or group rows as appropriate"
+        "After performing a partial supply on an RB order, the supplied portion row appears in the Ready tab with status Ready",
+        "The remaining unsupplied portion continues to appear in Total Orders with Pending status",
+        "No other tabs or order rows are affected"
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Replace the existing table with the same grouped design code layout implemented in TotalOrdersTab. Group ready orders by design code, display group headers with design code (clickable), order type badge, karigar name, sub-order count, aggregate qty, and aggregate weight. Include a chevron toggle for expand/collapse and a group checkbox. Sub-order rows show order number, qty, weight, generic name, order date, and ageing badge (reusing the AgeingBadge component). Preserve the existing 'return to pending' action (delete mutation) on individual sub-orders. Manage expansion state per-group."
+          "description": "Review the query or filter logic used to fetch Ready-status orders and ensure that newly supplied-portion orders (created by partial supply on RB orders) are correctly included when their status is Ready. Verify no additional frontend filter is excluding these rows."
         },
         {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Replace the existing table with the same grouped design code layout. Group hallmark orders by design code, display group headers with design code (clickable), order type badge, karigar name, sub-order count, aggregate qty, and aggregate weight. Include a chevron toggle and group checkbox. Sub-order rows show order number, qty, weight, generic name, order date, and ageing badge. Preserve the existing filters (order type, karigar, date range, search text) and the 'mark as returned' bulk action. Ensure the filters operate on the grouped data and the bulk selection applies across expanded sub-orders. Manage expansion state per-group."
+          "description": "Review the supply flow (SuppliedQtyDialog and related mutations) to ensure that when a partial supply is performed on an RB order, the frontend correctly invalidates queries so that the supplied portion (now Ready) appears in the Ready tab and the remaining portion (still Pending) remains in Total Orders."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "operation": "modify",
+          "description": "Ensure that after calling the supply mutation for a partial RB order, the query invalidation includes both the Ready tab query and Total Orders query so that the UI reflects the supplied portion in Ready and the remaining portion in Total Orders immediately."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Enable design code click in group headers to open DesignImageModal across Total Orders, Ready, and Hallmark tabs",
+      "summary": "Fix Hallmark tab 'Mark as Returned' action so that orders with status Hallmark are moved to Total Orders with status Pending after being marked as returned",
       "acceptanceCriteria": [
-        "Clicking a design code text in the group header opens DesignImageModal for that design code",
-        "Modal shows the design image with zoom and pan (existing DesignImageModal behaviour)",
-        "Modal can be closed and the table remains in its current expand/collapse state",
-        "Works across Total Orders, Ready, and Hallmark tabs"
+        "Clicking 'Mark as Returned' on a Hallmark-status order removes it from the Hallmark tab",
+        "The returned order appears in the Total Orders tab with status Pending",
+        "No other status transitions or tab behaviours are changed"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Add state to track the currently selected design code for the image modal (e.g., const [selectedDesignCode, setSelectedDesignCode] = useState<string | null>(null)). In the group header row, wrap the design code text in a clickable element (button or link styled as text) that calls setSelectedDesignCode(designCode) on click. Render the existing DesignImageModal component at the bottom of the component, passing selectedDesignCode and an onClose handler that resets selectedDesignCode to null. Ensure the modal does not interfere with expansion state."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Add state to track the currently selected design code for the image modal. In the group header row, make the design code clickable to open DesignImageModal. Render DesignImageModal at the bottom of the component with selectedDesignCode and onClose handler. Preserve expansion state when modal opens and closes."
-        },
-        {
           "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
           "operation": "modify",
-          "description": "Add state to track the currently selected design code for the image modal. In the group header row, make the design code clickable to open DesignImageModal. Render DesignImageModal at the bottom of the component with selectedDesignCode and onClose handler. Preserve expansion state when modal opens and closes."
+          "description": "Review the 'Mark as Returned' button handler to ensure it calls the correct backend method (batchReturnOrdersToPending or equivalent) and that the mutation invalidates both the Hallmark tab query and the Total Orders query so that returned orders immediately disappear from Hallmark and reappear in Total Orders with status Pending."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Verify that the query used in TotalOrdersTab includes orders with status Pending returned from Hallmark, and that query invalidation after the Hallmark return mutation causes these orders to appear correctly."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Add search bar and two filter dropdowns (order type, karigar) above the orders table in Total Orders, Ready, and Hallmark tabs",
+      "summary": "Fix Reconciliation page so that each row's parsed order type (RB, SO, or CO) is correctly preserved when rows are added to Total Orders",
       "acceptanceCriteria": [
-        "Search bar is present above the orders table in Total Orders, Ready, and Hallmark tabs",
-        "Typing in the search bar filters groups/sub-orders by design code, order number, or generic name (partial, case-insensitive)",
-        "Order type dropdown offers options: All Types, RB, CO, SO",
-        "Karigar dropdown is populated with unique karigar names from current orders, plus an 'All Karigars' default",
-        "Selecting an order type hides groups that do not match",
-        "Selecting a karigar hides groups not assigned to that karigar",
-        "All three controls combine with AND logic",
-        "Filters reset when switching tabs",
-        "Layout matches the screenshot: search left, two dropdowns right"
+        "Each reconciliation row carries its correctly parsed order type (RB, SO, or CO) when saved to the backend",
+        "Orders added from reconciliation appear in Total Orders with their correct type (RB rows show RB, SO rows show SO, CO rows show CO)",
+        "No other reconciliation behaviour or parsing logic is changed"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/pages/Reconciliation.tsx",
+          "operation": "modify",
+          "description": "Review the code that parses order type from the master file rows and ensure that when calling persistMasterDataRows, each MasterDataRow object includes the correctly parsed orderType (RB, SO, or CO). Verify that the frontend is not overriding the parsed type to CO before sending the data to the backend."
+        },
+        {
+          "path": "frontend/src/utils/excelParser.ts",
+          "operation": "modify",
+          "description": "Review the master file parsing logic to confirm that the order type is correctly extracted and set on each MasterDataRow object, and that no default CO override is applied during parsing."
+        },
+        {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Add state for search text, selected order type filter (All Types | RB | CO | SO), and selected karigar filter (All Karigars | specific karigar name). Derive the list of unique karigars from the orders data. Above the grouped table, render a flex container with: a search input (shadcn/ui Input) on the left with placeholder 'Search by order no, design code, generic name', and two shadcn/ui Select dropdowns on the right styled as pill/capsule buttons (one for order type, one for karigar). Apply filters to the orders data before grouping: filter by search text (match design code, order number, or generic name case-insensitively), filter by order type if not 'All Types', filter by karigar name if not 'All Karigars'. Use AND logic. Reset filters to default on component mount or when tab changes."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Add state for search text, order type filter, and karigar filter. Derive unique karigars from ready orders. Above the grouped table, render the same filter UI: search input on the left, two pill-style Select dropdowns (order type, karigar) on the right. Apply filters to ready orders before grouping using AND logic (search text matches design code/order number/generic name, order type matches if not 'All Types', karigar matches if not 'All Karigars'). Reset filters on component mount."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "HallmarkTab already has filters (order type, karigar, date range, search text). Refactor the existing filter UI to match the new layout: search input on the left, order type and karigar dropdowns on the right (styled as pills). Ensure the filters combine with AND logic and apply to the grouped data. Preserve the existing date range filter and export functionality. Reset filters on component mount."
+          "description": "Verify that after reconciliation rows are persisted to the backend, the Total Orders tab query refresh correctly displays each order with its parsed type (RB, SO, or CO) as set in the MasterDataRow."
         }
       ]
     }

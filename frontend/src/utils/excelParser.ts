@@ -1,420 +1,146 @@
-import { OrderType } from '@/backend';
-
-interface ParseError {
-  row: number;
-  field: string;
-  message: string;
-}
-
-export interface ParseResult<T> {
-  data: T[];
-  errors: ParseError[];
-}
-
 /**
- * Normalize design code by trimming whitespace and converting to uppercase.
- * This ensures consistent matching between order Excel and Master Design Excel.
+ * Excel parsing utilities.
+ * Uses SheetJS loaded dynamically from CDN to avoid npm package dependency.
  */
-export function normalizeDesignCode(code: string): string {
-  return code.trim().toUpperCase();
-}
 
-/**
- * Normalize a header name for comparison: uppercase, remove spaces and underscores.
- * e.g. "Order Type", "order_type", "ORDERTYPE" all become "ORDERTYPE"
- */
-function normalizeHeaderName(name: string): string {
-  return name.trim().toUpperCase().replace(/[\s_]+/g, '');
-}
+import { OrderType } from "../backend";
 
-/**
- * Safely extract a numeric value from an Excel row cell.
- */
-function extractNumber(row: any, ...keys: string[]): number {
-  for (const key of keys) {
-    const val = row[key];
-    if (val !== undefined && val !== null && val !== '') {
-      const num = Number(val);
-      if (!isNaN(num)) return num;
-    }
-  }
-  return 0;
-}
-
-/**
- * Safely extract a string value from an Excel row cell.
- */
-function extractString(row: any, ...keys: string[]): string {
-  for (const key of keys) {
-    const val = row[key];
-    if (val !== undefined && val !== null && String(val).trim() !== '') {
-      return String(val).trim();
-    }
-  }
-  return '';
-}
-
-/**
- * Parse a DD/MM/YYYY (or DD-MM-YYYY) string into epoch milliseconds.
- * Returns null if the string does not match the pattern or produces an invalid date.
- */
-function parseDDMMYYYY(str: string): number | null {
-  // Support both "/" and "-" separators
-  const match = str.trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (!match) return null;
-  const day = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10) - 1; // zero-indexed month
-  const year = parseInt(match[3], 10);
-  if (day < 1 || day > 31 || month < 0 || month > 11 || year < 1900) return null;
-  const date = new Date(year, month, day);
-  // Validate the date components round-trip correctly
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-  const ts = date.getTime();
-  if (isNaN(ts) || ts <= 0) return null;
-  return ts;
-}
-
-/**
- * Convert an Excel serial number to a JS timestamp (ms).
- *
- * The Excel file is created in an Indian locale where dates are entered as DD/MM/YYYY.
- * Excel (especially on Mac/iOS with Indian locale) correctly interprets and stores
- * DD/MM/YYYY dates as their proper serial numbers — no day/month swap is needed.
- *
- * For dates where day > 12 (e.g. "19/02/2026"), Excel cannot parse as MM/DD so it
- * stores the value as a text string — those are handled by parseDDMMYYYY instead
- * and never reach this function.
- *
- * For dates where day <= 12 (e.g. "03/12/2025"), Excel stores the correct serial
- * for December 3, 2025 — we just convert directly without any swap.
- */
-function excelSerialToTimestamp(serial: number): number | null {
-  if (!isFinite(serial) || serial <= 0) return null;
-  // Account for Excel's Lotus 1-2-3 leap year bug (serial 60 = fake Feb 29, 1900)
-  const adjustedSerial = serial > 60 ? serial - 1 : serial;
-  // 25569 = days between Excel epoch (Jan 1 1900) and Unix epoch (Jan 1 1970)
-  const msFromUnixEpoch = (adjustedSerial - 25569) * 86400 * 1000;
-  const date = new Date(msFromUnixEpoch);
-  if (isNaN(date.getTime())) return null;
-  return date.getTime();
-}
-
-/**
- * Extract and parse an order date from an Excel row.
- *
- * Priority:
- * 1. Strings — try DD/MM/YYYY first (primary format for Indian locale), then ISO, then fallback
- * 2. Numbers (Excel serial dates) — convert directly (no day/month swap needed)
- * 3. JS Date objects (from cellDates:true) — use directly
- *
- * Returns epoch milliseconds (number) or null. Never returns NaN or undefined.
- */
-function extractOrderDate(row: any): number | null {
-  const keys = [
-    'Order Date', 'OrderDate', 'ORDER DATE', 'order_date', 'orderdate',
-    'Date', 'DATE', 'Dt', 'DT', 'Order Dt', 'ORDER DT',
-  ];
-
-  for (const key of keys) {
-    const val = row[key];
-    if (val === undefined || val === null || val === '') continue;
-
-    try {
-      // Case 1: String — try DD/MM/YYYY first (primary format), then fallbacks
-      if (typeof val === 'string') {
-        const trimmed = val.trim();
-        if (!trimmed) continue;
-
-        // Primary: DD/MM/YYYY or DD-MM-YYYY
-        const ddmmTs = parseDDMMYYYY(trimmed);
-        if (ddmmTs !== null) return ddmmTs;
-
-        // ISO YYYY-MM-DD
-        if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-          const d = new Date(trimmed);
-          if (!isNaN(d.getTime())) return d.getTime();
-        }
-
-        // Last resort: native Date.parse (may misinterpret ambiguous formats)
-        const parsed = Date.parse(trimmed);
-        if (!isNaN(parsed) && parsed > 0) return parsed;
-        continue;
-      }
-
-      // Case 2: Number — Excel serial date; convert directly (Indian locale = correct serial)
-      if (typeof val === 'number' && !isNaN(val) && isFinite(val) && val > 0) {
-        const ts = excelSerialToTimestamp(val);
-        if (ts !== null && ts > 0) return ts;
-        continue;
-      }
-
-      // Case 3: JS Date object (SheetJS cellDates:true) — use directly
-      if (val instanceof Date) {
-        const rawTs = val.getTime();
-        if (!isNaN(rawTs) && rawTs > 0) return rawTs;
-        continue;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Resolve the Order Type value from a raw cell string.
- * Returns OrderType.RB for "RB", OrderType.SO for "SO",
- * and OrderType.CO for "CO", blank, or any unrecognised value.
- */
-function resolveOrderType(raw: string): OrderType {
-  const normalized = raw.trim().toUpperCase();
-  if (normalized === 'RB') return OrderType.RB;
-  if (normalized === 'SO') return OrderType.SO;
-  return OrderType.CO; // CO, blank, or unrecognised → default CO
-}
-
-export async function parseExcelFile(file: File): Promise<
-  ParseResult<{
-    orderNo: string;
-    orderType: OrderType;
-    product: string;
-    design: string;
-    weight: number;
-    size: number;
-    quantity: number;
-    remarks: string;
-    orderDate: number | null;
-  }>
-> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-      try {
-        const data = e.target?.result as ArrayBuffer;
-
-        // Use CDN dynamic import — 'xlsx' is not in package.json
-        const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
-
-        // Do NOT use cellDates:true — we want raw serial numbers so we can apply
-        // our own conversion logic.
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        // ── Step 1: Scan row 1 headers for an "Order Type" column ──────────────
-        // We read the raw header row to find the column key that matches
-        // "ORDERTYPE" (after normalizing spaces/underscores/case).
-        const TARGET_HEADER = normalizeHeaderName('Order Type'); // "ORDERTYPE"
-        let orderTypeHeaderKey: string | null = null;
-
-        // sheet_to_json with header:1 gives us the first row as an array of values.
-        const headerRows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          defval: '',
-          range: 0, // only first row
-        });
-
-        if (headerRows.length > 0) {
-          const firstRow: any[] = headerRows[0];
-          for (const cell of firstRow) {
-            if (cell !== undefined && cell !== null && String(cell).trim() !== '') {
-              const cellStr = String(cell).trim();
-              if (normalizeHeaderName(cellStr) === TARGET_HEADER) {
-                // Found the header — record the exact key as it appears in the sheet
-                orderTypeHeaderKey = cellStr;
-                break;
-              }
-            }
-          }
-        }
-
-        // ── Step 2: Parse data rows ─────────────────────────────────────────────
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-        const orders: any[] = [];
-        const errors: ParseError[] = [];
-
-        const CHUNK_SIZE = 100;
-        for (let i = 0; i < jsonData.length; i += CHUNK_SIZE) {
-          const chunk = (jsonData as any[]).slice(i, Math.min(i + CHUNK_SIZE, jsonData.length));
-
-          chunk.forEach((row: any, chunkIndex: number) => {
-            const index = i + chunkIndex;
-            const rowNumber = index + 2;
-
-            const orderNo = extractString(row, 'Order No', 'OrderNo', 'ORDER NO', 'order_no', 'orderno');
-            const product = extractString(row, 'Product', 'PRODUCT', 'product');
-            const designRaw = extractString(row, 'Design', 'DESIGN', 'design', 'Design Code', 'DesignCode');
-            const design = normalizeDesignCode(designRaw);
-            const weight = extractNumber(row, 'Weight', 'WEIGHT', 'weight', 'Wt', 'WT');
-            const size = extractNumber(row, 'Size', 'SIZE', 'size');
-            const quantity = extractNumber(row, 'Quantity', 'QUANTITY', 'Qty', 'QTY', 'qty', 'quantity');
-            const remarks = extractString(row, 'Remarks', 'REMARKS', 'remarks', 'Remark', 'REMARK');
-            const orderDate: number | null = extractOrderDate(row);
-
-            // ── Determine Order Type ──────────────────────────────────────────
-            // If an "Order Type" header column was found in row 1, read from it.
-            // Otherwise fall back to CO for all rows (backward compatibility).
-            let orderType: OrderType;
-            if (orderTypeHeaderKey !== null) {
-              const rawVal = extractString(row, orderTypeHeaderKey);
-              orderType = resolveOrderType(rawVal);
-            } else {
-              // No Order Type column in this file — default all to CO
-              orderType = OrderType.CO;
-            }
-
-            if (!orderNo) {
-              errors.push({ row: rowNumber, field: 'Order No', message: 'Order No is required' });
-            }
-            if (!product) {
-              errors.push({ row: rowNumber, field: 'Product', message: 'Product is required' });
-            }
-            if (!design) {
-              errors.push({ row: rowNumber, field: 'Design', message: 'Design is required' });
-            }
-
-            if (orderNo) {
-              orders.push({
-                orderNo,
-                orderType,
-                product,
-                design,
-                weight,
-                size,
-                quantity,
-                remarks,
-                orderDate,
-              });
-            }
-          });
-
-          if (i + CHUNK_SIZE < jsonData.length) {
-            await new Promise((res) => setTimeout(res, 0));
-          }
-        }
-
-        resolve({ data: orders, errors });
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-export async function parseMasterDesignExcel(file: File): Promise<
-  ParseResult<{
-    designCode: string;
-    genericName: string;
-    karigarName: string;
-  }>
-> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-      try {
-        const data = e.target?.result as ArrayBuffer;
-
-        const XLSX: any = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
-
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-
-        const mappings: any[] = [];
-        const errors: ParseError[] = [];
-
-        const CHUNK_SIZE = 100;
-        const totalRows = range.e.r;
-
-        for (let startRow = 1; startRow <= totalRows; startRow += CHUNK_SIZE) {
-          const endRow = Math.min(startRow + CHUNK_SIZE - 1, totalRows);
-
-          for (let row = startRow; row <= endRow; row++) {
-            const rowNumber = row + 1;
-
-            const cellA = worksheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
-            const cellB = worksheet[XLSX.utils.encode_cell({ r: row, c: 1 })];
-            const cellC = worksheet[XLSX.utils.encode_cell({ r: row, c: 2 })];
-
-            const designCodeRaw = cellA ? String(cellA.v || '').trim() : '';
-            const designCode = normalizeDesignCode(designCodeRaw);
-            const genericName = cellB ? String(cellB.v || '').trim() : '';
-            const karigarName = cellC ? String(cellC.v || '').trim() : '';
-
-            if (!designCode && !genericName && !karigarName) continue;
-
-            if (!designCode) {
-              errors.push({ row: rowNumber, field: 'Column A (DESIGN CODE)', message: 'Design Code is required' });
-            }
-            if (!genericName) {
-              errors.push({ row: rowNumber, field: 'Column B (GENERIC NAME)', message: 'Generic Name is required' });
-            }
-            if (!karigarName) {
-              errors.push({ row: rowNumber, field: 'Column C (KARIGAR NAME)', message: 'Karigar Name is required' });
-            }
-
-            if (designCode && genericName && karigarName) {
-              mappings.push({ designCode, genericName, karigarName });
-            }
-          }
-
-          if (startRow + CHUNK_SIZE <= totalRows) {
-            await new Promise((res) => setTimeout(res, 0));
-          }
-        }
-
-        resolve({ data: mappings, errors });
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-/**
- * Parse an orders Excel file and return an array of parsed orders ready for upload.
- * This is the convenience wrapper used by IngestOrders.tsx.
- */
-export async function parseOrdersExcel(file: File): Promise<Array<{
+export interface ParsedOrder {
   orderNo: string;
   orderType: OrderType;
   product: string;
   design: string;
   weight: number;
   size: number;
-  quantity: bigint;
+  quantity: number;
   remarks: string;
   orderId: string;
-  orderDate: number | null;
-}>> {
-  const result = await parseExcelFile(file);
+  orderDate: bigint | null;
+}
 
-  if (result.errors.length > 0) {
-    console.warn('Parsing errors:', result.errors);
+/** Normalize a design code: uppercase, trim whitespace */
+export function normalizeDesignCode(raw: string): string {
+  return raw.trim().toUpperCase();
+}
+
+function normalizeHeader(h: unknown): string {
+  return String(h ?? "")
+    .toLowerCase()
+    .replace(/[\s_\-]/g, "");
+}
+
+function resolveOrderType(raw: unknown): OrderType {
+  const val = String(raw ?? "").trim().toUpperCase();
+  if (val === "RB") return OrderType.RB;
+  if (val === "SO") return OrderType.SO;
+  return OrderType.CO;
+}
+
+async function loadXLSX(): Promise<any> {
+  // Use dynamic CDN import — xlsx is not in package.json
+  const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any);
+  return XLSX;
+}
+
+function parseExcelDateSerial(XLSX: any, raw: unknown): bigint | null {
+  if (!raw) return null;
+  if (typeof raw === "number") {
+    try {
+      const date = XLSX.SSF.parse_date_code(raw);
+      if (date) {
+        const ms = Date.UTC(date.y, date.m - 1, date.d);
+        return BigInt(ms) * BigInt(1_000_000);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof raw === "string") {
+    const ms = Date.parse(raw);
+    if (!isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
+  }
+  return null;
+}
+
+/**
+ * Parse an Excel file (as File or Uint8Array) and return an array of ParsedOrder objects.
+ * Accepts a File object — reads it internally.
+ */
+export async function parseOrdersExcel(file: File): Promise<ParsedOrder[]> {
+  const XLSX = await loadXLSX();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const data = new Uint8Array(arrayBuffer);
+
+  const workbook = XLSX.read(data, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: "",
+  }) as unknown[][];
+
+  if (rows.length < 2) return [];
+
+  const headerRow = rows[0] as unknown[];
+  const headers = headerRow.map(normalizeHeader);
+
+  const colIdx = (names: string[]): number => {
+    for (const name of names) {
+      const idx = headers.findIndex((h) => h === name);
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
+  const orderNoIdx = colIdx(["orderno", "ordernumber", "order no", "order number"]);
+  const orderTypeIdx = colIdx(["ordertype", "order type", "ordert", "order t", "type"]);
+  const productIdx = colIdx(["product", "productname", "product name"]);
+  const designIdx = colIdx(["designcode", "design code", "design"]);
+  const weightIdx = colIdx(["weight", "wt"]);
+  const sizeIdx = colIdx(["size"]);
+  const qtyIdx = colIdx(["quantity", "qty"]);
+  const remarksIdx = colIdx(["remarks", "remark", "note", "notes"]);
+  const orderDateIdx = colIdx(["orderdate", "order date", "date"]);
+
+  const parsed: ParsedOrder[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] as unknown[];
+    if (!row || row.every((c) => !c)) continue;
+
+    const orderNo = String(row[orderNoIdx] ?? "").trim();
+    const design = normalizeDesignCode(String(row[designIdx] ?? "").trim());
+    if (!orderNo || !design) continue;
+
+    const orderType: OrderType =
+      orderTypeIdx >= 0 ? resolveOrderType(row[orderTypeIdx]) : OrderType.CO;
+
+    const product = productIdx >= 0 ? String(row[productIdx] ?? "").trim() : "";
+    const weight = weightIdx >= 0 ? parseFloat(String(row[weightIdx] ?? "0")) || 0 : 0;
+    const size = sizeIdx >= 0 ? parseFloat(String(row[sizeIdx] ?? "0")) || 0 : 0;
+    const quantity = qtyIdx >= 0 ? parseInt(String(row[qtyIdx] ?? "1"), 10) || 1 : 1;
+    const remarks = remarksIdx >= 0 ? String(row[remarksIdx] ?? "").trim() : "";
+    const orderDate =
+      orderDateIdx >= 0 ? parseExcelDateSerial(XLSX, row[orderDateIdx]) : null;
+
+    const orderId = `${orderNo}_${design}_${Date.now()}_${i}_${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
+
+    parsed.push({
+      orderNo,
+      orderType,
+      product,
+      design,
+      weight,
+      size,
+      quantity,
+      remarks,
+      orderId,
+      orderDate,
+    });
   }
 
-  return result.data.map((order, index) => ({
-    ...order,
-    orderId: `${order.orderNo}-${Date.now()}-${index}`,
-    quantity: BigInt(order.quantity),
-    // orderDate stays as number | null for use in IngestOrders
-  }));
+  return parsed;
 }

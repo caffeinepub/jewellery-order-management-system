@@ -1,36 +1,69 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-03-01T21:56:31.456Z",
-  "summary": "The diff implements grouped display layout with expandable rows, ageing badges, image modal, and filters/search across TotalOrdersTab, ReadyTab, and HallmarkTab. All four requirements appear to be substantially implemented. One minor gap exists: the REQ-4 acceptance criterion requiring filters to reset when switching tabs is not verifiable from the diff. One hallucinated feature (date range filter) is present in HallmarkTab beyond what was requested.",
+  "generatedAt": "2026-03-01T22:37:59.677Z",
+  "summary": "The diff addresses all four requirements. REQ-2 (RB partial supply Ready tab fix) is handled via query invalidation in SuppliedQtyDialog and backend supplyOrder logic. REQ-3 (Hallmark Mark as Returned → Total Orders Pending) is addressed in HallmarkTab with batchUpdateStatus. REQ-4 (Reconciliation order type preservation) is handled in Reconciliation.tsx with per-row orderType parsing. REQ-1 (row layout redesign) is addressed in TotalOrdersTab.tsx. However, TotalOrdersTab.tsx is truncated, making it impossible to fully verify the child-row layout details for REQ-1.",
   "missing_requirements": [
     {
-      "id": "REQ-4",
-      "requirement": "Filters reset when switching tabs",
-      "reason": "Each tab holds its own local filter state via useState, which resets on unmount. However, if tabs are kept mounted in a tab panel, filters would persist across tab switches. The diff does not show an explicit reset mechanism such as a useEffect on tab activation, so this AC cannot be confirmed as fully met.",
+      "id": "REQ-1",
+      "requirement": "Child rows must remove the standalone checkbox column and instead make the entire row clickable to toggle selection; order number on left with Qty/Wt below, generic/type label in centre column, date + ageing badge on right, red × delete icon far right.",
+      "reason": "TotalOrdersTab.tsx is truncated and does not show the child row rendering JSX, so it cannot be confirmed that the checkbox column was removed, the row is fully clickable, or that the layout exactly matches the specified column arrangement.",
       "evidence": [
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "frontend/src/components/dashboard/HallmarkTab.tsx"
+        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Date range filter (startDate and endDate) added to HallmarkTab",
-      "reason": "The build request only requested a search bar and two dropdowns (order type and karigar). No date range filter was specified for any tab. HallmarkTab introduces startDate and endDate state variables and applies date-range filtering logic not mentioned in any requirement.",
+      "description": "A new backend/migration.mo file was added that strips rbStateBackup and rbSummary fields from state during migration.",
+      "reason": "No requirement asked for a data migration module or removal of rbStateBackup/rbSummary fields from the backend state. This is extra structural work not requested in any of the four REQs.",
       "evidence": [
-        "frontend/src/components/dashboard/HallmarkTab.tsx"
+        "backend/migration.mo"
+      ]
+    },
+    {
+      "description": "SummaryCards was modified to exclude ghost Pending entries (Pending rows whose orderId also has a Ready entry) from Total Orders calculations.",
+      "reason": "None of REQ-1 through REQ-4 requested changes to SummaryCards or ghost-entry exclusion logic.",
+      "evidence": [
+        "frontend/src/components/dashboard/SummaryCards.tsx",
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "An AgeingStock page and route were added to the application with a new sidebar menu item.",
+      "reason": "No requirement requested a new Ageing Stock page, route, or sidebar entry.",
+      "evidence": [
+        "frontend/src/App.tsx",
+        "frontend/src/components/layout/AppSidebar.tsx",
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "OrderTable component received a new isDeleting prop that shows a Loader2 spinner and disables delete buttons during in-flight mutations.",
+      "reason": "No requirement asked for changes to OrderTable or loading state on delete buttons.",
+      "evidence": [
+        "frontend/src/components/dashboard/OrderTable.tsx",
+        "frontend-file-summaries.txt"
       ]
     }
   ],
-  "confidence": 0.82,
+  "confidence": 0.72,
   "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "frontend-file-summaries.txt",
     "frontend/src/components/dashboard/HallmarkTab.tsx",
+    "frontend/src/components/dashboard/KarigarsTab.tsx",
     "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/utils/ageingBadge.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/pages/IngestOrders.tsx",
+    "frontend/src/pages/MasterDesigns.tsx",
+    "frontend/src/pages/Reconciliation.tsx",
+    "frontend/src/pages/UnmappedCodes.tsx",
+    "frontend/src/utils/excelParser.ts",
     "project_state.json"
   ]
 }

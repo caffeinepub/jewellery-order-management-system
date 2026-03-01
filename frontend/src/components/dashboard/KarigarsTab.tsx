@@ -8,24 +8,29 @@ import { useNavigate } from '@tanstack/react-router';
 
 export default function KarigarsTab() {
   const { data: orders = [], isLoading } = useGetAllOrders();
-  const { data: masterDesigns } = useGetMasterDesigns();
+  const { data: masterDesignsRaw = [] } = useGetMasterDesigns();
   const navigate = useNavigate();
 
-  const enrichedOrders = useMemo(() => {
-    if (!masterDesigns) return orders;
+  // Build a Map from the raw [designCode, genericName, karigarName][] tuples
+  const masterDesignsMap = useMemo(() => {
+    const map = new Map<string, { genericName: string; karigarName: string }>();
+    masterDesignsRaw.forEach(([designCode, genericName, karigarName]) => {
+      map.set(designCode.toUpperCase().trim(), { genericName, karigarName });
+    });
+    return map;
+  }, [masterDesignsRaw]);
 
+  const enrichedOrders = useMemo(() => {
     return orders.map((order) => {
       const normalizedDesign = order.design.toUpperCase().trim();
-      // masterDesigns is a Map<string, { genericName, karigarName }>
-      const mapping = masterDesigns.get(normalizedDesign);
-
+      const mapping = masterDesignsMap.get(normalizedDesign);
       return {
         ...order,
         genericName: mapping?.genericName || order.genericName,
         karigarName: mapping?.karigarName || order.karigarName,
       };
     });
-  }, [orders, masterDesigns]);
+  }, [orders, masterDesignsMap]);
 
   const karigarGroups = useMemo(() => {
     const pendingOrders = enrichedOrders.filter((order) => order.status === OrderStatus.Pending);
