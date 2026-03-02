@@ -1,27 +1,26 @@
 import Map "mo:core/Map";
-import Nat "mo:core/Nat";
 import Text "mo:core/Text";
-import List "mo:core/List";
-import Time "mo:core/Time";
 import Storage "blob-storage/Storage";
 
 module {
-  public type OrderType = {
-    #CO;
-    #RB;
-    #SO;
+  type OldActor = {
+    orders : Map.Map<Text, Order>;
+    designMappings : Map.Map<Text, DesignMapping>;
+    karigars : Map.Map<Text, Karigar>;
+    masterDesignKarigars : Map.Map<Text, Nat>;
+    filteredOutKarigars : Map.Map<Text, Bool>;
+    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    activeKarigar : ?Text;
+    masterDesignExcel : ?Storage.ExternalBlob;
   };
 
-  public type OrderStatus = {
-    #Pending;
-    #Ready;
-    #Hallmark;
-    #ReturnFromHallmark;
-  };
-
-  public type Order = {
+  type Order = {
     orderNo : Text;
-    orderType : OrderType;
+    orderType : {
+      #CO;
+      #RB;
+      #SO;
+    };
     product : Text;
     design : Text;
     weight : Float;
@@ -30,77 +29,54 @@ module {
     remarks : Text;
     genericName : ?Text;
     karigarName : ?Text;
-    status : OrderStatus;
+    status : {
+      #Pending;
+      #Ready;
+      #Hallmark;
+      #ReturnFromHallmark;
+    };
     orderId : Text;
-    createdAt : Time.Time;
-    updatedAt : Time.Time;
-    readyDate : ?Time.Time;
+    createdAt : Int;
+    updatedAt : Int;
+    readyDate : ?Int;
     originalOrderId : ?Text;
-    orderDate : ?Time.Time;
+    orderDate : ?Int;
+    movedBy : ?Text;
   };
 
-  public type Karigar = {
+  type DesignMapping = {
+    designCode : Text;
+    genericName : Text;
+    karigarName : Text;
+    createdBy : Text;
+    updatedBy : ?Text;
+    createdAt : Int;
+    updatedAt : Int;
+  };
+
+  type Karigar = {
     name : Text;
     createdBy : Text;
-    createdAt : Time.Time;
+    createdAt : Int;
   };
 
-  public func run(previous : {
+  type NewActor = {
     orders : Map.Map<Text, Order>;
-    designMappings : Map.Map<Text, {
-      designCode : Text;
-      genericName : Text;
-      karigarName : Text;
-      createdBy : Text;
-      updatedBy : ?Text;
-      createdAt : Time.Time;
-      updatedAt : Time.Time;
-    }>;
-    designImages : Map.Map<Text, Storage.ExternalBlob>;
+    designMappings : Map.Map<Text, DesignMapping>;
     karigars : Map.Map<Text, Karigar>;
     masterDesignKarigars : Map.Map<Text, Nat>;
-    masterDesignExcel : ?Storage.ExternalBlob;
+    filteredOutKarigars : Map.Map<Text, Bool>;
     activeKarigar : ?Text;
-    rbStateBackup : Map.Map<Time.Time, {
-      var totalQty : Nat;
-      var totalWeight : Float;
-      var totalOrders : Nat;
-      var totalReadyQty : Nat;
-      var totalReadyWeight : Float;
-    }>;
-    rbSummary : {
-      var totalQty : Nat;
-      var totalWeight : Float;
-      var totalOrders : Nat;
-      var totalReadyQty : Nat;
-      var totalReadyWeight : Float;
-    };
-  }) : {
-    orders : Map.Map<Text, Order>;
-    designMappings : Map.Map<Text, {
-      designCode : Text;
-      genericName : Text;
-      karigarName : Text;
-      createdBy : Text;
-      updatedBy : ?Text;
-      createdAt : Time.Time;
-      updatedAt : Time.Time;
-    }>;
-    designImages : Map.Map<Text, Storage.ExternalBlob>;
-    karigars : Map.Map<Text, Karigar>;
-    masterDesignKarigars : Map.Map<Text, Nat>;
-    masterDesignExcel : ?Storage.ExternalBlob;
-    activeKarigar : ?Text;
-  } {
+  };
+
+  public func run(old : OldActor) : NewActor {
     {
-      previous with
-      orders = previous.orders;
-      designMappings = previous.designMappings;
-      designImages = previous.designImages;
-      karigars = previous.karigars;
-      masterDesignKarigars = previous.masterDesignKarigars;
-      masterDesignExcel = previous.masterDesignExcel;
-      activeKarigar = previous.activeKarigar;
+      orders = old.orders;
+      designMappings = old.designMappings;
+      karigars = old.karigars;
+      masterDesignKarigars = old.masterDesignKarigars;
+      filteredOutKarigars = old.filteredOutKarigars;
+      activeKarigar = old.activeKarigar;
     };
   };
 };

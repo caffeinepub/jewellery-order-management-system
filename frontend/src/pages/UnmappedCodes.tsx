@@ -103,6 +103,7 @@ export default function UnmappedCodes() {
         await reassignDesignMutation.mutateAsync({
           designCode,
           newKarigar: editKarigarName.trim(),
+          movedBy: "user",
         });
       } else {
         // Use updateDesignMapping to set both fields

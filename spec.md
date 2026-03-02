@@ -1,12 +1,11 @@
 # Specification
 
 ## Summary
-**Goal:** Fix multiple bugs in the dashboard including invisible row card content, stale karigar names, broken karigar tab navigation, and missing export buttons on the Ready tab.
+**Goal:** Fix three bugs in the Jewellery Order Manager: restore the karigar PDF export grouped layout, fix karigar name sync across all tabs after a master design update, and fix the desktop sidebar/content overlap.
 
 **Planned changes:**
-- Fix design group row cards across all dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars) where text and content are invisible due to dark text on dark background — ensure all text, labels, design codes, weights, and quantities are visible with proper contrast
-- Fix the Totals tab karigar name display to use the latest karigar name from live design mappings instead of showing a stale name
-- Fix the Karigars tab so clicking a karigar card correctly navigates to the karigar detail page and loads that karigar's pending orders
-- Add missing Excel, PDF, and JPEG export buttons to the Ready tab and ensure they are functional
+- Restore karigar PDF export in KarigarDetail.tsx to group orders by design code, displaying the design image above each group's order list, matching the original KASI_orders_2026-02-27.pdf layout
+- Fix karigar name sync so that updating a karigar name on the Master Designs page immediately reflects in both the Total Orders tab and the Karigar tab, with query cache invalidation for orders, karigars, and design mappings
+- Fix desktop layout in App.tsx and AppSidebar.tsx so the sidebar and main content area sit side by side without overlapping, while leaving the mobile layout unchanged
 
-**User-visible outcome:** Dashboard row cards display all content clearly, karigar names are up to date, clicking a karigar card opens the correct detail page, and the Ready tab has working export options.
+**User-visible outcome:** The karigar PDF export shows correctly grouped design images with orders below each; the Total Orders and Karigar tabs always show the current karigar name from Master Designs; and on desktop, the sidebar no longer overlaps the main content area.

@@ -1,16 +1,17 @@
 import Time "mo:core/Time";
 import List "mo:core/List";
 import Map "mo:core/Map";
-import Array "mo:core/Array";
 import Float "mo:core/Float";
 import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
-
+import Nat "mo:core/Nat";
+import Array "mo:core/Array";
+import Text "mo:core/Text";
+import Migration "migration";
 
 import MixinStorage "blob-storage/Mixin";
-import Storage "blob-storage/Storage";
 
-
+(with migration = Migration.run)
 actor {
   type OrderType = {
     #CO;
@@ -43,16 +44,15 @@ actor {
     readyDate : ?Time.Time;
     originalOrderId : ?Text;
     orderDate : ?Time.Time;
+    movedBy : ?Text;
   };
 
   let orders = Map.empty<Text, Order>();
   let designMappings = Map.empty<Text, DesignMapping>();
-  let designImages = Map.empty<Text, Storage.ExternalBlob>();
   let karigars = Map.empty<Text, Karigar>();
   let masterDesignKarigars = Map.empty<Text, Nat>();
-  var masterDesignExcel : ?Storage.ExternalBlob = null;
+  let filteredOutKarigars = Map.empty<Text, Bool>();
   var activeKarigar : ?Text = null;
-  let karigarOrderCounts = Map.empty<Text, Nat>();
 
   type DesignMapping = {
     designCode : Text;
@@ -128,20 +128,10 @@ actor {
       readyDate = null;
       originalOrderId = null;
       orderDate;
+      movedBy = null;
     };
 
     orders.add(orderId, order);
-
-    switch (karigarName) {
-      case (?name) {
-        let currentCount = switch (karigarOrderCounts.get(name)) {
-          case (?count) { count };
-          case (null) { 0 };
-        };
-        karigarOrderCounts.add(name, currentCount + 1);
-      };
-      case (null) {};
-    };
   };
 
   public query ({ caller }) func getOrder(orderId : Text) : async ?Order {
@@ -162,28 +152,23 @@ actor {
             status = #Ready;
             updatedAt = Time.now();
             readyDate = ?Time.now();
+            movedBy = null;
           };
           orders.add(orderId, readyOrder);
-
-          switch (originalOrder.karigarName) {
-            case (?name) {
-              let currentCount = switch (karigarOrderCounts.get(name)) {
-                case (?count) { count };
-                case (null) { 0 };
-              };
-              karigarOrderCounts.add(name, currentCount - 1);
-            };
-            case (null) {};
-          };
         };
-        let remainingQuantity = originalOrder.quantity - suppliedQuantity;
-        if (remainingQuantity > 0) {
-          let pendingOrder : Order = {
-            originalOrder with
-            quantity = remainingQuantity;
-            updatedAt = Time.now();
+        switch (Nat.compare(originalOrder.quantity, suppliedQuantity)) {
+          case (#less) {};
+          case (#equal) {};
+          case (#greater) {
+            let remainingQuantity = originalOrder.quantity - suppliedQuantity;
+            let pendingOrder : Order = {
+              originalOrder with
+              quantity = remainingQuantity;
+              updatedAt = Time.now();
+              movedBy = null;
+            };
+            orders.add(orderId, pendingOrder);
           };
-          orders.add(orderId, pendingOrder);
         };
       };
     };
@@ -201,6 +186,7 @@ actor {
           originalOrder with quantity = suppliedQuantity;
           status = #ReturnFromHallmark;
           updatedAt = Time.now();
+          movedBy = null;
         };
         orders.add(orderId, order);
       };
@@ -223,6 +209,10 @@ actor {
 
   public query ({ caller }) func getKarigars() : async [Karigar] {
     karigars.values().toArray();
+  };
+
+  public query ({ caller }) func getFilteredOutKarigars() : async [Text] {
+    filteredOutKarigars.keys().toArray();
   };
 
   public query ({ caller }) func getUniqueKarigarsFromDesignMappings() : async [Text] {
@@ -292,7 +282,7 @@ actor {
     activeKarigar := null;
   };
 
-  public shared ({ caller }) func reassignDesign(designCode : Text, newKarigar : Text) : async () {
+  public shared ({ caller }) func reassignDesign(designCode : Text, newKarigar : Text, movedBy : Text) : async () {
     switch (designMappings.get(designCode)) {
       case (null) { Runtime.trap("Design mapping not found") };
       case (?mapping) {
@@ -316,30 +306,13 @@ actor {
             case (null) { Runtime.trap("Order with id " # orderId # " already removed") };
             case (?order) {
               if (order.status == #Pending) {
-                switch (order.karigarName) {
-                  case (?oldKarigar) {
-                    let currentOldCount = switch (karigarOrderCounts.get(oldKarigar)) {
-                      case (?count) { count };
-                      case (null) { 0 };
-                    };
-                    if (currentOldCount > 0) {
-                      karigarOrderCounts.add(oldKarigar, currentOldCount - 1);
-                    };
-                  };
-                  case (null) {};
-                };
-                let currentNewCount = switch (karigarOrderCounts.get(newKarigar)) {
-                  case (?count) { count };
-                  case (null) { 0 };
-                };
-                karigarOrderCounts.add(newKarigar, currentNewCount + 1);
-
                 let updatedOrder : Order = {
                   order with
                   genericName = ?mapping.genericName;
                   karigarName = ?mapping.karigarName;
                   status = #Pending;
                   updatedAt = Time.now();
+                  movedBy = ?movedBy;
                 };
                 orders.add(orderId, updatedOrder);
               } else {
@@ -390,18 +363,6 @@ actor {
     orders.clear();
   };
 
-  public shared ({ caller }) func uploadDesignImage(designCode : Text, blob : Storage.ExternalBlob) : async () {
-    designImages.add(designCode, blob);
-  };
-
-  public shared ({ caller }) func batchUploadDesignImages(images : [(Text, Storage.ExternalBlob)]) : async () {
-    images.forEach(func((designCode, blob)) { designImages.add(designCode, blob) });
-  };
-
-  public query ({ caller }) func getDesignImage(designCode : Text) : async ?Storage.ExternalBlob {
-    designImages.get(designCode);
-  };
-
   public type MasterDesignMapping = {
     designCode : Text;
     genericName : Text;
@@ -410,14 +371,6 @@ actor {
     updatedBy : ?Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
-  };
-
-  public shared ({ caller }) func uploadMasterDesignExcel(blob : Storage.ExternalBlob) : async () {
-    masterDesignExcel := ?blob;
-  };
-
-  public query ({ caller }) func getMasterDesignExcel() : async ?Storage.ExternalBlob {
-    masterDesignExcel;
   };
 
   public shared ({ caller }) func uploadDesignMapping(mappingData : [MappingRecord]) : async () {
@@ -455,19 +408,9 @@ actor {
             status = #Ready;
             updatedAt = Time.now();
             readyDate = ?Time.now();
+            movedBy = null;
           };
           orders.add(orderId, updatedOrder);
-
-          switch (order.karigarName) {
-            case (?name) {
-              let currentCount = switch (karigarOrderCounts.get(name)) {
-                case (?count) { count };
-                case (null) { 0 };
-              };
-              karigarOrderCounts.add(name, currentCount - 1);
-            };
-            case (null) {};
-          };
         };
       };
     };
@@ -541,6 +484,7 @@ actor {
             status = newStatus;
             updatedAt = Time.now();
             readyDate = if (newStatus == #Ready) { ?Time.now() } else { order.readyDate };
+            movedBy = null;
           };
           orders.add(orderId, updatedOrder);
         };
@@ -575,6 +519,7 @@ actor {
             order with
             status = #Hallmark;
             updatedAt = Time.now();
+            movedBy = null;
           };
           orders.add(code, updatedOrder);
         };
@@ -588,10 +533,6 @@ actor {
         (mapping.designCode, mapping.genericName, mapping.karigarName);
       }
     );
-  };
-
-  public query ({ caller }) func getDesignImageMapping() : async [(Text, Storage.ExternalBlob)] {
-    designImages.toArray();
   };
 
   public query ({ caller }) func getUnreturnedOrders() : async [Order] {
@@ -618,6 +559,7 @@ actor {
           status = #Ready;
           updatedAt = timestamp;
           readyDate = ?timestamp;
+          movedBy = null;
         };
         orders.add(orderId, updatedOrder);
       };
@@ -702,7 +644,15 @@ actor {
       }
     );
 
-    let alreadyExistingRows = masterDataRows.size() - newLines.size();
+    var alreadyExistingRows = newLines.size();
+
+    switch (Nat.compare(masterDataRows.size(), newLines.size())) {
+      case (#less) {};
+      case (#equal) {};
+      case (#greater) {
+        alreadyExistingRows := masterDataRows.size() - newLines.size();
+      };
+    };
 
     {
       newLines;
@@ -747,21 +697,11 @@ actor {
           readyDate = null;
           originalOrderId = null;
           orderDate = masterRow.orderDate;
+          movedBy = null;
         };
 
         orders.add(orderId, newOrder);
         persistedRows.add(newOrder);
-
-        switch (karigarName) {
-          case (?name) {
-            let currentCount = switch (karigarOrderCounts.get(name)) {
-              case (?count) { count };
-              case (null) { 0 };
-            };
-            karigarOrderCounts.add(name, currentCount + 1);
-          };
-          case (null) {};
-        };
       };
     };
 
@@ -769,6 +709,7 @@ actor {
     { persisted };
   };
 
+  // New method for marking orders as pending
   public shared ({ caller }) func markOrdersAsPending(orderIds : [Text]) : async () {
     for (orderId in orderIds.values()) {
       switch (orders.get(orderId)) {
@@ -784,21 +725,12 @@ actor {
             status = #Pending;
             updatedAt = Time.now();
             readyDate = null;
+            movedBy = null;
           };
           orders.add(orderId, updatedOrder);
-
-          switch (order.karigarName) {
-            case (?name) {
-              let currentCount = switch (karigarOrderCounts.get(name)) {
-                case (?count) { count };
-                case (null) { 0 };
-              };
-              karigarOrderCounts.add(name, currentCount + 1);
-            };
-            case (null) {};
-          };
         };
       };
     };
   };
 };
+

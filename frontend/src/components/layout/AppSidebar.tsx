@@ -1,82 +1,88 @@
-import { useState } from 'react';
-import { Link, useRouterState } from '@tanstack/react-router';
+import { useState } from "react";
+import { useNavigate, useLocation } from "@tanstack/react-router";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
   Upload,
   AlertCircle,
-  Database,
+  BookOpen,
   Image,
-  Printer,
+  Tag,
   ScanLine,
-  Trash2,
-  FileCheck,
+  GitMerge,
   Clock,
-} from 'lucide-react';
-import DataResetDialog from './DataResetDialog';
+} from "lucide-react";
+import DataResetDialog from "@/components/layout/DataResetDialog";
 
 const menuItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { title: 'Ingest Orders', icon: Upload, path: '/ingest-orders' },
-  { title: 'Unmapped Codes', icon: AlertCircle, path: '/unmapped-codes' },
-  { title: 'Master Designs', icon: Database, path: '/master-designs' },
-  { title: 'Design Images', icon: Image, path: '/design-images' },
-  { title: 'Tag Printing', icon: Printer, path: '/tag-printing' },
-  { title: 'Barcode Scanning', icon: ScanLine, path: '/barcode-scanning' },
-  { title: 'Reconciliation', icon: FileCheck, path: '/reconciliation' },
-  { title: 'Ageing Stock', icon: Clock, path: '/ageing-stock' },
+  { title: "Dashboard", path: "/", icon: LayoutDashboard },
+  { title: "Ingest Orders", path: "/ingest", icon: Upload },
+  { title: "Unmapped Codes", path: "/unmapped", icon: AlertCircle },
+  { title: "Master Designs", path: "/master-designs", icon: BookOpen },
+  { title: "Design Images", path: "/design-images", icon: Image },
+  { title: "Tag Printing", path: "/tag-printing", icon: Tag },
+  { title: "Barcode Scanning", path: "/barcode-scanning", icon: ScanLine },
+  { title: "Reconciliation", path: "/reconciliation", icon: GitMerge },
+  { title: "Ageing Stock", path: "/ageing-stock", icon: Clock },
 ];
 
-export default function AppSidebar() {
-  const routerState = useRouterState();
-  const currentPath = routerState.location.pathname;
-  const [showDataResetDialog, setShowDataResetDialog] = useState(false);
+export function AppSidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [showDataReset, setShowDataReset] = useState(false);
 
   return (
     <>
-      <Sidebar collapsible="icon">
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gold text-gold-foreground">
-              <LayoutDashboard className="h-5 w-5" />
+      <Sidebar collapsible="offcanvas" className="border-r border-border">
+        <SidebarHeader className="p-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <span className="text-primary-foreground font-bold text-sm">K</span>
             </div>
-            <div className="group-data-[collapsible=icon]:hidden">
-              <h2 className="text-base font-semibold">Jewellery OMS</h2>
-              <p className="text-xs text-muted-foreground">Order Management</p>
+            <div>
+              <div className="font-bold text-foreground text-sm leading-tight">KASI Jewellers</div>
+              <div className="text-xs text-muted-foreground">Order Management</div>
             </div>
           </div>
         </SidebarHeader>
+
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
-              Navigation
-            </SidebarGroupLabel>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {menuItems.map((item) => (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton asChild isActive={currentPath === item.path}>
-                      <Link to={item.path}>
-                        <item.icon className="h-4 w-4" />
+                {menuItems.map((item) => {
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        onClick={() => navigate({ to: item.path })}
+                        className="cursor-pointer"
+                      >
+                        <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => setShowDataResetDialog(true)}>
-                    <Trash2 className="h-4 w-4" />
+                  <SidebarMenuButton
+                    onClick={() => setShowDataReset(true)}
+                    className="cursor-pointer text-destructive hover:text-destructive"
+                  >
+                    <AlertCircle className="w-4 h-4" />
                     <span>Data Reset</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -84,30 +90,28 @@ export default function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border p-4">
-          <p className="text-xs text-muted-foreground text-center group-data-[collapsible=icon]:hidden">
-            Built with love using{' '}
+
+        <SidebarFooter className="p-3 border-t border-border space-y-1">
+          <div className="text-xs text-muted-foreground text-center">
+            © {new Date().getFullYear()} KASI Jewellers
+          </div>
+          <div className="text-xs text-muted-foreground text-center">
+            Built with ❤️ using{" "}
             <a
-              href={`https://caffeine.ai/?utm_source=Caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(
-                window.location.hostname
-              )}`}
+              href={`https://caffeine.ai/?utm_source=Caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-foreground hover:underline font-medium"
+              className="underline hover:text-foreground transition-colors"
             >
               caffeine.ai
             </a>
-          </p>
-          <p className="text-xs text-muted-foreground text-center mt-1 group-data-[collapsible=icon]:hidden">
-            © {new Date().getFullYear()}
-          </p>
+          </div>
         </SidebarFooter>
       </Sidebar>
 
-      <DataResetDialog
-        open={showDataResetDialog}
-        onOpenChange={setShowDataResetDialog}
-      />
+      <DataResetDialog open={showDataReset} onOpenChange={setShowDataReset} />
     </>
   );
 }
+
+export default AppSidebar;

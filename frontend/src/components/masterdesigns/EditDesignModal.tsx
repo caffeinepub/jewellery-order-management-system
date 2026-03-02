@@ -1,24 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { useUpdateDesignMapping, useGetUniqueKarigarsFromDesignMappings } from '@/hooks/useQueries';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useActor } from "@/hooks/useActor";
 
 interface EditDesignModalProps {
   open: boolean;
@@ -26,6 +20,7 @@ interface EditDesignModalProps {
   designCode: string;
   genericName: string;
   currentKarigar: string;
+  karigars: string[];
 }
 
 export function EditDesignModal({
@@ -34,46 +29,69 @@ export function EditDesignModal({
   designCode,
   genericName,
   currentKarigar,
+  karigars,
 }: EditDesignModalProps) {
-  const [newGenericName, setNewGenericName] = useState(genericName);
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
   const [selectedKarigar, setSelectedKarigar] = useState(currentKarigar);
+  const [newKarigarName, setNewKarigarName] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const { data: karigarsRaw = [], isLoading: karigarsLoading } =
-    useGetUniqueKarigarsFromDesignMappings();
-
-  // Deduplicate karigar names
-  const karigars = Array.from(new Set(karigarsRaw.filter(Boolean))).sort();
-
-  const updateMutation = useUpdateDesignMapping();
-
-  // Reset form when modal opens with new data
   useEffect(() => {
     if (open) {
-      setNewGenericName(genericName);
       setSelectedKarigar(currentKarigar);
+      setNewKarigarName("");
+      setAddingNew(false);
     }
-  }, [open, genericName, currentKarigar]);
+  }, [open, currentKarigar]);
+
+  // Deduplicate karigar list
+  const uniqueKarigars = Array.from(new Set(karigars.filter(Boolean)));
 
   const handleSave = async () => {
-    if (!selectedKarigar) {
-      toast.error('Please select a karigar');
+    if (!actor) return;
+
+    const karigarToUse = addingNew ? newKarigarName.trim() : selectedKarigar;
+
+    if (!karigarToUse) {
+      toast.error("Please select or enter a karigar name.");
       return;
     }
 
+    setIsSaving(true);
     try {
-      await updateMutation.mutateAsync({
-        designCode,
-        newGenericName: newGenericName.trim(),
-        newKarigarName: selectedKarigar,
-      });
-      toast.success(`Design ${designCode} updated successfully`);
+      if (addingNew && newKarigarName.trim()) {
+        try {
+          await actor.addKarigar(newKarigarName.trim());
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!msg.toLowerCase().includes("already exists")) {
+            throw err;
+          }
+        }
+      }
+
+      await actor.reassignDesign(designCode, karigarToUse, "user");
+
+      // Invalidate all relevant caches so KarigarsTab and TotalOrdersTab update
+      await queryClient.invalidateQueries({ queryKey: ["allOrders"] });
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
+      await queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      await queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+      await queryClient.invalidateQueries({ queryKey: ["karigars"] });
+
+      toast.success(`Design ${designCode} reassigned to ${karigarToUse}`);
       onOpenChange(false);
-    } catch (err: any) {
-      const msg =
-        err?.message?.includes('Reject text:')
-          ? err.message.split('Reject text:')[1].trim()
-          : err?.message ?? 'Failed to update design mapping';
-      toast.error(msg);
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : String(err);
+      const match = raw.match(/Reject text: (.+)/);
+      const message = match ? match[1] : raw;
+      toast.error(`Failed to save: ${message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -85,63 +103,66 @@ export function EditDesignModal({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="space-y-1">
-            <Label className="text-muted-foreground text-xs">Design Code</Label>
-            <p className="font-bold text-primary">{designCode}</p>
+          <div>
+            <Label className="text-sm text-muted-foreground">Design Code</Label>
+            <p className="font-semibold text-orange-500">{designCode}</p>
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="genericName">Generic Name</Label>
-            <Input
-              id="genericName"
-              value={newGenericName}
-              onChange={(e) => setNewGenericName(e.target.value)}
-              placeholder="Enter generic name"
-            />
+          <div>
+            <Label className="text-sm text-muted-foreground">Generic Name</Label>
+            <p className="font-medium">{genericName}</p>
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="karigar">Karigar</Label>
-            {karigarsLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading karigars…
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="karigar-select">Assign Karigar</Label>
+            {!addingNew ? (
+              <select
+                id="karigar-select"
+                className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                value={selectedKarigar}
+                onChange={(e) => setSelectedKarigar(e.target.value)}
+              >
+                <option value="">-- Select Karigar --</option>
+                {uniqueKarigars.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
             ) : (
-              <Select value={selectedKarigar} onValueChange={setSelectedKarigar}>
-                <SelectTrigger id="karigar">
-                  <SelectValue placeholder="Select karigar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {karigars.length === 0 ? (
-                    <SelectItem value="__none__" disabled>
-                      No karigars found
-                    </SelectItem>
-                  ) : (
-                    karigars.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <Input
+                placeholder="Enter new karigar name"
+                value={newKarigarName}
+                onChange={(e) => setNewKarigarName(e.target.value)}
+              />
             )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={() => {
+                setAddingNew(!addingNew);
+                setNewKarigarName("");
+              }}
+            >
+              {addingNew ? "← Select existing karigar" : "+ Add new karigar"}
+            </Button>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={updateMutation.isPending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={updateMutation.isPending || !selectedKarigar}>
-            {updateMutation.isPending ? (
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Saving…
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
               </>
             ) : (
-              'Save Changes'
+              "Save"
             )}
           </Button>
         </DialogFooter>

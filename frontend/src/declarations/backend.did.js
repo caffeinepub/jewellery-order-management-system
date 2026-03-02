@@ -40,7 +40,6 @@ export const DesignMapping = IDL.Record({
   'genericName' : IDL.Text,
   'designCode' : IDL.Text,
 });
-export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const OrderType = IDL.Variant({
   'CO' : IDL.Null,
   'RB' : IDL.Null,
@@ -52,6 +51,7 @@ export const Order = IDL.Record({
   'readyDate' : IDL.Opt(Time),
   'originalOrderId' : IDL.Opt(IDL.Text),
   'createdAt' : Time,
+  'movedBy' : IDL.Opt(IDL.Text),
   'size' : IDL.Float64,
   'orderDate' : IDL.Opt(Time),
   'orderType' : OrderType,
@@ -137,11 +137,6 @@ export const idlService = IDL.Service({
       [],
     ),
   'batchUpdateOrderStatus' : IDL.Func([IDL.Vec(IDL.Text), OrderStatus], [], []),
-  'batchUploadDesignImages' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
-      [],
-      [],
-    ),
   'clearAllDesignMappings' : IDL.Func([], [], []),
   'deleteOrder' : IDL.Func([IDL.Text], [], []),
   'deleteReadyOrder' : IDL.Func([IDL.Text], [], []),
@@ -156,15 +151,9 @@ export const idlService = IDL.Service({
       [IDL.Opt(IDL.Nat)],
       ['query'],
     ),
-  'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
-  'getDesignImageMapping' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
-      ['query'],
-    ),
   'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
+  'getFilteredOutKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
-  'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
   'getMasterDesignKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'getMasterDesigns' : IDL.Func(
       [],
@@ -203,7 +192,7 @@ export const idlService = IDL.Service({
       [MasterPersistedResponse],
       [],
     ),
-  'reassignDesign' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'reassignDesign' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'reconcileMasterFile' : IDL.Func(
       [IDL.Vec(MasterDataRow)],
       [MasterReconciliationResult],
@@ -235,9 +224,7 @@ export const idlService = IDL.Service({
   'updateDesignGroupStatus' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
   'updateDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
   'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-  'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
   'uploadDesignMapping' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
-  'uploadMasterDesignExcel' : IDL.Func([ExternalBlob], [], []),
 });
 
 export const idlInitArgs = [];
@@ -275,7 +262,6 @@ export const idlFactory = ({ IDL }) => {
     'genericName' : IDL.Text,
     'designCode' : IDL.Text,
   });
-  const ExternalBlob = IDL.Vec(IDL.Nat8);
   const OrderType = IDL.Variant({
     'CO' : IDL.Null,
     'RB' : IDL.Null,
@@ -287,6 +273,7 @@ export const idlFactory = ({ IDL }) => {
     'readyDate' : IDL.Opt(Time),
     'originalOrderId' : IDL.Opt(IDL.Text),
     'createdAt' : Time,
+    'movedBy' : IDL.Opt(IDL.Text),
     'size' : IDL.Float64,
     'orderDate' : IDL.Opt(Time),
     'orderType' : OrderType,
@@ -374,11 +361,6 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
-    'batchUploadDesignImages' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
-        [],
-        [],
-      ),
     'clearAllDesignMappings' : IDL.Func([], [], []),
     'deleteOrder' : IDL.Func([IDL.Text], [], []),
     'deleteReadyOrder' : IDL.Func([IDL.Text], [], []),
@@ -393,15 +375,9 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IDL.Nat)],
         ['query'],
       ),
-    'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
-    'getDesignImageMapping' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
-        ['query'],
-      ),
     'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
+    'getFilteredOutKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
-    'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
     'getMasterDesignKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getMasterDesigns' : IDL.Func(
         [],
@@ -440,7 +416,7 @@ export const idlFactory = ({ IDL }) => {
         [MasterPersistedResponse],
         [],
       ),
-    'reassignDesign' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'reassignDesign' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'reconcileMasterFile' : IDL.Func(
         [IDL.Vec(MasterDataRow)],
         [MasterReconciliationResult],
@@ -472,9 +448,7 @@ export const idlFactory = ({ IDL }) => {
     'updateDesignGroupStatus' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
     'updateDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
     'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-    'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
     'uploadDesignMapping' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
-    'uploadMasterDesignExcel' : IDL.Func([ExternalBlob], [], []),
   });
 };
 

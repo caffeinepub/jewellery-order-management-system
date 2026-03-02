@@ -76,7 +76,7 @@ export default function UnmappedSection() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate({ to: '/unmapped-codes' })}
+              onClick={() => navigate({ to: '/unmapped' })}
               className="bg-background"
             >
               View All Unmapped

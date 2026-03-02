@@ -1,95 +1,77 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix dashboard design group rows invisible content and related bugs",
+  "title": "Fix karigar PDF export format, karigar name sync, and desktop sidebar overlap",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix design group row cards in all dashboard tabs where card content is invisible due to dark text rendering on a dark background",
+      "summary": "Restore the karigar PDF export format in KarigarDetail.tsx so that the exported PDF groups orders by design code, displays the design image above each group, and lists all orders belonging to that design code below the image",
       "acceptanceCriteria": [
-        "Design group row cards in Total Orders tab display all text content (design code, generic name, order count, weight) visibly",
-        "Row card content is readable with sufficient contrast against the dark card background",
-        "All other tabs (Ready, Hallmark, Customer Orders, Karigars) also render row card content visibly",
-        "No dark-on-dark text rendering anywhere in the dashboard row cards"
+        "Exporting a karigar's orders as PDF produces one section per design code",
+        "Each section shows the design image (fetched from blob storage by design code) above the order rows",
+        "All orders for a design code are listed beneath that design's image in a table or list",
+        "The layout matches the grouped-by-design format of KASI_orders_2026-02-27.pdf"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Update the design group row card rendering to use light text colors (text-white or text-gray-100) for all content elements including design code, generic name, order count, weight, and action buttons. Ensure the card background remains dark while text has sufficient contrast. Review the grouping logic and Card/CardContent styling to ensure all child text elements inherit appropriate light colors."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Update the design group row card rendering to use light text colors for all content (design code, generic name, counts, weights) displayed in the grouped rows. Ensure expandable row headers and content within each card have sufficient contrast against the dark background. Apply text-white or text-gray-100 classes to labels and values."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Update the design group row card rendering to use light text colors for all visible content including design codes, karigar names, weights, quantities, and action elements. Ensure all text within the grouped card structure has appropriate contrast against dark card backgrounds."
-        },
-        {
-          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Update any card or grouped row rendering to use light text colors (text-white or text-gray-100) for design codes, order numbers, and other content displayed in dark cards. Ensure sufficient text-to-background contrast throughout the component."
-        },
-        {
-          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
-          "operation": "modify",
-          "description": "Update the karigar summary card rendering to use light text colors for karigar names, design codes, weights, and generic names. Ensure all text content within each karigar card has sufficient contrast against the dark card background by applying text-white or text-gray-100 classes."
+          "description": "Modify the handleExportPDF function to group orders by design code, fetch design images from blob storage using ExternalBlob for each design code, render each design image above its corresponding order rows, and generate a PDF that matches the grouped-by-design layout shown in KASI_orders_2026-02-27.pdf. Use the blob-storage component's ExternalBlob class to fetch images via getDirectURL() or getBytes(). Verify the component's usage instructions before implementing."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Fix the Totals tab karigar name display so it shows the correct karigar name from live design mappings instead of stale names",
+      "summary": "Fix the karigar name sync so that when a karigar name is updated on the Master Designs page, the updated name is immediately reflected in the Total Orders tab and the Karigar tab",
       "acceptanceCriteria": [
-        "Totals tab groups orders using the latest karigar name from the live design mappings query",
-        "Updated karigar names (e.g., ZYRA FACTORY) are reflected immediately after mappings are refreshed",
-        "No stale karigar name (e.g., SANTU) appears when the mapping has been updated"
+        "After updating a karigar name on the Master Designs page, the Total Orders tab reflects the new karigar name for the affected design code without requiring a page reload",
+        "After updating the karigar name for CHTMN40046 to Prasanna, the Total Orders tab shows Prasanna (not SANTU) for that design code",
+        "Selecting the Prasanna tab in the Karigar section displays all orders mapped to CHTMN40046",
+        "The old karigar name SANTU no longer appears for CHTMN40046 in any tab after the update",
+        "Query cache for orders, karigars, and design mappings is invalidated after a karigar name update on the Master Designs page"
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/masterdesigns/EditDesignModal.tsx",
+          "operation": "modify",
+          "description": "After successfully calling actor.reassignDesign or actor.updateDesignMapping, ensure the mutation's onSuccess callback invalidates the query cache for 'orders', 'karigars', 'designMappings', and 'ordersWithMappings' using queryClient.invalidateQueries(). This ensures the Total Orders tab and Karigar tab reflect the updated karigar name immediately."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review the useReassignDesignMutation and useUpdateDesignMappingMutation hooks to ensure they invalidate all relevant query keys on success: ['orders'], ['karigars'], ['designMappings'], ['ordersWithMappings'], and ['masterDesigns']. If any of these invalidations are missing, add them to the onSuccess callback."
+        },
+        {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Ensure the component queries fresh design mappings using useGetAllDesignMappings and applies the latest karigar name from the mappings to each order before grouping or displaying. If an order has a karigar name but the design mapping has been updated, prefer the mapping's karigar name. Remove any caching or stale data logic that prevents the live karigar name from appearing. Verify that when mappings are refreshed, the grouped rows immediately reflect the new karigar assignments."
+          "description": "Ensure the component subscribes to the 'ordersWithMappings' query (or equivalent) so that when the query cache is invalidated after a karigar name update, the component automatically refetches and displays the updated karigar name for each design code. Confirm that the karigar name displayed in the table comes from the enriched order data that includes the latest design mapping."
+        },
+        {
+          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the component subscribes to both the 'orders' and 'designMappings' queries so that when the query cache is invalidated after a karigar name update, the component refetches and correctly groups orders under the new karigar name. Verify that the grouping logic uses the latest design mappings to resolve karigar names for each order."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly",
+      "summary": "Fix the desktop layout in App.tsx and AppSidebar.tsx so the sidebar and the main dashboard content do not overlap",
       "acceptanceCriteria": [
-        "Clicking a karigar card in the Karigars tab navigates to the karigar detail page",
-        "The karigar detail page loads and displays the correct pending orders for the selected karigar",
-        "No empty or broken state appears after clicking a karigar card"
+        "On desktop viewport widths, the sidebar and main content area are displayed side by side with no overlap",
+        "The main content area begins where the sidebar ends and uses the remaining width",
+        "No content is hidden behind the sidebar on desktop",
+        "Mobile layout remains unaffected"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Add an onClick handler to each karigar card that navigates to the karigar detail page using the correct route and passes the karigar name as a URL parameter. Ensure the handler encodes the karigar name properly if it contains spaces or special characters. Verify that the navigation triggers and the detail page receives the correct karigar identifier."
+          "description": "Adjust the layout container for the main content area to include proper left margin or padding that accounts for the sidebar width on desktop viewports. Use Tailwind responsive utilities (e.g., md:ml-[sidebar-width]) to ensure the main content is offset correctly when the sidebar is visible on desktop, while keeping the mobile layout unchanged."
         },
         {
-          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "path": "frontend/src/components/layout/AppSidebar.tsx",
           "operation": "modify",
-          "description": "Ensure the component correctly extracts the karigar name from the route parameters and uses it to filter pending orders. Verify that the useGetAllOrders query or a similar data-fetching hook filters orders by the selected karigar name and Pending status. If the karigar name is missing or invalid, display a user-friendly error or empty state instead of breaking."
-        }
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "summary": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab",
-      "acceptanceCriteria": [
-        "Ready tab shows Excel, PDF, and JPEG export buttons",
-        "Export buttons trigger their respective export actions (download CSV/Excel, generate PDF, generate JPEG)",
-        "Export buttons are visible and accessible without scrolling or additional interactions"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Add a button group or toolbar containing Excel, PDF, and JPEG export buttons positioned prominently near the top of the Ready tab UI (e.g., next to the search input or tab header). Wire each button to the corresponding export utility function from frontend/src/utils/exportUtils.ts (exportToExcel, exportToPDF) and implement JPEG export by rendering the visible content to an HTML canvas and converting to an image. Ensure the buttons are always visible and enabled when there are orders to export."
+          "description": "Ensure the sidebar has a fixed or sticky position on desktop (e.g., fixed left-0 top-0 h-screen) with a consistent width, and that it does not overlay the main content. Use Tailwind responsive utilities to apply these styles only on desktop breakpoints (md: and above), preserving the existing mobile drawer behavior."
         }
       ]
     }

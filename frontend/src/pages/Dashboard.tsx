@@ -1,88 +1,72 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { TotalOrdersTab } from "../components/dashboard/TotalOrdersTab";
-import ReadyTab from "../components/dashboard/ReadyTab";
-import { HallmarkTab } from "../components/dashboard/HallmarkTab";
-import CustomerOrdersTab from "../components/dashboard/CustomerOrdersTab";
-import KarigarsTab from "../components/dashboard/KarigarsTab";
-import SummaryCards from "../components/dashboard/SummaryCards";
-import UnmappedSection from "../components/dashboard/UnmappedSection";
-import { useGetAllOrders } from "../hooks/useQueries";
+import SummaryCards from "@/components/dashboard/SummaryCards";
+import TotalOrdersTab from "@/components/dashboard/TotalOrdersTab";
+import ReadyTab from "@/components/dashboard/ReadyTab";
+import HallmarkTab from "@/components/dashboard/HallmarkTab";
+import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
+import KarigarsTab from "@/components/dashboard/KarigarsTab";
+import UnmappedSection from "@/components/dashboard/UnmappedSection";
+import { useGetAllOrders } from "@/hooks/useQueries";
 
-const TAB_VALUES = {
-  TOTAL: "total-orders",
-  READY: "ready",
-  HALLMARK: "hallmark",
-  CUSTOMER: "customer-orders",
-  KARIGARS: "karigars",
-} as const;
+type TabKey = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
-function tabValueToSummaryKey(tabValue: string): string {
-  switch (tabValue) {
-    case TAB_VALUES.READY:
-      return "ready";
-    case TAB_VALUES.HALLMARK:
-      return "hallmark";
-    case TAB_VALUES.CUSTOMER:
-      return "customer";
-    case TAB_VALUES.KARIGARS:
-      return "karigars";
-    default:
-      return "total";
-  }
-}
-
-const Dashboard: React.FC = () => {
+export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<TabKey>("total");
   const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
-  const [activeTab, setActiveTab] = useState<string>(TAB_VALUES.TOTAL);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <SummaryCards
-        orders={allOrders}
-        isError={isError}
-        activeTab={tabValueToSummaryKey(activeTab)}
-      />
+    <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0">
+      <SummaryCards activeTab={activeTab} />
 
       <UnmappedSection />
 
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
-        defaultValue={TAB_VALUES.TOTAL}
+        onValueChange={(val) => setActiveTab(val as TabKey)}
+        className="w-full"
       >
         <div className="overflow-x-auto">
           <TabsList className="w-max min-w-full">
-            <TabsTrigger value={TAB_VALUES.TOTAL}>Total Orders</TabsTrigger>
-            <TabsTrigger value={TAB_VALUES.READY}>Ready</TabsTrigger>
-            <TabsTrigger value={TAB_VALUES.HALLMARK}>Hallmark</TabsTrigger>
-            <TabsTrigger value={TAB_VALUES.CUSTOMER}>Customer Orders</TabsTrigger>
-            <TabsTrigger value={TAB_VALUES.KARIGARS}>Karigars</TabsTrigger>
+            <TabsTrigger value="total" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap">
+              Total Orders
+            </TabsTrigger>
+            <TabsTrigger value="ready" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap">
+              Ready
+            </TabsTrigger>
+            <TabsTrigger value="hallmark" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap">
+              Hallmark
+            </TabsTrigger>
+            <TabsTrigger value="customer" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap">
+              Customer Orders
+            </TabsTrigger>
+            <TabsTrigger value="karigars" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap">
+              Karigars
+            </TabsTrigger>
           </TabsList>
         </div>
 
         {isLoading ? (
           <div className="flex flex-col gap-3 mt-4">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              <div key={i} className="h-14 w-full rounded-lg bg-muted animate-pulse" />
             ))}
           </div>
         ) : (
           <>
-            <TabsContent value={TAB_VALUES.TOTAL}>
+            <TabsContent value="total" className="mt-3">
               <TotalOrdersTab orders={allOrders} isError={isError} />
             </TabsContent>
-            <TabsContent value={TAB_VALUES.READY}>
+            <TabsContent value="ready" className="mt-3">
               <ReadyTab orders={allOrders} isError={isError} />
             </TabsContent>
-            <TabsContent value={TAB_VALUES.HALLMARK}>
+            <TabsContent value="hallmark" className="mt-3">
               <HallmarkTab orders={allOrders} isError={isError} />
             </TabsContent>
-            <TabsContent value={TAB_VALUES.CUSTOMER}>
+            <TabsContent value="customer" className="mt-3">
               <CustomerOrdersTab />
             </TabsContent>
-            <TabsContent value={TAB_VALUES.KARIGARS}>
+            <TabsContent value="karigars" className="mt-3">
               <KarigarsTab />
             </TabsContent>
           </>
@@ -90,6 +74,4 @@ const Dashboard: React.FC = () => {
       </Tabs>
     </div>
   );
-};
-
-export default Dashboard;
+}

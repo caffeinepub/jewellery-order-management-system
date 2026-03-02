@@ -1,92 +1,83 @@
 {
   "kind": "build_request",
-  "title": "Fix dashboard design group rows invisible content and related bugs",
+  "title": "Fix karigar PDF export format, karigar name sync, and desktop sidebar overlap",
+  "projectName": "Jewellery Order Manager",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the design group row cards in the Total Orders tab (and all other dashboard tabs) where card content is invisible due to dark text rendering on a dark background. Ensure all text, labels, design codes, weights, quantities, and action elements inside each row card are visible with appropriate contrast against the dark card background.",
+      "text": "Restore the karigar PDF export format in KarigarDetail.tsx so that the exported PDF groups orders by design code, displays the design image above each group, and lists all orders belonging to that design code below the image — matching the original KASI_orders_2026-02-27.pdf layout.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4",
-          "msg-5"
+          "msg-1",
+          "msg-2"
         ],
         "quotes": [
-          "the design group rows below the tabs are rendering as dark empty boxes with no visible content",
-          "Row card content invisible — dark text on dark background in design group rows (the empty dark boxes in IMG_6556)"
+          "karigar export available with design image and order underneath it for each design code",
+          "KASI_orders_2026-02-27.pdf that's exactly how export pdf looks like"
         ]
       },
       "acceptanceCriteria": [
-        "Design group row cards in Total Orders tab display all text content (design code, generic name, order count, weight) visibly",
-        "Row card content is readable with sufficient contrast against the dark card background",
-        "All other tabs (Ready, Hallmark, Customer Orders, Karigars) also render row card content visibly",
-        "No dark-on-dark text rendering anywhere in the dashboard row cards"
+        "Exporting a karigar's orders as PDF produces one section per design code",
+        "Each section shows the design image (fetched from blob storage by design code) above the order rows",
+        "All orders for a design code are listed beneath that design's image in a table or list",
+        "The layout matches the grouped-by-design format of KASI_orders_2026-02-27.pdf"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the Totals tab karigar name display so it shows the correct karigar name (e.g., ZYRA FACTORY) from the live design mappings instead of a stale/incorrect name (e.g., SANTU). Ensure karigar names in grouped rows reflect the current mapping data.",
-      "target": "frontend",
+      "text": "Fix the karigar name sync so that when a karigar name is updated on the Master Designs page (MasterDesigns.tsx / EditDesignModal.tsx), the updated name (e.g., Prasanna for design code CHTMN40046) is immediately reflected in the Total Orders tab and the Karigar tab. The karigar tab for Prasanna must show all orders mapped to that design code, and the Total Orders tab must display Prasanna instead of the old name SANTU for CHTMN40046.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-1",
+          "msg-2"
         ],
         "quotes": [
-          "Karigar name sync — still showing SANTU instead of ZYRA FACTORY in Totals tab"
+          "Since karigar mapping was updated, the newly updated karigar name Prasanna shows in karigar tab but not in total orders tab against the design code CHTMN40046 it shows SANTU",
+          "in karigar tab, when Prasanna tab is selected no orders shows up there",
+          "We have a master design page where all design code, generic name, and karigar name is uploaded, and in that page only updation is also done."
         ]
       },
       "acceptanceCriteria": [
-        "Totals tab groups orders using the latest karigar name from the live design mappings query",
-        "Updated karigar names (e.g., ZYRA FACTORY) are reflected immediately after mappings are refreshed",
-        "No stale karigar name (e.g., SANTU) appears when the mapping has been updated"
+        "After updating a karigar name on the Master Designs page, the Total Orders tab reflects the new karigar name for the affected design code without requiring a page reload",
+        "After updating the karigar name for CHTMN40046 to Prasanna, the Total Orders tab shows Prasanna (not SANTU) for that design code",
+        "Selecting the Prasanna tab in the Karigar section displays all orders mapped to CHTMN40046",
+        "The old karigar name SANTU no longer appears for CHTMN40046 in any tab after the update",
+        "Query cache for orders, karigars, and design mappings is invalidated after a karigar name update on the Master Designs page"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly. The click handler must pass the correct karigar name and route parameters.",
+      "text": "Fix the desktop layout in App.tsx and AppSidebar.tsx so the sidebar and the main dashboard content do not overlap. The sidebar should occupy its own fixed or sticky column and the main content area should be offset correctly to sit beside the sidebar without any overlap.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-1"
         ],
         "quotes": [
-          "Karigar tab click — not loading pending orders when clicking a karigar card"
+          "When the app is viewed in desktop, the sidebar and main dashboard screen are overlapping."
         ]
       },
       "acceptanceCriteria": [
-        "Clicking a karigar card in the Karigars tab navigates to the karigar detail page",
-        "The karigar detail page loads and displays the correct pending orders for the selected karigar",
-        "No empty or broken state appears after clicking a karigar card"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab. Ensure the export controls are rendered and functional in the Ready tab UI.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "Export buttons on Ready tab — missing export options"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Ready tab shows Excel, PDF, and JPEG export buttons",
-        "Export buttons trigger their respective export actions (download CSV/Excel, generate PDF, generate JPEG)",
-        "Export buttons are visible and accessible without scrolling or additional interactions"
+        "On desktop viewport widths, the sidebar and main content area are displayed side by side with no overlap",
+        "The main content area begins where the sidebar ends and uses the remaining width",
+        "No content is hidden behind the sidebar on desktop",
+        "Mobile layout remains unaffected"
       ]
     }
   ],
   "constraints": [
-    "Do not change backend data models or Motoko actor logic",
-    "Do not modify files under frontend/src/hooks/ or frontend/src/components/ui/"
+    "Do not change any feature or UI behaviour beyond the three issues described above",
+    "Do not modify files listed in frontend.immutablePaths",
+    "All karigar name resolution must continue to use the Master Designs page as the single source of truth"
   ],
   "nonGoals": [
-    "Adding new dashboard tabs or features",
-    "Changing the overall dark theme or color palette",
-    "Backend schema migrations"
+    "Adding new pages or navigation items",
+    "Changing the Excel upload or order ingestion flow",
+    "Redesigning any UI beyond fixing the sidebar layout overlap",
+    "Adding new karigar management features"
   ],
   "imageRequirements": {
     "required": [],

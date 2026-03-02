@@ -1,245 +1,176 @@
-import { Package, Weight, Hash, ShoppingBag, CheckCircle, Gem, Users } from "lucide-react";
+import { useGetAllOrders } from "@/hooks/useQueries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Order, OrderStatus, OrderType } from "@/backend";
+import { Package, Weight, Hash, ShoppingBag } from "lucide-react";
+import { OrderStatus, OrderType } from "@/backend";
+
+type TabKey = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
 interface SummaryCardsProps {
-  orders: Order[];
-  isLoading?: boolean;
-  isError?: boolean;
-  activeTab?: string;
+  activeTab: TabKey;
 }
 
-/**
- * Returns a set of orderIds that have a Ready entry.
- * When the backend's Map.add appends (rather than overwrites), a partial supply
- * leaves both a Ready entry AND a Pending entry for the same orderId.
- * After a full supply, a new Ready entry is added but the old Pending entry may
- * persist as a ghost. We use this set to exclude ghost Pending rows from totals.
- */
-function getReadyOrderIds(orders: Order[]): Set<string> {
-  return new Set(
-    orders
-      .filter((o) => o.status === OrderStatus.Ready)
-      .map((o) => o.orderId)
+export default function SummaryCards({ activeTab }: SummaryCardsProps) {
+  const { data: orders = [], isLoading } = useGetAllOrders();
+
+  const pendingOrders = orders.filter((o) => o.status === OrderStatus.Pending);
+  const readyOrders = orders.filter((o) => o.status === OrderStatus.Ready);
+  const hallmarkOrders = orders.filter((o) => o.status === OrderStatus.Hallmark);
+  const coOrders = orders.filter(
+    (o) => o.orderType === OrderType.CO && o.status === OrderStatus.Pending
   );
-}
 
-function computeMetrics(orders: Order[], activeTab: string) {
-  if (activeTab === "ready") {
-    // Ready tab: each row is independent (no consolidation by orderNo)
-    const readyOrders = orders.filter((o) => o.status === OrderStatus.Ready);
-    const totalOrders = readyOrders.length;
-    const totalWeight = readyOrders.reduce(
-      (s, o) => s + o.weight * Number(o.quantity),
-      0
-    );
-    const totalQuantity = readyOrders.reduce((s, o) => s + Number(o.quantity), 0);
-    const coReadyOrders = readyOrders.filter((o) => o.orderType === OrderType.CO);
-    const distinctCOOrderNos = new Set(coReadyOrders.map((o) => o.orderNo));
-    return {
-      totalOrders,
-      totalWeight,
-      totalQuantity,
-      coOrders: distinctCOOrderNos.size,
-      label: "Ready rows",
-      weightLabel: "Ready weight",
-      qtyLabel: "Ready items",
-      coLabel: "CO ready",
-    };
-  }
+  // Exclude ghost pending entries (Pending rows whose orderId also has a Ready entry)
+  const readyOrderIds = new Set(readyOrders.map((o) => o.orderId));
+  const truePendingOrders = pendingOrders.filter((o) => !readyOrderIds.has(o.orderId));
 
-  if (activeTab === "hallmark") {
-    const hallmarkOrders = orders.filter((o) => o.status === OrderStatus.Hallmark);
-    const distinctOrderNos = new Set(hallmarkOrders.map((o) => o.orderNo));
-    const totalWeight = hallmarkOrders.reduce((s, o) => s + o.weight * Number(o.quantity), 0);
-    const totalQuantity = hallmarkOrders.reduce((s, o) => s + Number(o.quantity), 0);
-    const coHallmarkOrders = hallmarkOrders.filter((o) => o.orderType === OrderType.CO);
-    const distinctCOOrderNos = new Set(coHallmarkOrders.map((o) => o.orderNo));
-    return {
-      totalOrders: distinctOrderNos.size,
-      totalWeight,
-      totalQuantity,
-      coOrders: distinctCOOrderNos.size,
-      label: "Hallmark orders",
-      weightLabel: "Hallmark weight",
-      qtyLabel: "Hallmark items",
-      coLabel: "CO hallmark",
-    };
-  }
-
-  if (activeTab === "customer") {
-    const coPendingOrders = orders.filter(
-      (o) =>
-        o.orderType === OrderType.CO &&
-        o.status === OrderStatus.Pending
-    );
-    const distinctOrderNos = new Set(coPendingOrders.map((o) => o.orderNo));
-    const totalWeight = coPendingOrders.reduce((s, o) => s + o.weight * Number(o.quantity), 0);
-    const totalQuantity = coPendingOrders.reduce((s, o) => s + Number(o.quantity), 0);
-    return {
-      totalOrders: distinctOrderNos.size,
-      totalWeight,
-      totalQuantity,
-      coOrders: distinctOrderNos.size,
-      label: "CO pending orders",
-      weightLabel: "CO pending weight",
-      qtyLabel: "CO pending items",
-      coLabel: "CO orders",
-    };
-  }
-
-  if (activeTab === "karigars") {
-    const pendingOrders = orders.filter(
-      (o) => o.status === OrderStatus.Pending
-    );
-    const distinctOrderNos = new Set(pendingOrders.map((o) => o.orderNo));
-    const totalWeight = pendingOrders.reduce((s, o) => s + o.weight * Number(o.quantity), 0);
-    const totalQuantity = pendingOrders.reduce((s, o) => s + Number(o.quantity), 0);
-    const distinctKarigars = new Set(
-      pendingOrders.filter((o) => o.karigarName).map((o) => o.karigarName as string)
-    );
-    return {
-      totalOrders: distinctOrderNos.size,
-      totalWeight,
-      totalQuantity,
-      coOrders: distinctKarigars.size,
-      label: "Pending orders",
-      weightLabel: "Pending weight",
-      qtyLabel: "Pending items",
-      coLabel: "Active karigars",
-    };
-  }
-
-  // Default: "total" tab — all pending orders, excluding ghost Pending entries.
-  // A ghost Pending entry is one whose orderId also has a Ready entry, which happens
-  // when the backend's Map.add appends rather than overwrites during supply operations.
-  const readyOrderIds = getReadyOrderIds(orders);
-  const pendingOrders = orders.filter(
-    (o) => o.status === OrderStatus.Pending && !readyOrderIds.has(o.orderId)
-  );
-  const distinctPendingOrderNos = new Set(pendingOrders.map((o) => o.orderNo));
-  const totalWeight = pendingOrders.reduce((s, o) => s + o.weight * Number(o.quantity), 0);
-  const totalQuantity = pendingOrders.reduce((s, o) => s + Number(o.quantity), 0);
-  const pendingCOOrders = pendingOrders.filter((o) => o.orderType === OrderType.CO);
-  const distinctCOOrderNos = new Set(pendingCOOrders.map((o) => o.orderNo));
-  return {
-    totalOrders: distinctPendingOrderNos.size,
-    totalWeight,
-    totalQuantity,
-    coOrders: distinctCOOrderNos.size,
-    label: "Pending orders",
-    weightLabel: "Pending weight",
-    qtyLabel: "Pending items",
-    coLabel: "CO pending",
+  const getMetrics = () => {
+    switch (activeTab) {
+      case "total":
+        return {
+          orderCount: truePendingOrders.length,
+          totalWeight: truePendingOrders.reduce((sum, o) => sum + o.weight, 0),
+          totalQty: truePendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
+          coCount: coOrders.length,
+          orderLabel: "Pending orders",
+          weightLabel: "Pending weight",
+          qtyLabel: "Pending items",
+          coLabel: "CO pending",
+        };
+      case "ready":
+        return {
+          orderCount: readyOrders.length,
+          totalWeight: readyOrders.reduce((sum, o) => sum + o.weight, 0),
+          totalQty: readyOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
+          coCount: readyOrders.filter((o) => o.orderType === OrderType.CO).length,
+          orderLabel: "Ready orders",
+          weightLabel: "Ready weight",
+          qtyLabel: "Ready items",
+          coLabel: "CO ready",
+        };
+      case "hallmark":
+        return {
+          orderCount: hallmarkOrders.length,
+          totalWeight: hallmarkOrders.reduce((sum, o) => sum + o.weight, 0),
+          totalQty: hallmarkOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
+          coCount: hallmarkOrders.filter((o) => o.orderType === OrderType.CO).length,
+          orderLabel: "At hallmark",
+          weightLabel: "Hallmark weight",
+          qtyLabel: "Hallmark items",
+          coLabel: "CO at hallmark",
+        };
+      case "customer":
+        return {
+          orderCount: coOrders.length,
+          totalWeight: coOrders.reduce((sum, o) => sum + o.weight, 0),
+          totalQty: coOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
+          coCount: coOrders.length,
+          orderLabel: "CO pending",
+          weightLabel: "CO weight",
+          qtyLabel: "CO items",
+          coLabel: "CO pending",
+        };
+      case "karigars":
+        return {
+          orderCount: truePendingOrders.length,
+          totalWeight: truePendingOrders.reduce((sum, o) => sum + o.weight, 0),
+          totalQty: truePendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
+          coCount: coOrders.length,
+          orderLabel: "Pending orders",
+          weightLabel: "Pending weight",
+          qtyLabel: "Pending items",
+          coLabel: "CO pending",
+        };
+      default:
+        return {
+          orderCount: 0,
+          totalWeight: 0,
+          totalQty: 0,
+          coCount: 0,
+          orderLabel: "Orders",
+          weightLabel: "Weight",
+          qtyLabel: "Items",
+          coLabel: "CO",
+        };
+    }
   };
-}
 
-function getTabIcon(activeTab: string) {
-  switch (activeTab) {
-    case "ready":
-      return CheckCircle;
-    case "hallmark":
-      return Gem;
-    case "karigars":
-      return Users;
-    default:
-      return Package;
-  }
-}
+  const metrics = getMetrics();
 
-export default function SummaryCards({ orders, isLoading, isError, activeTab = "total" }: SummaryCardsProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="border-gold/20 bg-gradient-to-br from-gold/5 to-transparent">
-            <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16" />
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-3 md:p-5">
+              <div className="h-3 bg-muted rounded w-2/3 mb-2" />
+              <div className="h-6 bg-muted rounded w-1/3 mb-1" />
+              <div className="h-2 bg-muted rounded w-1/2" />
             </CardContent>
           </Card>
         ))}
       </div>
     );
   }
-
-  if (isError) {
-    return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="border-destructive/30">
-            <CardContent className="pt-6">
-              <p className="text-sm text-destructive">Error loading data</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  const metrics = computeMetrics(orders, activeTab);
-  const OrdersIcon = getTabIcon(activeTab);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card className="border-gold/20 bg-gradient-to-br from-gold/5 to-transparent">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <OrdersIcon className="h-4 w-4 text-gold" />
+    <div className="grid grid-cols-2 gap-2 md:gap-4">
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-1 pt-3 px-3 md:pb-2 md:pt-4 md:px-5">
+          <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <Package className="h-3.5 w-3.5 md:h-4 md:w-4 text-gold" />
             Total Orders
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-foreground">
-            {metrics.totalOrders}
+        <CardContent className="px-3 pb-3 md:px-5 md:pb-4">
+          <div className="text-xl md:text-3xl font-bold text-foreground">
+            {metrics.orderCount}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{metrics.label}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.orderLabel}</p>
         </CardContent>
       </Card>
 
-      <Card className="border-gold/20 bg-gradient-to-br from-gold/5 to-transparent">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Weight className="h-4 w-4 text-gold" />
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-1 pt-3 px-3 md:pb-2 md:pt-4 md:px-5">
+          <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <Weight className="h-3.5 w-3.5 md:h-4 md:w-4 text-gold" />
             Total Weight
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-foreground">
+        <CardContent className="px-3 pb-3 md:px-5 md:pb-4">
+          <div className="text-xl md:text-3xl font-bold text-foreground">
             {metrics.totalWeight.toFixed(2)}g
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{metrics.weightLabel}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.weightLabel}</p>
         </CardContent>
       </Card>
 
-      <Card className="border-gold/20 bg-gradient-to-br from-gold/5 to-transparent">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Hash className="h-4 w-4 text-gold" />
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-1 pt-3 px-3 md:pb-2 md:pt-4 md:px-5">
+          <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <Hash className="h-3.5 w-3.5 md:h-4 md:w-4 text-gold" />
             Total Quantity
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-foreground">{metrics.totalQuantity}</div>
-          <p className="text-xs text-muted-foreground mt-1">{metrics.qtyLabel}</p>
+        <CardContent className="px-3 pb-3 md:px-5 md:pb-4">
+          <div className="text-xl md:text-3xl font-bold text-foreground">
+            {metrics.totalQty}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.qtyLabel}</p>
         </CardContent>
       </Card>
 
-      <Card className="border-gold/20 bg-gradient-to-br from-gold/5 to-transparent">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <ShoppingBag className="h-4 w-4 text-gold" />
-            {activeTab === "karigars" ? "Active Karigars" : "Customer Orders"}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-1 pt-3 px-3 md:pb-2 md:pt-4 md:px-5">
+          <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <ShoppingBag className="h-3.5 w-3.5 md:h-4 md:w-4 text-gold" />
+            Customer Orders
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-foreground">
-            {metrics.coOrders}
+        <CardContent className="px-3 pb-3 md:px-5 md:pb-4">
+          <div className="text-xl md:text-3xl font-bold text-foreground">
+            {metrics.coCount}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{metrics.coLabel}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{metrics.coLabel}</p>
         </CardContent>
       </Card>
     </div>

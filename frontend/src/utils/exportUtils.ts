@@ -1,301 +1,307 @@
-import { Order } from '../backend';
+import { Order } from "@/backend";
 
-function getOrderStatusLabel(status: Order['status']): string {
-  if (status === 'Ready') return 'Ready';
-  if (status === 'Hallmark') return 'Hallmark';
-  if (status === 'ReturnFromHallmark') return 'Return From Hallmark';
-  return 'Pending';
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function formatDate(ts: bigint | undefined | null): string {
+  if (!ts) return "—";
+  const ms = Number(ts) / 1_000_000;
+  return new Date(ms).toLocaleDateString("en-IN");
 }
 
-function getOrderTypeLabel(type: Order['orderType']): string {
-  if (type === 'CO') return 'CO';
-  if (type === 'RB') return 'RB';
-  if (type === 'SO') return 'SO';
-  return String(type);
-}
-
-function formatDate(time?: bigint): string {
-  if (!time) return '-';
-  const ms = Number(time) / 1_000_000;
-  return new Date(ms).toLocaleDateString('en-IN');
-}
-
-// ─── Excel Export ────────────────────────────────────────────────────────────
-
-export function exportToExcel(orders: Order[], filename = 'orders'): void {
-  try {
-    const headers = [
-      'Order No', 'Order Type', 'Design Code', 'Generic Name', 'Karigar',
-      'Weight (g)', 'Quantity', 'Status', 'Order Date', 'Ready Date', 'Remarks'
-    ];
-
-    const rows = orders.map(o => [
-      o.orderNo,
-      getOrderTypeLabel(o.orderType),
-      o.design,
-      o.genericName ?? '-',
-      o.karigarName ?? '-',
-      o.weight.toFixed(3),
-      String(o.quantity),
-      getOrderStatusLabel(o.status),
-      formatDate(o.orderDate),
-      formatDate(o.readyDate),
-      o.remarks ?? ''
-    ]);
-
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    triggerDownload(blob, `${filename}.csv`);
-  } catch (err) {
-    console.error('Excel export failed:', err);
-    alert('Export failed. Please try again.');
-  }
-}
-
-// ─── PDF Export ──────────────────────────────────────────────────────────────
-
-export async function exportToPDF(orders: Order[], filename = 'orders'): Promise<void> {
-  try {
-    const jsPDF = await loadJsPDF();
-
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = 210;
-    const pageH = 297;
-    const margin = 14;
-    const contentW = pageW - margin * 2;
-
-    orders.forEach((order, idx) => {
-      if (idx > 0) doc.addPage();
-
-      // Header bar
-      doc.setFillColor(249, 115, 22);
-      doc.rect(0, 0, pageW, 18, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(13);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Order Details', margin, 12);
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Page ${idx + 1} of ${orders.length}`, pageW - margin, 12, { align: 'right' });
-
-      // Card background
-      doc.setFillColor(30, 30, 30);
-      doc.roundedRect(margin, 24, contentW, pageH - 40, 4, 4, 'F');
-
-      const fields: [string, string][] = [
-        ['Order No', order.orderNo],
-        ['Order Type', getOrderTypeLabel(order.orderType)],
-        ['Design Code', order.design],
-        ['Generic Name', order.genericName ?? '-'],
-        ['Karigar', order.karigarName ?? '-'],
-        ['Weight', `${order.weight.toFixed(3)} g`],
-        ['Quantity', String(order.quantity)],
-        ['Status', getOrderStatusLabel(order.status)],
-        ['Order Date', formatDate(order.orderDate)],
-        ['Ready Date', formatDate(order.readyDate)],
-        ['Remarks', order.remarks || '-'],
-      ];
-
-      let y = 36;
-      const labelX = margin + 6;
-      const valueX = margin + 60;
-
-      fields.forEach(([label, value]) => {
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 180, 180);
-        doc.text(label, labelX, y);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(240, 240, 240);
-        const lines = doc.splitTextToSize(value, contentW - 70);
-        doc.text(lines, valueX, y);
-        y += Math.max(8, lines.length * 6);
-      });
-
-      doc.setFontSize(7);
-      doc.setTextColor(120, 120, 120);
-      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, pageH - 6);
-    });
-
-    const pdfBlob = doc.output('blob');
-    triggerDownload(pdfBlob, `${filename}.pdf`);
-  } catch (err) {
-    console.error('PDF export failed:', err);
-    alert('PDF export failed. Please try again.');
-  }
-}
-
-// Alias for KarigarDetail backward compatibility
-export async function exportKarigarToPDF(orders: Order[], _karigarName: string, _actor?: any): Promise<void> {
-  return exportToPDF(orders, `karigar-orders`);
-}
-
-// ─── JPEG Export ─────────────────────────────────────────────────────────────
-
-export async function exportToJPEG(orders: Order[], filename = 'orders'): Promise<void> {
-  try {
-    const CARD_W = 800;
-    const CARD_H = 320;
-    const PADDING = 28;
-    const HEADER_H = 52;
-    const ROW_H = 28;
-    const COLS_PER_ROW = 2;
-    const CARDS_PER_COL = Math.ceil(orders.length / COLS_PER_ROW);
-
-    const canvasW = CARD_W * COLS_PER_ROW;
-    const canvasH = HEADER_H + CARDS_PER_COL * CARD_H;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasW;
-    canvas.height = canvasH;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D context not available');
-
-    // Background
-    ctx.fillStyle = '#111111';
-    ctx.fillRect(0, 0, canvasW, canvasH);
-
-    // Header
-    ctx.fillStyle = '#f97316';
-    ctx.fillRect(0, 0, canvasW, HEADER_H);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 26px Arial, sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Orders Export', PADDING, HEADER_H / 2);
-    ctx.font = '16px Arial, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.textAlign = 'right';
-    ctx.fillText(new Date().toLocaleString('en-IN'), canvasW - PADDING, HEADER_H / 2);
-    ctx.textAlign = 'left';
-
-    orders.forEach((order, idx) => {
-      const col = idx % COLS_PER_ROW;
-      const row = Math.floor(idx / COLS_PER_ROW);
-      const x = col * CARD_W;
-      const y = HEADER_H + row * CARD_H;
-
-      // Card background
-      ctx.fillStyle = '#1e1e1e';
-      ctx.fillRect(x + 4, y + 4, CARD_W - 8, CARD_H - 8);
-
-      // Card border
-      ctx.strokeStyle = '#333333';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 4, y + 4, CARD_W - 8, CARD_H - 8);
-
-      // Design code
-      ctx.fillStyle = '#f97316';
-      ctx.font = 'bold 18px Arial, sans-serif';
-      ctx.fillText(order.design, x + PADDING, y + 28);
-
-      // Order no
-      ctx.fillStyle = '#aaaaaa';
-      ctx.font = '14px Arial, sans-serif';
-      ctx.fillText(`#${order.orderNo}`, x + PADDING + 200, y + 28);
-
-      // Status
-      const statusColor = order.status === 'Ready' ? '#22c55e'
-        : order.status === 'Hallmark' ? '#3b82f6'
-        : order.status === 'ReturnFromHallmark' ? '#a855f7'
-        : '#f97316';
-      ctx.fillStyle = statusColor;
-      ctx.font = 'bold 12px Arial, sans-serif';
-      ctx.fillText(getOrderStatusLabel(order.status), x + CARD_W - PADDING - 120, y + 28);
-
-      // Divider
-      ctx.strokeStyle = '#333333';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x + PADDING, y + 40);
-      ctx.lineTo(x + CARD_W - PADDING, y + 40);
-      ctx.stroke();
-
-      // Fields
-      const fields: [string, string][] = [
-        ['Type', getOrderTypeLabel(order.orderType)],
-        ['Generic', order.genericName ?? '-'],
-        ['Karigar', order.karigarName ?? '-'],
-        ['Weight', `${order.weight.toFixed(3)} g`],
-        ['Qty', String(order.quantity)],
-        ['Order Date', formatDate(order.orderDate)],
-        ['Ready Date', formatDate(order.readyDate)],
-        ['Remarks', order.remarks || '-'],
-      ];
-
-      const halfLen = Math.ceil(fields.length / 2);
-      fields.forEach(([label, value], fi) => {
-        const col2 = fi < halfLen ? 0 : 1;
-        const row2 = fi < halfLen ? fi : fi - halfLen;
-        const fx = x + PADDING + col2 * (CARD_W / 2 - PADDING);
-        const fy = y + 52 + row2 * ROW_H;
-
-        ctx.fillStyle = '#888888';
-        ctx.font = '12px Arial, sans-serif';
-        ctx.fillText(label + ':', fx, fy);
-
-        ctx.fillStyle = '#eeeeee';
-        ctx.font = '13px Arial, sans-serif';
-        const displayVal = value.length > 22 ? value.substring(0, 22) + '…' : value;
-        ctx.fillText(displayVal, fx + 72, fy);
-      });
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) { reject(new Error('Canvas toBlob returned null')); return; }
-          // filename may be passed as old-style actor object from legacy callers — guard it
-          const safeName = typeof filename === 'string' ? filename : 'orders';
-          triggerDownload(blob, `${safeName}.jpg`);
-          resolve();
-        },
-        'image/jpeg',
-        0.92
-      );
-    });
-  } catch (err) {
-    console.error('JPEG export failed:', err);
-    alert('JPEG export failed. Please try again.');
-  }
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function triggerDownload(blob: Blob, filename: string): void {
+function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
-  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   setTimeout(() => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, 300);
+  }, 200);
 }
 
-function loadJsPDF(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if ((window as any).jspdf?.jsPDF) {
-      resolve((window as any).jspdf.jsPDF);
-      return;
+// ─── Excel export ────────────────────────────────────────────────────────────
+
+export async function exportToExcel(orders: Order[], filename = "orders.xlsx") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const XLSX: any = await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs" as string);
+    const rows = orders.map((o) => ({
+      "Order No": o.orderNo,
+      "Order Type": o.orderType,
+      "Design": o.design,
+      "Generic Name": o.genericName ?? "",
+      "Karigar": o.karigarName ?? "",
+      "Weight": o.weight,
+      "Qty": Number(o.quantity),
+      "Status": o.status,
+      "Order Date": formatDate(o.orderDate ?? undefined),
+      "Ready Date": formatDate(o.readyDate ?? undefined),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Orders");
+    XLSX.writeFile(wb, filename);
+  } catch {
+    // fallback CSV
+    const headers = ["Order No","Order Type","Design","Generic Name","Karigar","Weight","Qty","Status","Order Date","Ready Date"];
+    const rows = orders.map((o) =>
+      [o.orderNo, o.orderType, o.design, o.genericName ?? "", o.karigarName ?? "",
+       o.weight, Number(o.quantity), o.status,
+       formatDate(o.orderDate ?? undefined), formatDate(o.readyDate ?? undefined)].join(",")
+    );
+    const csv = [headers.join(","), ...rows].join("\n");
+    triggerDownload(new Blob([csv], { type: "text/csv" }), filename.replace(".xlsx", ".csv"));
+  }
+}
+
+// ─── PDF export (pure client-side, no external lib needed) ──────────────────
+
+function buildPDFBytes(orders: Order[]): ArrayBuffer {
+  // Build a minimal valid PDF. Each order gets its own page (A4: 595 x 842 pt).
+  const PAGE_W = 595;
+  const PAGE_H = 842;
+  const MARGIN = 50;
+
+  const objects: string[] = [];
+  let objCount = 0;
+
+  function addObj(content: string): number {
+    objCount++;
+    objects.push(`${objCount} 0 obj\n${content}\nendobj`);
+    return objCount;
+  }
+
+  // Font
+  const fontId = addObj(
+    `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`
+  );
+
+  const pageContentIds: number[] = [];
+  const pageIds: number[] = [];
+
+  for (const order of orders) {
+    const lines: string[] = [
+      `Order No: ${order.orderNo}`,
+      `Order Type: ${order.orderType}`,
+      `Design Code: ${order.design}`,
+      `Generic Name: ${order.genericName ?? "\u2014"}`,
+      `Karigar: ${order.karigarName ?? "\u2014"}`,
+      `Weight: ${order.weight} g`,
+      `Quantity: ${Number(order.quantity)}`,
+      `Status: ${order.status}`,
+      `Order Date: ${formatDate(order.orderDate ?? undefined)}`,
+      `Ready Date: ${formatDate(order.readyDate ?? undefined)}`,
+      `Remarks: ${order.remarks || "\u2014"}`,
+    ];
+
+    // Escape special PDF string chars; strip non-latin chars to avoid encoding issues
+    const escape = (s: string) =>
+      s
+        .replace(/[^\x20-\x7E]/g, "?")
+        .replace(/\\/g, "\\\\")
+        .replace(/\(/g, "\\(")
+        .replace(/\)/g, "\\)");
+
+    let stream = "BT\n";
+    stream += `/F1 14 Tf\n`;
+    stream += `${MARGIN} ${PAGE_H - MARGIN - 14} Td\n`;
+    stream += `(Order Details) Tj\n`;
+    stream += `/F1 11 Tf\n`;
+    stream += `0 -30 Td\n`;
+
+    for (let i = 0; i < lines.length; i++) {
+      stream += `(${escape(lines[i])}) Tj\n`;
+      if (i < lines.length - 1) stream += `0 -20 Td\n`;
     }
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    script.onload = () => {
-      if ((window as any).jspdf?.jsPDF) {
-        resolve((window as any).jspdf.jsPDF);
-      } else {
-        reject(new Error('jsPDF failed to load'));
-      }
-    };
-    script.onerror = () => reject(new Error('Failed to load jsPDF script'));
-    document.head.appendChild(script);
+    stream += "ET\n";
+
+    const streamLen = new TextEncoder().encode(stream).length;
+    const contentId = addObj(
+      `<< /Length ${streamLen} >>\nstream\n${stream}\nendstream`
+    );
+    pageContentIds.push(contentId);
+
+    // Placeholder page — will be updated with Parent ref below
+    const pageId = addObj(
+      `<< /Type /Page /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>`
+    );
+    pageIds.push(pageId);
+  }
+
+  // Pages node
+  const kidsRef = pageIds.map((id) => `${id} 0 R`).join(" ");
+  const pagesId = addObj(
+    `<< /Type /Pages /Kids [${kidsRef}] /Count ${pageIds.length} >>`
+  );
+
+  // Update each page object to include Parent reference
+  for (let i = 0; i < pageIds.length; i++) {
+    const idx = pageIds[i] - 1; // objects array is 0-based
+    objects[idx] =
+      `${pageIds[i]} 0 obj\n` +
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
+      `/Contents ${pageContentIds[i]} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>\n` +
+      `endobj`;
+  }
+
+  // Catalog
+  const catalogId = addObj(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+  // Assemble PDF body
+  const header = "%PDF-1.4\n";
+  let body = header;
+  const offsets: number[] = [];
+
+  for (const obj of objects) {
+    offsets.push(body.length);
+    body += obj + "\n";
+  }
+
+  // Cross-reference table
+  const xrefOffset = body.length;
+  body += "xref\n";
+  body += `0 ${objCount + 1}\n`;
+  body += "0000000000 65535 f \n";
+  for (const off of offsets) {
+    body += off.toString().padStart(10, "0") + " 00000 n \n";
+  }
+
+  body += "trailer\n";
+  body += `<< /Size ${objCount + 1} /Root ${catalogId} 0 R >>\n`;
+  body += "startxref\n";
+  body += `${xrefOffset}\n`;
+  body += "%%EOF\n";
+
+  // Convert string to ArrayBuffer (avoids Uint8Array<ArrayBufferLike> type issue)
+  const encoded = new TextEncoder().encode(body);
+  return encoded.buffer.slice(0) as ArrayBuffer;
+}
+
+export function exportAllToPDF(orders: Order[], filename = "orders-all.pdf") {
+  if (!orders.length) {
+    alert("No orders to export.");
+    return;
+  }
+  const buf = buildPDFBytes(orders);
+  triggerDownload(new Blob([buf], { type: "application/pdf" }), filename);
+}
+
+export function exportSelectedToPDF(orders: Order[], filename = "orders-selected.pdf") {
+  if (!orders.length) {
+    alert("No orders selected for export.");
+    return;
+  }
+  const buf = buildPDFBytes(orders);
+  triggerDownload(new Blob([buf], { type: "application/pdf" }), filename);
+}
+
+// Legacy alias — kept so OrderTable and KarigarDetail still compile
+export function exportToPDF(orders: Order[], filename = "orders.pdf") {
+  exportAllToPDF(orders, filename);
+}
+
+// ─── JPEG / Image export ─────────────────────────────────────────────────────
+
+export async function exportOrdersToImage(
+  orders: Order[],
+  title: string,
+  filename = "export.jpg"
+): Promise<void> {
+  if (!orders.length) {
+    alert("No orders to export.");
+    return;
+  }
+
+  const COLS = ["Order No", "Design", "Generic Name", "Karigar", "Weight", "Qty", "Status", "Order Date"];
+  const ROW_H = 32;
+  const COL_W = 160;
+  const PADDING = 16;
+  const HEADER_H = 60;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = COLS.length * COL_W + PADDING * 2;
+  canvas.height = HEADER_H + (orders.length + 1) * ROW_H + PADDING * 2;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    alert("Canvas not supported in this browser.");
+    return;
+  }
+
+  // Background
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Title
+  ctx.fillStyle = "#1a1a1a";
+  ctx.font = "bold 20px Arial, sans-serif";
+  ctx.fillText(title, PADDING, PADDING + 24);
+
+  const tableTop = HEADER_H;
+
+  // Header row
+  ctx.fillStyle = "#f3f4f6";
+  ctx.fillRect(PADDING, tableTop, COLS.length * COL_W, ROW_H);
+  ctx.fillStyle = "#374151";
+  ctx.font = "bold 12px Arial, sans-serif";
+  COLS.forEach((col, i) => {
+    ctx.fillText(col, PADDING + i * COL_W + 8, tableTop + 20);
   });
+
+  // Data rows
+  orders.forEach((order, rowIdx) => {
+    const y = tableTop + (rowIdx + 1) * ROW_H;
+    ctx.fillStyle = rowIdx % 2 === 0 ? "#ffffff" : "#f9fafb";
+    ctx.fillRect(PADDING, y, COLS.length * COL_W, ROW_H);
+
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "11px Arial, sans-serif";
+    const cells = [
+      order.orderNo,
+      order.design,
+      order.genericName ?? "—",
+      order.karigarName ?? "—",
+      String(order.weight),
+      String(Number(order.quantity)),
+      order.status,
+      formatDate(order.orderDate ?? undefined),
+    ];
+    cells.forEach((cell, i) => {
+      ctx.fillText(String(cell).substring(0, 18), PADDING + i * COL_W + 8, y + 20);
+    });
+  });
+
+  // Grid lines
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.lineWidth = 1;
+  for (let r = 0; r <= orders.length + 1; r++) {
+    const y = tableTop + r * ROW_H;
+    ctx.beginPath();
+    ctx.moveTo(PADDING, y);
+    ctx.lineTo(PADDING + COLS.length * COL_W, y);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= COLS.length; c++) {
+    const x = PADDING + c * COL_W;
+    ctx.beginPath();
+    ctx.moveTo(x, tableTop);
+    ctx.lineTo(x, tableTop + (orders.length + 1) * ROW_H);
+    ctx.stroke();
+  }
+
+  canvas.toBlob(
+    (blob) => {
+      if (blob) triggerDownload(blob, filename);
+      else alert("Failed to generate image.");
+    },
+    "image/jpeg",
+    0.92
+  );
+}
+
+// Legacy alias used by OrderTable
+export async function exportToJPEG(orders: Order[], _actor?: unknown): Promise<void> {
+  await exportOrdersToImage(orders, "Orders Export", "orders.jpg");
 }

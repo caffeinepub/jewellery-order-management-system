@@ -2,13 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-design-group-row-cards-in-the-total-orders-tab-and-all-other-dashboard-tabs-where-card-content-is-invisible-due-to-dark-text-rendering-on-a-dark-background-ensure-all-text-labels-design-codes-weights-quantities-and-action-elements-inside-each-row-card-are-visible-with-appropriate-contrast-against-the-dark-card-background",
-      "featureTitle": "Fix the design group row cards in the Total Orders tab (and all other dashboard tabs) where card content is invisible due to dark text rendering on a dark background. Ensure all text, labels, design codes, weights, quantities, and action elements inside each row card are visible with appropriate contrast against the dark card background.",
+      "featureId": "feature-restore-the-karigar-pdf-export-format-in-karigardetail-tsx-so-that-the-exported-pdf-groups-orders-by-design-code-displays-the-design-image-above-each-group-and-lists-all-orders-belonging-to-that-design-code-below-the-image-matching-the-original-kasi-orders-2026-02-27-pdf-layout",
+      "featureTitle": "Restore the karigar PDF export format in KarigarDetail.tsx so that the exported PDF groups orders by design code, displays the design image above each group, and lists all orders belonging to that design code below the image — matching the original KASI_orders_2026-02-27.pdf layout.",
       "files": [
-        "frontend/src/components/dashboard/HallmarkTab.tsx",
-        "frontend/src/components/dashboard/KarigarsTab.tsx",
-        "frontend/src/components/dashboard/ReadyTab.tsx",
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        "frontend/src/pages/KarigarDetail.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -26,10 +23,12 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-totals-tab-karigar-name-display-so-it-shows-the-correct-karigar-name-e-g-zyra-factory-from-the-live-design-mappings-instead-of-a-stale-incorrect-name-e-g-santu-ensure-karigar-names-in-grouped-rows-reflect-the-current-mapping-data",
-      "featureTitle": "Fix the Totals tab karigar name display so it shows the correct karigar name (e.g., ZYRA FACTORY) from the live design mappings instead of a stale/incorrect name (e.g., SANTU). Ensure karigar names in grouped rows reflect the current mapping data.",
+      "featureId": "feature-fix-the-karigar-name-sync-so-that-when-a-karigar-name-is-updated-on-the-master-designs-page-masterdesigns-tsx-editdesignmodal-tsx-the-updated-name-e-g-prasanna-for-design-code-chtmn40046-is-immediately-reflected-in-the-total-orders-tab-and-the-karigar-tab-the-karigar-tab-for-prasanna-must-show-all-orders-mapped-to-that-design-code-and-the-total-orders-tab-must-display-prasanna-instead-of-the-old-name-santu-for-chtmn40046",
+      "featureTitle": "Fix the karigar name sync so that when a karigar name is updated on the Master Designs page (MasterDesigns.tsx / EditDesignModal.tsx), the updated name (e.g., Prasanna for design code CHTMN40046) is immediately reflected in the Total Orders tab and the Karigar tab. The karigar tab for Prasanna must show all orders mapped to that design code, and the Total Orders tab must display Prasanna instead of the old name SANTU for CHTMN40046.",
       "files": [
-        "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        "frontend/src/components/dashboard/KarigarsTab.tsx",
+        "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+        "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -47,11 +46,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-karigars-tab-so-that-clicking-a-karigar-card-navigates-to-the-karigar-detail-page-and-loads-that-karigar-s-pending-orders-correctly-the-click-handler-must-pass-the-correct-karigar-name-and-route-parameters",
-      "featureTitle": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly. The click handler must pass the correct karigar name and route parameters.",
+      "featureId": "feature-fix-the-desktop-layout-in-app-tsx-and-appsidebar-tsx-so-the-sidebar-and-the-main-dashboard-content-do-not-overlap-the-sidebar-should-occupy-its-own-fixed-or-sticky-column-and-the-main-content-area-should-be-offset-correctly-to-sit-beside-the-sidebar-without-any-overlap",
+      "featureTitle": "Fix the desktop layout in App.tsx and AppSidebar.tsx so the sidebar and the main dashboard content do not overlap. The sidebar should occupy its own fixed or sticky column and the main content area should be offset correctly to sit beside the sidebar without any overlap.",
       "files": [
-        "frontend/src/components/dashboard/KarigarsTab.tsx",
-        "frontend/src/pages/KarigarDetail.tsx"
+        "frontend/src/App.tsx",
+        "frontend/src/components/layout/AppSidebar.tsx"
       ],
       "components": [
         "qr-code@1.0.0",
@@ -65,27 +64,6 @@
       ],
       "testIds": [
         "REQ-3"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-fix-the-ready-tab-to-display-export-buttons-excel-pdf-jpeg-so-users-can-export-orders-from-that-tab-ensure-the-export-controls-are-rendered-and-functional-in-the-ready-tab-ui",
-      "featureTitle": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab. Ensure the export controls are rendered and functional in the Ready tab UI.",
-      "files": [
-        "frontend/src/components/dashboard/ReadyTab.tsx"
-      ],
-      "components": [
-        "qr-code@1.0.0",
-        "camera@1.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0",
-        "blob-storage@4.0.0"
-      ],
-      "testIds": [
-        "REQ-4"
       ],
       "confidence": "high"
     }

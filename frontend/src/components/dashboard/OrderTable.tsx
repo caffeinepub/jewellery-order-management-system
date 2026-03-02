@@ -43,14 +43,14 @@ interface OrderTableProps {
   enableExport?: boolean;
 }
 
-export default function OrderTable({ 
-  orders, 
-  showDateFilter = false, 
+export default function OrderTable({
+  orders,
+  showDateFilter = false,
   enableBulkActions = false,
   onMarkAsReady,
   onDelete,
   isDeleting = false,
-  enableExport = false
+  enableExport = false,
 }: OrderTableProps) {
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -70,29 +70,21 @@ export default function OrderTable({
 
   const handleRowClick = (orderId: string) => {
     if (!enableBulkActions) return;
-    
     setSelectedRows((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(orderId)) {
-        newSet.delete(orderId);
-      } else {
-        newSet.add(orderId);
-      }
+      if (newSet.has(orderId)) newSet.delete(orderId);
+      else newSet.add(orderId);
       return newSet;
     });
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedRows(new Set(orders.map((o) => o.orderId)));
-    } else {
-      setSelectedRows(new Set());
-    }
+    if (checked) setSelectedRows(new Set(orders.map((o) => o.orderId)));
+    else setSelectedRows(new Set());
   };
 
   const handleMarkAsReady = () => {
     const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
-
     const rbOrders = selectedOrders.filter((order) => order.orderType === OrderType.RB);
     const soCoOrders = selectedOrders.filter(
       (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
@@ -111,27 +103,23 @@ export default function OrderTable({
       toast.error("Actor not initialized");
       return;
     }
-
     setIsUpdating(true);
     try {
       const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
       const soCoOrders = selectedOrders.filter(
         (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
       );
-      
-      const orderIds = soCoOrders.map(order => order.orderId);
+      const orderIds = soCoOrders.map((order) => order.orderId);
       await actor.markOrdersAsReady(orderIds);
-      
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      await queryClient.invalidateQueries({ queryKey: ["allOrders"] });
       await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-      await queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-      
+      await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
+      await queryClient.invalidateQueries({ queryKey: ["allOrders"] });
       toast.success(`${soCoOrders.length} order(s) marked as Ready`);
       setSelectedRows(new Set());
       setShowConfirmDialog(false);
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to update orders";
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update orders";
       toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
@@ -142,30 +130,30 @@ export default function OrderTable({
     setIsExporting(true);
     try {
       if (format === "excel") {
-        exportToExcel(orders);
+        await exportToExcel(orders);
         toast.success("Exported to Excel");
       } else if (format === "pdf") {
-        await exportToPDF(orders);
-        toast.success("Exported to PDF");
+        exportToPDF(orders);
+        toast.success("PDF downloaded");
       } else if (format === "jpeg") {
         await exportToJPEG(orders);
-        toast.success("Exported to JPEG");
+        toast.success("JPEG downloaded");
       }
-    } catch (error) {
+    } catch {
       toast.error(`Failed to export ${format.toUpperCase()}`);
-      console.error(error);
     } finally {
       setIsExporting(false);
     }
   };
 
-  const groupedOrders = orders.reduce((acc, order) => {
-    if (!acc[order.design]) {
-      acc[order.design] = [];
-    }
-    acc[order.design].push(order);
-    return acc;
-  }, {} as Record<string, Order[]>);
+  const groupedOrders = orders.reduce(
+    (acc, order) => {
+      if (!acc[order.design]) acc[order.design] = [];
+      acc[order.design].push(order);
+      return acc;
+    },
+    {} as Record<string, Order[]>
+  );
 
   const allSelected = orders.length > 0 && selectedRows.size === orders.length;
   const someSelected = selectedRows.size > 0 && selectedRows.size < orders.length;
@@ -179,11 +167,7 @@ export default function OrderTable({
           </div>
           <div className="flex gap-2">
             {enableBulkActions && selectedRows.size > 0 && (
-              <Button
-                onClick={handleMarkAsReady}
-                size="sm"
-                className="bg-gold hover:bg-gold-hover"
-              >
+              <Button onClick={handleMarkAsReady} size="sm" className="bg-gold hover:bg-gold-hover">
                 Mark as Ready
               </Button>
             )}
@@ -289,34 +273,33 @@ export default function OrderTable({
                         {order.orderType}
                       </span>
                     </TableCell>
-                    <TableCell>{order.remarks || "-"}</TableCell>
+                    <TableCell className="max-w-[120px] truncate">{order.remarks || "-"}</TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
                           order.status === OrderStatus.Ready
-                            ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                            : order.status === OrderStatus.Pending
-                            ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
                             : order.status === OrderStatus.Hallmark
-                            ? "bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300"
-                            : "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                              : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                         }`}
                       >
-                        {order.status === OrderStatus.ReturnFromHallmark ? "Returned" : order.status}
+                        {order.status === OrderStatus.ReturnFromHallmark
+                          ? "Returned"
+                          : order.status}
                       </span>
                     </TableCell>
                     {onDelete && (
                       <TableCell>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
                             onDelete(order.orderId);
                           }}
                           disabled={isDeleting}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                          title="Delete order"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
                         >
                           {isDeleting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -334,20 +317,14 @@ export default function OrderTable({
         </Table>
       </div>
 
-      {selectedDesign && (
-        <DesignImageModal
-          designCode={selectedDesign}
-          open={!!selectedDesign}
-          onClose={() => setSelectedDesign(null)}
-        />
-      )}
-
+      {/* Confirm mark as ready dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark Orders as Ready</AlertDialogTitle>
+            <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark {selectedRows.size} order(s) as Ready?
+              This will mark {selectedRows.size} selected order(s) as Ready. This action cannot be
+              undone easily.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -365,6 +342,15 @@ export default function OrderTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Design image modal */}
+      {selectedDesign && (
+        <DesignImageModal
+          designCode={selectedDesign}
+          open={!!selectedDesign}
+          onClose={() => setSelectedDesign(null)}
+        />
+      )}
     </div>
   );
 }

@@ -3,20 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
-  useUploadMasterDesignExcel,
-  useGetMasterDesignExcel,
   useUploadDesignMapping,
   useAssignOrdersToKarigar,
   useUpdateMasterDesignKarigars,
   useGetAllMasterDesignMappings,
   useGetAllOrders,
+  useReassignDesign,
+  useGetUniqueKarigarsFromDesignMappings,
   useAddKarigar,
+  useUpdateDesignMapping,
 } from "@/hooks/useQueries";
-import { MappingRecord, DesignMapping, ExternalBlob } from "@/backend";
-import { normalizeDesignCode } from "@/utils/excelParser";
+import { MappingRecord } from "@/backend";
 import {
   Table,
   TableBody,
@@ -25,12 +25,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { EditDesignModal } from "@/components/masterdesigns/EditDesignModal";
+
+// Normalize design code: uppercase, trim
+function normalizeDesignCode(code: string): string {
+  return code.toUpperCase().trim();
+}
 
 export default function MasterDesigns() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   const [editingMapping, setEditingMapping] = useState<{
     designCode: string;
     genericName: string;
@@ -38,17 +43,20 @@ export default function MasterDesigns() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadMasterDesignExcelMutation = useUploadMasterDesignExcel();
   const uploadDesignMappingMutation = useUploadDesignMapping();
   const assignOrdersToKarigarMutation = useAssignOrdersToKarigar();
   const updateMasterDesignKarigarsMutation = useUpdateMasterDesignKarigars();
+  const reassignDesignMutation = useReassignDesign();
+  const updateDesignMappingMutation = useUpdateDesignMapping();
   const addKarigarMutation = useAddKarigar();
-  const { data: masterDesignExcel } = useGetMasterDesignExcel();
   const { data: masterDesignMappings = [] } = useGetAllMasterDesignMappings();
   const { data: allOrders = [] } = useGetAllOrders();
+  const { data: availableKarigars = [] } = useGetUniqueKarigarsFromDesignMappings();
 
-  // Suppress unused variable warnings
+  // Suppress unused variable warnings for mutations not directly called in JSX
   void assignOrdersToKarigarMutation;
+  void reassignDesignMutation;
+  void updateDesignMappingMutation;
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -65,11 +73,14 @@ export default function MasterDesigns() {
     try {
       const arrayBuffer = await file.arrayBuffer();
 
-      const XLSX: any = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any);
+      // Dynamically import XLSX from CDN
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const XLSX: any = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as string);
 
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
       setUploadProgress(20);
@@ -109,15 +120,13 @@ export default function MasterDesigns() {
 
       setUploadProgress(60);
 
+      // Upload design mappings
       await uploadDesignMappingMutation.mutateAsync(mappings);
 
       setUploadProgress(80);
 
+      // Update master design karigars list
       await updateMasterDesignKarigarsMutation.mutateAsync(Array.from(uniqueKarigars));
-
-      const uint8Data = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
-      const externalBlob = ExternalBlob.fromBytes(uint8Data);
-      await uploadMasterDesignExcelMutation.mutateAsync(externalBlob);
 
       setUploadProgress(100);
       toast.success(`Successfully uploaded ${mappings.length} design mappings`);
@@ -144,6 +153,20 @@ export default function MasterDesigns() {
     return acc;
   }, {});
 
+  // Deduplicate available karigars for the modal
+  const uniqueKarigarList = Array.from(new Set(availableKarigars.filter(Boolean)));
+
+  // Filter mappings by search query
+  const filteredMappings = masterDesignMappings.filter(([code, mapping]) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      code.toLowerCase().includes(q) ||
+      mapping.genericName.toLowerCase().includes(q) ||
+      mapping.karigarName.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div>
@@ -165,16 +188,6 @@ export default function MasterDesigns() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {masterDesignExcel && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                A master design Excel file has been previously uploaded. Uploading a new file will
-                update all mappings.
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="flex items-center gap-4">
             <Label htmlFor="excel-upload" className="cursor-pointer">
               <div className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted transition-colors">
@@ -187,35 +200,51 @@ export default function MasterDesigns() {
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls"
-              onChange={handleFileUpload}
               className="hidden"
+              onChange={handleFileUpload}
               disabled={isUploading}
             />
             {isUploading && (
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gold transition-all duration-300"
+                    className="h-full bg-primary transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <span className="text-sm text-muted-foreground">{uploadProgress}%</span>
+                <span>{uploadProgress}%</span>
               </div>
             )}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Excel format: Column A = Design Code, Column B = Generic Name, Column C = Karigar Name
+          </p>
         </CardContent>
       </Card>
 
       {/* Mappings Table */}
-      {masterDesignMappings.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Design Mappings ({masterDesignMappings.length})</CardTitle>
-            <CardDescription>
-              Current design code to generic name and karigar mappings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle>Design Mappings ({masterDesignMappings.length})</CardTitle>
+          <CardDescription>
+            All design codes with their generic names and karigar assignments
+          </CardDescription>
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by design code, generic name, or karigar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {masterDesignMappings.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No design mappings found. Upload a master design Excel file to get started.
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -228,25 +257,26 @@ export default function MasterDesigns() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {masterDesignMappings.map(([designCode, mapping]: [string, DesignMapping]) => (
-                    <TableRow key={designCode}>
-                      <TableCell className="font-mono font-medium">{designCode}</TableCell>
+                  {filteredMappings.map(([code, mapping]) => (
+                    <TableRow key={code}>
+                      <TableCell className="font-mono font-bold text-primary">
+                        {code}
+                      </TableCell>
                       <TableCell>{mapping.genericName}</TableCell>
-                      <TableCell>{mapping.karigarName}</TableCell>
-                      <TableCell className="text-right">
-                        {orderCountByDesign[normalizeDesignCode(designCode)] || 0}
+                      <TableCell>
+                        <span className="px-2 py-0.5 rounded-full bg-muted text-xs font-medium">
+                          {mapping.karigarName}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {orderCountByDesign[normalizeDesignCode(code)] || 0}
                       </TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            handleEditMapping(
-                              designCode,
-                              mapping.genericName,
-                              mapping.karigarName
-                            )
-                          }
+                          className="h-7 text-xs"
+                          onClick={() => handleEditMapping(code, mapping.genericName, mapping.karigarName)}
                         >
                           Edit
                         </Button>
@@ -256,20 +286,11 @@ export default function MasterDesigns() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
-      {masterDesignMappings.length === 0 && !isUploading && (
-        <Card>
-          <CardContent className="py-12">
-            <p className="text-center text-muted-foreground">
-              No design mappings found. Upload a master design Excel file to get started.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Edit Modal */}
       {editingMapping && (
         <EditDesignModal
           open={!!editingMapping}
@@ -277,6 +298,7 @@ export default function MasterDesigns() {
           designCode={editingMapping.designCode}
           genericName={editingMapping.genericName}
           currentKarigar={editingMapping.karigarName}
+          karigars={uniqueKarigarList}
         />
       )}
     </div>
