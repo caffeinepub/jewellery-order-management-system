@@ -7,79 +7,40 @@
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-restore-the-summary-tab-value-computation-logic-to-match-v158-behaviour-so-that-metric-values-order-counts-weight-quantity-co-orders-update-correctly-and-reflect-the-appropriate-subset-of-orders-when-switching-between-dashboard-tabs-total-orders-ready-hallmark-customer-orders-karigars",
-      "title": "Restore the summary tab value computation logic to match v158 behaviour so that metric values (order counts, weight, quantity, CO orders) update correctly and reflect the appropriate subset of orders when switching between dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars).",
+      "id": "feature-fix-the-design-group-row-cards-in-the-total-orders-tab-and-all-other-dashboard-tabs-where-card-content-is-invisible-due-to-dark-text-rendering-on-a-dark-background-ensure-all-text-labels-design-codes-weights-quantities-and-action-elements-inside-each-row-card-are-visible-with-appropriate-contrast-against-the-dark-card-background",
+      "title": "Fix the design group row cards in the Total Orders tab (and all other dashboard tabs) where card content is invisible due to dark text rendering on a dark background. Ensure all text, labels, design codes, weights, quantities, and action elements inside each row card are visible with appropriate contrast against the dark card background.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-within-each-design-group-in-the-total-orders-tab-sort-the-rows-from-longest-due-oldest-order-date-to-least-due-most-recent-order-date-top-to-bottom-grouped-by-weight",
-      "title": "Within each design group in the Total Orders tab, sort the rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight.",
+      "id": "feature-fix-the-totals-tab-karigar-name-display-so-it-shows-the-correct-karigar-name-e-g-zyra-factory-from-the-live-design-mappings-instead-of-a-stale-incorrect-name-e-g-santu-ensure-karigar-names-in-grouped-rows-reflect-the-current-mapping-data",
+      "title": "Fix the Totals tab karigar name display so it shows the correct karigar name (e.g., ZYRA FACTORY) from the live design mappings instead of a stale/incorrect name (e.g., SANTU). Ensure karigar names in grouped rows reflect the current mapping data.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-karigars-tab-so-that-clicking-a-karigar-card-navigates-to-the-karigar-detail-page-and-loads-that-karigar-s-pending-orders-correctly-the-click-handler-must-pass-the-correct-karigar-name-and-route-parameters",
+      "title": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly. The click handler must pass the correct karigar name and route parameters.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-in-the-design-group-header-row-in-the-total-orders-tab-display-the-design-code-text-in-bold-orange-color",
-      "title": "In the design group header row in the Total Orders tab, display the design code text in bold orange color.",
+      "id": "feature-fix-the-ready-tab-to-display-export-buttons-excel-pdf-jpeg-so-users-can-export-orders-from-that-tab-ensure-the-export-controls-are-rendered-and-functional-in-the-ready-tab-ui",
+      "title": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab. Ensure the export controls are rendered and functional in the Ready tab UI.",
       "reqIds": [
         "REQ-4"
       ],
       "version": 1
-    },
-    {
-      "id": "feature-remove-the-image-icon-from-the-design-group-header-row-in-the-total-orders-tab",
-      "title": "Remove the image icon from the design group header row in the Total Orders tab.",
-      "reqIds": [
-        "REQ-5"
-      ],
-      "version": 1
     }
   ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "Fix summary tabs not changing values across tabs (restore v158 supply logic behaviour)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Fix RB partial supplied row not showing in Ready tab",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Sort rows within each design group in Total Orders tab from longest due to least due, grouped by weight",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Display design codes in design group header in bold orange color",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Remove image icon from design group header in Totals tab",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-7",
-      "summary": "Fix the RB partial supplied row so it appears in the Ready tab after a partial supply action is performed. When an RB order is partially supplied, the supplied portion must be visible as a row in the Ready tab.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "status": "pending"
-    }
-  ],
-  "projectName": "Jewellery Order Manager",
+  "new_feature_requests": [],
+  "projectName": "Fix dashboard design group rows invisible content and related bugs",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

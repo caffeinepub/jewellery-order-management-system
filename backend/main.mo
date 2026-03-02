@@ -1,14 +1,14 @@
 import Time "mo:core/Time";
 import List "mo:core/List";
 import Map "mo:core/Map";
-import Nat "mo:core/Nat";
 import Array "mo:core/Array";
 import Float "mo:core/Float";
 import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
+
+
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-
 
 
 actor {
@@ -52,6 +52,7 @@ actor {
   let masterDesignKarigars = Map.empty<Text, Nat>();
   var masterDesignExcel : ?Storage.ExternalBlob = null;
   var activeKarigar : ?Text = null;
+  let karigarOrderCounts = Map.empty<Text, Nat>();
 
   type DesignMapping = {
     designCode : Text;
@@ -130,6 +131,17 @@ actor {
     };
 
     orders.add(orderId, order);
+
+    switch (karigarName) {
+      case (?name) {
+        let currentCount = switch (karigarOrderCounts.get(name)) {
+          case (?count) { count };
+          case (null) { 0 };
+        };
+        karigarOrderCounts.add(name, currentCount + 1);
+      };
+      case (null) {};
+    };
   };
 
   public query ({ caller }) func getOrder(orderId : Text) : async ?Order {
@@ -152,6 +164,17 @@ actor {
             readyDate = ?Time.now();
           };
           orders.add(orderId, readyOrder);
+
+          switch (originalOrder.karigarName) {
+            case (?name) {
+              let currentCount = switch (karigarOrderCounts.get(name)) {
+                case (?count) { count };
+                case (null) { 0 };
+              };
+              karigarOrderCounts.add(name, currentCount - 1);
+            };
+            case (null) {};
+          };
         };
         let remainingQuantity = originalOrder.quantity - suppliedQuantity;
         if (remainingQuantity > 0) {
@@ -293,6 +316,24 @@ actor {
             case (null) { Runtime.trap("Order with id " # orderId # " already removed") };
             case (?order) {
               if (order.status == #Pending) {
+                switch (order.karigarName) {
+                  case (?oldKarigar) {
+                    let currentOldCount = switch (karigarOrderCounts.get(oldKarigar)) {
+                      case (?count) { count };
+                      case (null) { 0 };
+                    };
+                    if (currentOldCount > 0) {
+                      karigarOrderCounts.add(oldKarigar, currentOldCount - 1);
+                    };
+                  };
+                  case (null) {};
+                };
+                let currentNewCount = switch (karigarOrderCounts.get(newKarigar)) {
+                  case (?count) { count };
+                  case (null) { 0 };
+                };
+                karigarOrderCounts.add(newKarigar, currentNewCount + 1);
+
                 let updatedOrder : Order = {
                   order with
                   genericName = ?mapping.genericName;
@@ -416,6 +457,17 @@ actor {
             readyDate = ?Time.now();
           };
           orders.add(orderId, updatedOrder);
+
+          switch (order.karigarName) {
+            case (?name) {
+              let currentCount = switch (karigarOrderCounts.get(name)) {
+                case (?count) { count };
+                case (null) { 0 };
+              };
+              karigarOrderCounts.add(name, currentCount - 1);
+            };
+            case (null) {};
+          };
         };
       };
     };
@@ -699,10 +751,54 @@ actor {
 
         orders.add(orderId, newOrder);
         persistedRows.add(newOrder);
+
+        switch (karigarName) {
+          case (?name) {
+            let currentCount = switch (karigarOrderCounts.get(name)) {
+              case (?count) { count };
+              case (null) { 0 };
+            };
+            karigarOrderCounts.add(name, currentCount + 1);
+          };
+          case (null) {};
+        };
       };
     };
 
     let persisted = persistedRows.toArray();
     { persisted };
+  };
+
+  public shared ({ caller }) func markOrdersAsPending(orderIds : [Text]) : async () {
+    for (orderId in orderIds.values()) {
+      switch (orders.get(orderId)) {
+        case (null) {
+          Runtime.trap("Order with id " # orderId # " not found");
+        };
+        case (?order) {
+          if (order.status != #Ready) {
+            Runtime.trap("Order must be in Ready state to be marked as Pending");
+          };
+          let updatedOrder : Order = {
+            order with
+            status = #Pending;
+            updatedAt = Time.now();
+            readyDate = null;
+          };
+          orders.add(orderId, updatedOrder);
+
+          switch (order.karigarName) {
+            case (?name) {
+              let currentCount = switch (karigarOrderCounts.get(name)) {
+                case (?count) { count };
+                case (null) { 0 };
+              };
+              karigarOrderCounts.add(name, currentCount + 1);
+            };
+            case (null) {};
+          };
+        };
+      };
+    };
   };
 };

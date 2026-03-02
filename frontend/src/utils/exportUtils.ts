@@ -1,499 +1,301 @@
-import { Order } from "@/backend";
-import { ExternalBlob } from "@/backend";
+import { Order } from '../backend';
 
-export async function exportToExcel(orders: Order[]) {
+function getOrderStatusLabel(status: Order['status']): string {
+  if (status === 'Ready') return 'Ready';
+  if (status === 'Hallmark') return 'Hallmark';
+  if (status === 'ReturnFromHallmark') return 'Return From Hallmark';
+  return 'Pending';
+}
+
+function getOrderTypeLabel(type: Order['orderType']): string {
+  if (type === 'CO') return 'CO';
+  if (type === 'RB') return 'RB';
+  if (type === 'SO') return 'SO';
+  return String(type);
+}
+
+function formatDate(time?: bigint): string {
+  if (!time) return '-';
+  const ms = Number(time) / 1_000_000;
+  return new Date(ms).toLocaleDateString('en-IN');
+}
+
+// ─── Excel Export ────────────────────────────────────────────────────────────
+
+export function exportToExcel(orders: Order[], filename = 'orders'): void {
   try {
-    // Dynamic import of xlsx from CDN
-    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any);
-    
-    const data = orders.map((order) => ({
-      "Order No": order.orderNo,
-      Design: order.design,
-      "Generic Name": order.genericName || "-",
-      Karigar: order.karigarName || "-",
-      "Weight (g)": order.weight,
-      Size: order.size,
-      Quantity: Number(order.quantity),
-      Type: order.orderType,
-      Product: order.product,
-      Remarks: order.remarks || "-",
-      Status: order.status === "ReturnFromHallmark" ? "Returned" : order.status,
-    }));
+    const headers = [
+      'Order No', 'Order Type', 'Design Code', 'Generic Name', 'Karigar',
+      'Weight (g)', 'Quantity', 'Status', 'Order Date', 'Ready Date', 'Remarks'
+    ];
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Orders");
-    XLSX.writeFile(wb, `orders_${new Date().toISOString().split("T")[0]}.xlsx`);
-  } catch (error) {
-    console.error('Export to Excel failed:', error);
-    throw error;
+    const rows = orders.map(o => [
+      o.orderNo,
+      getOrderTypeLabel(o.orderType),
+      o.design,
+      o.genericName ?? '-',
+      o.karigarName ?? '-',
+      o.weight.toFixed(3),
+      String(o.quantity),
+      getOrderStatusLabel(o.status),
+      formatDate(o.orderDate),
+      formatDate(o.readyDate),
+      o.remarks ?? ''
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    triggerDownload(blob, `${filename}.csv`);
+  } catch (err) {
+    console.error('Excel export failed:', err);
+    alert('Export failed. Please try again.');
   }
 }
 
-// Helper function to extract numeric portion from design code for sorting
-function extractNumericPortion(designCode: string): number {
-  const match = designCode.match(/\d+/);
-  return match ? parseInt(match[0], 10) : 0;
-}
+// ─── PDF Export ──────────────────────────────────────────────────────────────
 
-// Helper function to fetch design image URL
-async function fetchDesignImageURL(designCode: string, actor: any): Promise<string | null> {
+export async function exportToPDF(orders: Order[], filename = 'orders'): Promise<void> {
   try {
-    if (!actor) return null;
-    const blob = await actor.getDesignImage(designCode);
-    if (!blob) return null;
+    const jsPDF = await loadJsPDF();
 
-    // Use getDirectURL() for streaming and caching
-    return blob.getDirectURL();
-  } catch (error) {
-    console.error(`Failed to fetch image for ${designCode}:`, error);
-    return null;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 14;
+    const contentW = pageW - margin * 2;
+
+    orders.forEach((order, idx) => {
+      if (idx > 0) doc.addPage();
+
+      // Header bar
+      doc.setFillColor(249, 115, 22);
+      doc.rect(0, 0, pageW, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Order Details', margin, 12);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Page ${idx + 1} of ${orders.length}`, pageW - margin, 12, { align: 'right' });
+
+      // Card background
+      doc.setFillColor(30, 30, 30);
+      doc.roundedRect(margin, 24, contentW, pageH - 40, 4, 4, 'F');
+
+      const fields: [string, string][] = [
+        ['Order No', order.orderNo],
+        ['Order Type', getOrderTypeLabel(order.orderType)],
+        ['Design Code', order.design],
+        ['Generic Name', order.genericName ?? '-'],
+        ['Karigar', order.karigarName ?? '-'],
+        ['Weight', `${order.weight.toFixed(3)} g`],
+        ['Quantity', String(order.quantity)],
+        ['Status', getOrderStatusLabel(order.status)],
+        ['Order Date', formatDate(order.orderDate)],
+        ['Ready Date', formatDate(order.readyDate)],
+        ['Remarks', order.remarks || '-'],
+      ];
+
+      let y = 36;
+      const labelX = margin + 6;
+      const valueX = margin + 60;
+
+      fields.forEach(([label, value]) => {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 180, 180);
+        doc.text(label, labelX, y);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(240, 240, 240);
+        const lines = doc.splitTextToSize(value, contentW - 70);
+        doc.text(lines, valueX, y);
+        y += Math.max(8, lines.length * 6);
+      });
+
+      doc.setFontSize(7);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, margin, pageH - 6);
+    });
+
+    const pdfBlob = doc.output('blob');
+    triggerDownload(pdfBlob, `${filename}.pdf`);
+  } catch (err) {
+    console.error('PDF export failed:', err);
+    alert('PDF export failed. Please try again.');
   }
 }
 
-// Helper function to load image and convert to base64
-async function loadImageAsBase64(imageUrl: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(null);
-          return;
-        }
-        ctx.drawImage(img, 0, 0);
-        const base64 = canvas.toDataURL('image/jpeg', 0.95);
-        resolve(base64);
-      } catch (error) {
-        console.error('Failed to convert image to base64:', error);
-        resolve(null);
+// Alias for KarigarDetail backward compatibility
+export async function exportKarigarToPDF(orders: Order[], _karigarName: string, _actor?: any): Promise<void> {
+  return exportToPDF(orders, `karigar-orders`);
+}
+
+// ─── JPEG Export ─────────────────────────────────────────────────────────────
+
+export async function exportToJPEG(orders: Order[], filename = 'orders'): Promise<void> {
+  try {
+    const CARD_W = 800;
+    const CARD_H = 320;
+    const PADDING = 28;
+    const HEADER_H = 52;
+    const ROW_H = 28;
+    const COLS_PER_ROW = 2;
+    const CARDS_PER_COL = Math.ceil(orders.length / COLS_PER_ROW);
+
+    const canvasW = CARD_W * COLS_PER_ROW;
+    const canvasH = HEADER_H + CARDS_PER_COL * CARD_H;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context not available');
+
+    // Background
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // Header
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(0, 0, canvasW, HEADER_H);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px Arial, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Orders Export', PADDING, HEADER_H / 2);
+    ctx.font = '16px Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.textAlign = 'right';
+    ctx.fillText(new Date().toLocaleString('en-IN'), canvasW - PADDING, HEADER_H / 2);
+    ctx.textAlign = 'left';
+
+    orders.forEach((order, idx) => {
+      const col = idx % COLS_PER_ROW;
+      const row = Math.floor(idx / COLS_PER_ROW);
+      const x = col * CARD_W;
+      const y = HEADER_H + row * CARD_H;
+
+      // Card background
+      ctx.fillStyle = '#1e1e1e';
+      ctx.fillRect(x + 4, y + 4, CARD_W - 8, CARD_H - 8);
+
+      // Card border
+      ctx.strokeStyle = '#333333';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 4, y + 4, CARD_W - 8, CARD_H - 8);
+
+      // Design code
+      ctx.fillStyle = '#f97316';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.fillText(order.design, x + PADDING, y + 28);
+
+      // Order no
+      ctx.fillStyle = '#aaaaaa';
+      ctx.font = '14px Arial, sans-serif';
+      ctx.fillText(`#${order.orderNo}`, x + PADDING + 200, y + 28);
+
+      // Status
+      const statusColor = order.status === 'Ready' ? '#22c55e'
+        : order.status === 'Hallmark' ? '#3b82f6'
+        : order.status === 'ReturnFromHallmark' ? '#a855f7'
+        : '#f97316';
+      ctx.fillStyle = statusColor;
+      ctx.font = 'bold 12px Arial, sans-serif';
+      ctx.fillText(getOrderStatusLabel(order.status), x + CARD_W - PADDING - 120, y + 28);
+
+      // Divider
+      ctx.strokeStyle = '#333333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + PADDING, y + 40);
+      ctx.lineTo(x + CARD_W - PADDING, y + 40);
+      ctx.stroke();
+
+      // Fields
+      const fields: [string, string][] = [
+        ['Type', getOrderTypeLabel(order.orderType)],
+        ['Generic', order.genericName ?? '-'],
+        ['Karigar', order.karigarName ?? '-'],
+        ['Weight', `${order.weight.toFixed(3)} g`],
+        ['Qty', String(order.quantity)],
+        ['Order Date', formatDate(order.orderDate)],
+        ['Ready Date', formatDate(order.readyDate)],
+        ['Remarks', order.remarks || '-'],
+      ];
+
+      const halfLen = Math.ceil(fields.length / 2);
+      fields.forEach(([label, value], fi) => {
+        const col2 = fi < halfLen ? 0 : 1;
+        const row2 = fi < halfLen ? fi : fi - halfLen;
+        const fx = x + PADDING + col2 * (CARD_W / 2 - PADDING);
+        const fy = y + 52 + row2 * ROW_H;
+
+        ctx.fillStyle = '#888888';
+        ctx.font = '12px Arial, sans-serif';
+        ctx.fillText(label + ':', fx, fy);
+
+        ctx.fillStyle = '#eeeeee';
+        ctx.font = '13px Arial, sans-serif';
+        const displayVal = value.length > 22 ? value.substring(0, 22) + '…' : value;
+        ctx.fillText(displayVal, fx + 72, fy);
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { reject(new Error('Canvas toBlob returned null')); return; }
+          // filename may be passed as old-style actor object from legacy callers — guard it
+          const safeName = typeof filename === 'string' ? filename : 'orders';
+          triggerDownload(blob, `${safeName}.jpg`);
+          resolve();
+        },
+        'image/jpeg',
+        0.92
+      );
+    });
+  } catch (err) {
+    console.error('JPEG export failed:', err);
+    alert('JPEG export failed. Please try again.');
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 300);
+}
+
+function loadJsPDF(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).jspdf?.jsPDF) {
+      resolve((window as any).jspdf.jsPDF);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    script.onload = () => {
+      if ((window as any).jspdf?.jsPDF) {
+        resolve((window as any).jspdf.jsPDF);
+      } else {
+        reject(new Error('jsPDF failed to load'));
       }
     };
-    
-    img.onerror = () => {
-      console.error('Failed to load image:', imageUrl);
-      resolve(null);
-    };
-    
-    img.src = imageUrl;
+    script.onerror = () => reject(new Error('Failed to load jsPDF script'));
+    document.head.appendChild(script);
   });
-}
-
-// Detect if device is iOS
-function isIOS(): boolean {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-}
-
-// Detect if device is Android
-function isAndroid(): boolean {
-  return /Android/i.test(navigator.userAgent);
-}
-
-// Detect if device is mobile
-function isMobile(): boolean {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-export async function exportToPDF(orders: Order[], actor?: any): Promise<void> {
-  if (!actor) {
-    throw new Error('Actor is required for PDF export with images');
-  }
-
-  // Group orders by design code
-  const groupedOrders = orders.reduce((acc, order) => {
-    if (!acc[order.design]) {
-      acc[order.design] = [];
-    }
-    acc[order.design].push(order);
-    return acc;
-  }, {} as Record<string, Order[]>);
-
-  // Sort design codes numerically (lower to higher)
-  const sortedDesignCodes = Object.keys(groupedOrders).sort((a, b) => {
-    return extractNumericPortion(a) - extractNumericPortion(b);
-  });
-
-  // Fetch all design image URLs in parallel
-  const imagePromises = sortedDesignCodes.map(async (designCode) => {
-    const imageUrl = await fetchDesignImageURL(designCode, actor);
-    if (!imageUrl) return { designCode, base64Image: null };
-    
-    // Convert to base64 for embedding in HTML
-    const base64Image = await loadImageAsBase64(imageUrl);
-    return { designCode, base64Image };
-  });
-
-  const imageResults = await Promise.all(imagePromises);
-  const imageMap = new Map(imageResults.map(r => [r.designCode, r.base64Image]));
-
-  let html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        @page { size: A4; margin: 20mm; }
-        body { font-family: Arial, sans-serif; font-size: 12px; }
-        h1 { text-align: center; margin-bottom: 5px; }
-        h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #4CAF50; color: white; font-weight: bold; }
-        .design-group { page-break-after: always; }
-        .design-header { 
-          background-color: #4CAF50; 
-          color: white; 
-          font-weight: bold; 
-          font-size: 16px; 
-          padding: 12px; 
-          margin: 20px 0 10px 0; 
-          border-radius: 4px;
-        }
-        .image-container { text-align: center; margin: 15px 0; }
-        .image-container img { max-width: 500px; max-height: 500px; border: 2px solid #ddd; border-radius: 4px; }
-        .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
-      </style>
-    </head>
-    <body>
-      <h1>Shree I Jewellery</h1>
-      <h2>Orders - ${new Date().toLocaleDateString()}</h2>
-  `;
-
-  for (const designCode of sortedDesignCodes) {
-    const designOrders = groupedOrders[designCode];
-    const base64Image = imageMap.get(designCode);
-
-    html += `<div class="design-group">`;
-    html += `<div class="design-header">Design: ${designCode}</div>`;
-    
-    html += `<div class="image-container">`;
-    if (base64Image) {
-      html += `<img src="${base64Image}" alt="Design ${designCode}" />`;
-    } else {
-      html += `<div class="image-placeholder">Image Not Available</div>`;
-    }
-    html += `</div>`;
-
-    html += `<table>
-      <thead>
-        <tr>
-          <th>Generic Name</th>
-          <th>Karigar</th>
-          <th>Weight</th>
-          <th>Size</th>
-          <th>Qty</th>
-          <th>Remarks</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    designOrders.forEach((order) => {
-      html += `<tr>
-        <td>${order.genericName || "-"}</td>
-        <td>${order.karigarName || "-"}</td>
-        <td>${order.weight.toFixed(3)}</td>
-        <td>${order.size.toFixed(2)}</td>
-        <td>${order.quantity}</td>
-        <td>${order.remarks || "-"}</td>
-        <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
-      </tr>`;
-    });
-
-    html += `</tbody></table></div>`;
-  }
-
-  html += `</body></html>`;
-
-  // Create blob and trigger download
-  const blob = new Blob([html], { type: 'text/html' });
-  const blobUrl = URL.createObjectURL(blob);
-  
-  // Mobile-specific handling
-  if (isMobile()) {
-    // For mobile devices, use anchor element with download attribute
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `orders_${new Date().toISOString().split("T")[0]}.html`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-  } else {
-    // For desktop, use anchor element
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `orders_${new Date().toISOString().split("T")[0]}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-  }
-}
-
-export async function exportToJPEG(orders: Order[], actor?: any) {
-  if (!actor) {
-    throw new Error('Actor is required for JPEG export with images');
-  }
-
-  // Group orders by design code
-  const groupedOrders = orders.reduce((acc, order) => {
-    if (!acc[order.design]) {
-      acc[order.design] = [];
-    }
-    acc[order.design].push(order);
-    return acc;
-  }, {} as Record<string, Order[]>);
-
-  // Sort design codes numerically (lower to higher)
-  const sortedDesignCodes = Object.keys(groupedOrders).sort((a, b) => {
-    return extractNumericPortion(a) - extractNumericPortion(b);
-  });
-
-  // Fetch all design image URLs in parallel
-  const imagePromises = sortedDesignCodes.map(async (designCode) => {
-    const imageUrl = await fetchDesignImageURL(designCode, actor);
-    if (!imageUrl) return { designCode, base64Image: null };
-    
-    // Convert to base64 for embedding in HTML
-    const base64Image = await loadImageAsBase64(imageUrl);
-    return { designCode, base64Image };
-  });
-
-  const imageResults = await Promise.all(imagePromises);
-  const imageMap = new Map(imageResults.map(r => [r.designCode, r.base64Image]));
-
-  let html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; background: white; }
-        h1 { text-align: center; margin-bottom: 5px; }
-        h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #4CAF50; color: white; font-weight: bold; }
-        .design-header { 
-          background-color: #4CAF50; 
-          color: white; 
-          font-weight: bold; 
-          font-size: 16px; 
-          padding: 12px; 
-          margin: 20px 0 10px 0; 
-          border-radius: 4px;
-        }
-        .image-container { text-align: center; margin: 15px 0; }
-        .image-container img { max-width: 500px; max-height: 500px; border: 2px solid #ddd; border-radius: 4px; }
-        .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
-      </style>
-    </head>
-    <body>
-      <h1>Shree I Jewellery</h1>
-      <h2>Orders - ${new Date().toLocaleDateString()}</h2>
-  `;
-
-  for (const designCode of sortedDesignCodes) {
-    const designOrders = groupedOrders[designCode];
-    const base64Image = imageMap.get(designCode);
-
-    html += `<div class="design-header">Design: ${designCode}</div>`;
-    
-    html += `<div class="image-container">`;
-    if (base64Image) {
-      html += `<img src="${base64Image}" alt="Design ${designCode}" />`;
-    } else {
-      html += `<div class="image-placeholder">Image Not Available</div>`;
-    }
-    html += `</div>`;
-
-    html += `<table>
-      <thead>
-        <tr>
-          <th>Generic Name</th>
-          <th>Karigar</th>
-          <th>Weight</th>
-          <th>Size</th>
-          <th>Qty</th>
-          <th>Remarks</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    designOrders.forEach((order) => {
-      html += `<tr>
-        <td>${order.genericName || "-"}</td>
-        <td>${order.karigarName || "-"}</td>
-        <td>${order.weight.toFixed(3)}</td>
-        <td>${order.size.toFixed(2)}</td>
-        <td>${order.quantity}</td>
-        <td>${order.remarks || "-"}</td>
-        <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
-      </tr>`;
-    });
-
-    html += `</tbody></table>`;
-  }
-
-  html += `</body></html>`;
-
-  // Create blob
-  const blob = new Blob([html], { type: 'text/html' });
-  const blobUrl = URL.createObjectURL(blob);
-  
-  // Open in new window for screenshot/save
-  const printWindow = window.open(blobUrl, '_blank');
-  if (!printWindow) {
-    throw new Error('Failed to open window. Please allow popups for this site.');
-  }
-}
-
-export async function exportKarigarToPDF(orders: Order[], karigarName: string, actor?: any): Promise<void> {
-  if (!actor) {
-    throw new Error('Actor is required for PDF export with images');
-  }
-
-  // Group orders by design code
-  const groupedOrders = orders.reduce((acc, order) => {
-    if (!acc[order.design]) {
-      acc[order.design] = [];
-    }
-    acc[order.design].push(order);
-    return acc;
-  }, {} as Record<string, Order[]>);
-
-  // Sort design codes numerically (lower to higher)
-  const sortedDesignCodes = Object.keys(groupedOrders).sort((a, b) => {
-    return extractNumericPortion(a) - extractNumericPortion(b);
-  });
-
-  // Fetch all design image URLs in parallel
-  const imagePromises = sortedDesignCodes.map(async (designCode) => {
-    const imageUrl = await fetchDesignImageURL(designCode, actor);
-    if (!imageUrl) return { designCode, base64Image: null };
-    
-    // Convert to base64 for embedding in HTML
-    const base64Image = await loadImageAsBase64(imageUrl);
-    return { designCode, base64Image };
-  });
-
-  const imageResults = await Promise.all(imagePromises);
-  const imageMap = new Map(imageResults.map(r => [r.designCode, r.base64Image]));
-
-  let html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        @page { size: A4; margin: 20mm; }
-        body { font-family: Arial, sans-serif; font-size: 12px; }
-        h1 { text-align: center; margin-bottom: 5px; }
-        h2 { text-align: center; margin-top: 0; margin-bottom: 20px; font-weight: normal; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #4CAF50; color: white; font-weight: bold; }
-        .design-group { page-break-after: always; }
-        .design-header { 
-          background-color: #4CAF50; 
-          color: white; 
-          font-weight: bold; 
-          font-size: 16px; 
-          padding: 12px; 
-          margin: 20px 0 10px 0; 
-          border-radius: 4px;
-        }
-        .image-container { text-align: center; margin: 15px 0; }
-        .image-container img { max-width: 500px; max-height: 500px; border: 2px solid #ddd; border-radius: 4px; }
-        .image-placeholder { color: #999; font-style: italic; padding: 20px; background-color: #f5f5f5; border-radius: 4px; }
-      </style>
-    </head>
-    <body>
-      <h1>Shree I Jewellery - ${karigarName}</h1>
-      <h2>Orders - ${new Date().toLocaleDateString()}</h2>
-  `;
-
-  for (const designCode of sortedDesignCodes) {
-    const designOrders = groupedOrders[designCode];
-    const base64Image = imageMap.get(designCode);
-
-    html += `<div class="design-group">`;
-    html += `<div class="design-header">Design: ${designCode}</div>`;
-    
-    html += `<div class="image-container">`;
-    if (base64Image) {
-      html += `<img src="${base64Image}" alt="Design ${designCode}" />`;
-    } else {
-      html += `<div class="image-placeholder">Image Not Available</div>`;
-    }
-    html += `</div>`;
-
-    html += `<table>
-      <thead>
-        <tr>
-          <th>Generic Name</th>
-          <th>Weight</th>
-          <th>Size</th>
-          <th>Qty</th>
-          <th>Remarks</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    designOrders.forEach((order) => {
-      html += `<tr>
-        <td>${order.genericName || "-"}</td>
-        <td>${order.weight.toFixed(3)}</td>
-        <td>${order.size.toFixed(2)}</td>
-        <td>${order.quantity}</td>
-        <td>${order.remarks || "-"}</td>
-        <td>${order.status === "ReturnFromHallmark" ? "Returned" : order.status}</td>
-      </tr>`;
-    });
-
-    html += `</tbody></table></div>`;
-  }
-
-  html += `</body></html>`;
-
-  // Create blob and trigger download
-  const blob = new Blob([html], { type: 'text/html' });
-  const blobUrl = URL.createObjectURL(blob);
-  
-  // Mobile-specific handling
-  if (isMobile()) {
-    // For mobile devices, use anchor element with download attribute
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `${karigarName}_orders_${new Date().toISOString().split("T")[0]}.html`;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-  } else {
-    // For desktop, use anchor element
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `${karigarName}_orders_${new Date().toISOString().split("T")[0]}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-  }
 }

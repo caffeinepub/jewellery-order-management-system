@@ -1,99 +1,95 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix summary tabs, RB partial supply row, total orders sorting, bold orange design codes, remove image icon",
+  "title": "Fix dashboard design group rows invisible content and related bugs",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Restore summary tab value computation logic to match v158 behaviour so metric values update correctly when switching between dashboard tabs",
+      "summary": "Fix design group row cards in all dashboard tabs where card content is invisible due to dark text rendering on a dark background",
       "acceptanceCriteria": [
-        "Switching to the Ready tab shows summary card values computed only from Ready-status orders.",
-        "Switching to the Hallmark tab shows summary card values computed from Hallmark-status orders.",
-        "Switching to the Total Orders tab shows summary card values for all Pending orders.",
-        "Summary card values visibly change when navigating between tabs, matching v158 behaviour.",
-        "No regression in supply logic or ghost-row filtering in SummaryCards.tsx."
+        "Design group row cards in Total Orders tab display all text content (design code, generic name, order count, weight) visibly",
+        "Row card content is readable with sufficient contrast against the dark card background",
+        "All other tabs (Ready, Hallmark, Customer Orders, Karigars) also render row card content visibly",
+        "No dark-on-dark text rendering anywhere in the dashboard row cards"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/SummaryCards.tsx",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Update the SummaryCards component to accept a tab-specific filtered orders array instead of computing metrics from all orders. Ensure the component filters out ghost rows (orders with originalOrderId) and computes metrics (order counts, weight, quantity, CO orders) only from the provided orders array. Remove any internal filtering by status that overrides the parent's filtering intent."
+          "description": "Update the design group row card rendering to use light text colors (text-white or text-gray-100) for all content elements including design code, generic name, order count, weight, and action buttons. Ensure the card background remains dark while text has sufficient contrast. Review the grouping logic and Card/CardContent styling to ensure all child text elements inherit appropriate light colors."
         },
         {
-          "path": "frontend/src/pages/Dashboard.tsx",
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Update the Dashboard component to pass tab-specific filtered order arrays to the SummaryCards component. For the Total Orders tab, pass only Pending orders. For the Ready tab, pass only Ready-status orders. For the Hallmark tab, pass only Hallmark-status orders. For the Customer Orders tab, pass only CO-type Pending orders. For the Karigars tab, pass only Pending orders. Ensure each tab receives the correct subset of orders so SummaryCards computes metrics accordingly."
+          "description": "Update the design group row card rendering to use light text colors for all content (design code, generic name, counts, weights) displayed in the grouped rows. Ensure expandable row headers and content within each card have sufficient contrast against the dark background. Apply text-white or text-gray-100 classes to labels and values."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Update the design group row card rendering to use light text colors for all visible content including design codes, karigar names, weights, quantities, and action elements. Ensure all text within the grouped card structure has appropriate contrast against dark card backgrounds."
+        },
+        {
+          "path": "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Update any card or grouped row rendering to use light text colors (text-white or text-gray-100) for design codes, order numbers, and other content displayed in dark cards. Ensure sufficient text-to-background contrast throughout the component."
+        },
+        {
+          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "operation": "modify",
+          "description": "Update the karigar summary card rendering to use light text colors for karigar names, design codes, weights, and generic names. Ensure all text content within each karigar card has sufficient contrast against the dark card background by applying text-white or text-gray-100 classes."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Fix RB partial supplied row so it appears in the Ready tab after a partial supply action",
+      "summary": "Fix the Totals tab karigar name display so it shows the correct karigar name from live design mappings instead of stale names",
       "acceptanceCriteria": [
-        "After submitting a partial supply for an RB order via SuppliedQtyDialog, the supplied portion appears as a row in the Ready tab.",
-        "The remaining un-supplied portion stays in the Pending/Total Orders tab.",
-        "No other rows are affected or hidden in the Ready tab."
+        "Totals tab groups orders using the latest karigar name from the live design mappings query",
+        "Updated karigar names (e.g., ZYRA FACTORY) are reflected immediately after mappings are refreshed",
+        "No stale karigar name (e.g., SANTU) appears when the mapping has been updated"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Update the SuppliedQtyDialog component to ensure that when a partial supply is submitted for an RB order, the mutation correctly invokes the backend capability that creates a Ready-status row for the supplied quantity. Verify that the remaining quantity stays as a Pending order. After mutation success, invalidate the orders query to force a refetch so the Ready tab displays the newly supplied row immediately."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Ensure the ReadyTab component correctly displays all orders with Ready status, including partial supply rows that have an originalOrderId. Verify that no filtering logic inadvertently hides these rows. If ghost-row filtering is present, confirm it only applies to summary metrics and not to the displayed table rows."
+          "description": "Ensure the component queries fresh design mappings using useGetAllDesignMappings and applies the latest karigar name from the mappings to each order before grouping or displaying. If an order has a karigar name but the design mapping has been updated, prefer the mapping's karigar name. Remove any caching or stale data logic that prevents the live karigar name from appearing. Verify that when mappings are refreshed, the grouped rows immediately reflect the new karigar assignments."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Within each design group in the Total Orders tab, sort rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight",
+      "summary": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly",
       "acceptanceCriteria": [
-        "Inside each expanded design group in TotalOrdersTab, rows are sorted so the oldest due date appears at the top and the most recent at the bottom.",
-        "Rows with the same weight are grouped together within this sort order.",
-        "The sort applies consistently to all design groups.",
-        "No other tab ordering is affected."
+        "Clicking a karigar card in the Karigars tab navigates to the karigar detail page",
+        "The karigar detail page loads and displays the correct pending orders for the selected karigar",
+        "No empty or broken state appears after clicking a karigar card"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
           "operation": "modify",
-          "description": "Update the TotalOrdersTab component to sort orders within each design group. After grouping orders by design code, sort each group's orders by order date ascending (oldest first) and then by weight to group same-weight items together. Ensure this sort logic applies consistently to all design groups and does not affect other tabs."
+          "description": "Add an onClick handler to each karigar card that navigates to the karigar detail page using the correct route and passes the karigar name as a URL parameter. Ensure the handler encodes the karigar name properly if it contains spaces or special characters. Verify that the navigation triggers and the detail page receives the correct karigar identifier."
+        },
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Ensure the component correctly extracts the karigar name from the route parameters and uses it to filter pending orders. Verify that the useGetAllOrders query or a similar data-fetching hook filters orders by the selected karigar name and Pending status. If the karigar name is missing or invalid, display a user-friendly error or empty state instead of breaking."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Display design code text in bold orange color in the design group header row in the Total Orders tab",
+      "summary": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab",
       "acceptanceCriteria": [
-        "Every design group header in TotalOrdersTab renders the design code in bold font weight.",
-        "The design code text color is orange (matching the app's orange accent, e.g., Tailwind orange-500 or equivalent).",
-        "The styling applies to all design group headers, not just selected ones.",
-        "No other text in the header is unintentionally changed."
+        "Ready tab shows Excel, PDF, and JPEG export buttons",
+        "Export buttons trigger their respective export actions (download CSV/Excel, generate PDF, generate JPEG)",
+        "Export buttons are visible and accessible without scrolling or additional interactions"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
           "operation": "modify",
-          "description": "Update the design group header row rendering in TotalOrdersTab to apply bold font weight (font-bold) and orange text color (text-orange-500 or equivalent) to the design code text. Ensure this styling applies to all design group headers consistently without affecting other header elements."
-        }
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "summary": "Remove the image icon from the design group header row in the Total Orders tab",
-      "acceptanceCriteria": [
-        "No image icon is rendered in any design group header row in TotalOrdersTab.",
-        "The rest of the header layout (design code, counts, expand/collapse control) remains intact.",
-        "No other tabs or components have their image icons removed."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Remove the image icon element from the design group header row rendering in TotalOrdersTab. Locate the icon component or element in the header and delete it, ensuring the rest of the header layout (design code text, counts, expand/collapse control) remains intact and properly aligned. Do not remove image icons from other tabs or components."
+          "description": "Add a button group or toolbar containing Excel, PDF, and JPEG export buttons positioned prominently near the top of the Ready tab UI (e.g., next to the search input or tab header). Wire each button to the corresponding export utility function from frontend/src/utils/exportUtils.ts (exportToExcel, exportToPDF) and implement JPEG export by rendering the visible content to an HTML canvas and converting to an image. Ensure the buttons are always visible and enabled when there are orders to export."
         }
       ]
     }

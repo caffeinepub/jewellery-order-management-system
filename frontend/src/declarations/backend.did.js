@@ -196,6 +196,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'markAllAsReady' : IDL.Func([], [], []),
+  'markOrdersAsPending' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
   'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
   'persistMasterDataRows' : IDL.Func(
       [IDL.Vec(MasterDataRow)],
@@ -432,6 +433,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'markAllAsReady' : IDL.Func([], [], []),
+    'markOrdersAsPending' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
     'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
     'persistMasterDataRows' : IDL.Func(
         [IDL.Vec(MasterDataRow)],

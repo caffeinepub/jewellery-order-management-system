@@ -2,9 +2,8 @@ import { useParams, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download } from "lucide-react";
 import { useGetOrdersByKarigar, useMarkOrdersAsReady } from "@/hooks/useQueries";
-import { useActor } from "@/hooks/useActor";
 import OrderTable from "@/components/dashboard/OrderTable";
-import { exportKarigarToPDF, exportToJPEG, exportToExcel } from "@/utils/exportUtils";
+import { exportToPDF, exportToJPEG, exportToExcel } from "@/utils/exportUtils";
 import { toast } from "sonner";
 import { OrderStatus, OrderType, Order } from "@/backend";
 import { useState, useMemo } from "react";
@@ -19,10 +18,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function KarigarDetail() {
-  const { name } = useParams({ from: "/karigar/$name" });
+  const { name: encodedName } = useParams({ from: "/karigar/$name" });
+  // Decode the URL-encoded karigar name so filtering works correctly
+  const name = decodeURIComponent(encodedName);
   const navigate = useNavigate();
   const { data: orders = [], isLoading } = useGetOrdersByKarigar(name);
-  const { actor } = useActor();
   const [isExporting, setIsExporting] = useState(false);
   const [selectedRBOrdersForSupply, setSelectedRBOrdersForSupply] = useState<Order[]>([]);
   const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
@@ -44,11 +44,6 @@ export default function KarigarDetail() {
     format: "pdf" | "jpeg" | "excel",
     type: "daily" | "total"
   ) => {
-    if (!actor && (format === "pdf" || format === "jpeg")) {
-      toast.error("Actor not initialized");
-      return;
-    }
-
     const ordersToExport = type === "daily" ? todayOrders : pendingOrders;
 
     if (ordersToExport.length === 0) {
@@ -59,13 +54,13 @@ export default function KarigarDetail() {
     setIsExporting(true);
     try {
       if (format === "pdf") {
-        await exportKarigarToPDF(ordersToExport, name, actor);
-        toast.success("PDF downloaded successfully. Check your Downloads folder.");
+        await exportToPDF(ordersToExport, `karigar-${name}-${type}`);
+        toast.success("PDF downloaded successfully.");
       } else if (format === "jpeg") {
-        await exportToJPEG(ordersToExport, actor);
-        toast.success("JPEG opened in new tab. You can save it from there.");
+        await exportToJPEG(ordersToExport, `karigar-${name}-${type}`);
+        toast.success("JPEG downloaded successfully.");
       } else if (format === "excel") {
-        exportToExcel(ordersToExport);
+        exportToExcel(ordersToExport, `karigar-${name}-${type}`);
         toast.success("Excel file downloaded successfully");
       }
     } catch {

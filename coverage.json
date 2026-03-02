@@ -1,68 +1,66 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-03-01T22:59:43.435Z",
+  "generatedAt": "2026-03-02T07:05:46.546Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 5,
+    "total": 4,
     "implemented": 4,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Restore the summary tab value computation logic to match v158 behaviour so that metric values (order counts, weight, quantity, CO orders) update correctly and reflect the appropriate subset of orders when switching between dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars).",
+        "summary": "Fix the design group row cards in the Total Orders tab (and all other dashboard tabs) where card content is invisible due to dark text rendering on a dark background. Ensure all text, labels, design codes, weights, quantities, and action elements inside each row card are visible with appropriate contrast against the dark card background.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/SummaryCards.tsx",
-          "frontend/src/pages/Dashboard.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/CustomerOrdersTab.tsx",
+          "frontend/src/components/dashboard/KarigarsTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/pages/Dashboard.tsx"
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/components/dashboard/KarigarsTab.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Fix the RB partial supplied row so it appears in the Ready tab after a partial supply action is performed. When an RB order is partially supplied, the supplied portion must be visible as a row in the Ready tab.",
-        "status": "missing",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx"
-        ],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-3",
-        "summary": "Within each design group in the Total Orders tab, sort the rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight.",
+        "summary": "Fix the Totals tab karigar name display so it shows the correct karigar name (e.g., ZYRA FACTORY) from the live design mappings instead of a stale/incorrect name (e.g., SANTU). Ensure karigar names in grouped rows reflect the current mapping data.",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx"
         ],
         "matchedFiles": [
           "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-3",
+        "summary": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly. The click handler must pass the correct karigar name and route parameters.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
         ]
       },
       {
         "id": "REQ-4",
-        "summary": "In the design group header row in the Total Orders tab, display the design code text in bold orange color.",
+        "summary": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab. Ensure the export controls are rendered and functional in the Ready tab UI.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-5",
-        "summary": "Remove the image icon from the design group header row in the Total Orders tab.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+          "frontend/src/components/dashboard/ReadyTab.tsx"
         ]
       }
     ]
@@ -72,8 +70,11 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/components/dashboard/HallmarkTab.tsx",
+    "frontend/src/components/dashboard/KarigarsTab.tsx",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/pages/KarigarDetail.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

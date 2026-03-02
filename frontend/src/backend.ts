@@ -207,6 +207,7 @@ export interface backendInterface {
     getUnreturnedOrders(): Promise<Array<Order>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     markAllAsReady(): Promise<void>;
+    markOrdersAsPending(orderIds: Array<string>): Promise<void>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
     persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;
@@ -730,6 +731,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.markAllAsReady();
+            return result;
+        }
+    }
+    async markOrdersAsPending(arg0: Array<string>): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.markOrdersAsPending(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.markOrdersAsPending(arg0);
             return result;
         }
     }

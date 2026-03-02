@@ -1,15 +1,18 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-03-01T22:59:43.432Z",
-  "summary": "The diff addresses all 5 requirements. REQ-1 is handled in Dashboard.tsx (activeTab state + tabValueToSummaryKey passed to SummaryCards) and SummaryCards.tsx (ghost-row filtering per tab). REQ-2 is described in file summaries for SummaryCards.tsx and ReadyTab.tsx. REQ-3, REQ-4, and REQ-5 are implemented in TotalOrdersTab.tsx (oldest-first sort, bold orange design code, image icon removed). However, the diff is truncated for TotalOrdersTab.tsx so REQ-4 and REQ-5 cannot be fully confirmed from code, only from the file summary. REQ-2's ReadyTab.tsx change is only referenced in the summary file, not shown in the actual diff. Confidence is moderate due to truncation.",
+  "generatedAt": "2026-03-02T07:05:46.543Z",
+  "summary": "All four requirements appear to be implemented in the diff. REQ-1 is addressed by replacing CSS variable classes with explicit bg-zinc-900/text-white Tailwind classes across TotalOrdersTab, ReadyTab, HallmarkTab, and KarigarsTab. REQ-2 is addressed in TotalOrdersTab and KarigarsTab by building a live karigar name map from design mappings. REQ-3 is addressed in KarigarsTab with a handleKarigarClick that URL-encodes the karigar name and navigates to /karigar/$name, and in KarigarDetail.tsx which decodes the name. REQ-4 is addressed in ReadyTab with Excel/PDF/JPEG export buttons and handlers.",
   "missing_requirements": [],
   "hallucinated_features": [],
-  "confidence": 0.78,
+  "confidence": 0.88,
   "changed_files": [
     "frontend-file-summaries.txt",
+    "frontend/src/components/dashboard/HallmarkTab.tsx",
+    "frontend/src/components/dashboard/KarigarsTab.tsx",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
     "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/pages/Dashboard.tsx",
+    "frontend/src/pages/KarigarDetail.tsx",
     "project_state.json"
   ]
 }

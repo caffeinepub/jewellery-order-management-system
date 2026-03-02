@@ -60,6 +60,9 @@ export default function OrderTable({
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
+  // suppress unused warning
+  void showDateFilter;
+
   const handleDesignClick = (design: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDesign(design);
@@ -90,19 +93,15 @@ export default function OrderTable({
   const handleMarkAsReady = () => {
     const selectedOrders = orders.filter((o) => selectedRows.has(o.orderId));
 
-    // Separate orders by type
     const rbOrders = selectedOrders.filter((order) => order.orderType === OrderType.RB);
     const soCoOrders = selectedOrders.filter(
       (order) => order.orderType === OrderType.SO || order.orderType === OrderType.CO
     );
 
     if (rbOrders.length > 0 && onMarkAsReady) {
-      // Pass ALL selected orders to the parent handler so it can process
-      // RB orders via supply dialog AND SO/CO orders via markOrdersAsReady
       onMarkAsReady(selectedOrders);
       setSelectedRows(new Set());
     } else if (soCoOrders.length > 0) {
-      // Only SO/CO orders selected — show confirmation dialog
       setShowConfirmDialog(true);
     }
   };
@@ -121,15 +120,12 @@ export default function OrderTable({
       );
       
       const orderIds = soCoOrders.map(order => order.orderId);
-      
-      // Call the backend method to mark orders as ready
       await actor.markOrdersAsReady(orderIds);
       
-      // Invalidate all order-related queries to refresh data across all tabs
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["allOrders"] });
       await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-      await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      await queryClient.invalidateQueries({ queryKey: ["ready-orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
       
       toast.success(`${soCoOrders.length} order(s) marked as Ready`);
       setSelectedRows(new Set());
@@ -137,27 +133,23 @@ export default function OrderTable({
     } catch (error: any) {
       const errorMessage = error?.message || "Failed to update orders";
       toast.error(errorMessage);
-      console.error("Error updating orders:", error);
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleExport = async (format: "excel" | "pdf" | "jpeg") => {
-    if (!actor) {
-      toast.error("Actor not initialized");
-      return;
-    }
-
     setIsExporting(true);
     try {
       if (format === "excel") {
         exportToExcel(orders);
         toast.success("Exported to Excel");
       } else if (format === "pdf") {
-        await exportToPDF(orders, actor);
+        await exportToPDF(orders);
+        toast.success("Exported to PDF");
       } else if (format === "jpeg") {
-        await exportToJPEG(orders, actor);
+        await exportToJPEG(orders);
+        toast.success("Exported to JPEG");
       }
     } catch (error) {
       toast.error(`Failed to export ${format.toUpperCase()}`);
@@ -167,7 +159,6 @@ export default function OrderTable({
     }
   };
 
-  // Group orders by design code
   const groupedOrders = orders.reduce((acc, order) => {
     if (!acc[order.design]) {
       acc[order.design] = [];
@@ -325,7 +316,7 @@ export default function OrderTable({
                           }}
                           disabled={isDeleting}
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                          title="Reset to Pending"
+                          title="Delete order"
                         >
                           {isDeleting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -354,19 +345,22 @@ export default function OrderTable({
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark Orders as Ready?</AlertDialogTitle>
+            <AlertDialogTitle>Mark Orders as Ready</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to mark {selectedRows.size} order(s) as Ready? This action will update the order status.
+              Are you sure you want to mark {selectedRows.size} order(s) as Ready?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmMarkAsReady}
-              disabled={isUpdating}
-              className="bg-gold hover:bg-gold-hover"
-            >
-              {isUpdating ? "Updating..." : "Confirm"}
+            <AlertDialogAction onClick={confirmMarkAsReady} disabled={isUpdating}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Confirm"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

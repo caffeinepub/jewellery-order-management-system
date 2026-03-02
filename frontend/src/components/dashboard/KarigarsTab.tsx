@@ -1,110 +1,146 @@
-import { useMemo } from 'react';
-import { useGetAllOrders, useGetMasterDesigns } from '@/hooks/useQueries';
-import { OrderStatus } from '@/backend';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Users, Package } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
+import { useMemo } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { Order, OrderStatus } from "../../backend";
+import { useGetAllOrders, useGetAllMasterDesignMappings } from "../../hooks/useQueries";
 
-export default function KarigarsTab() {
-  const { data: orders = [], isLoading } = useGetAllOrders();
-  const { data: masterDesignsRaw = [] } = useGetMasterDesigns();
+interface KarigarsTabProps {
+  orders?: Order[];
+}
+
+export default function KarigarsTab({ orders: propOrders }: KarigarsTabProps) {
+  const { data: fetchedOrders, isLoading } = useGetAllOrders();
+  const { data: designMappings } = useGetAllMasterDesignMappings();
   const navigate = useNavigate();
 
-  // Build a Map from the raw [designCode, genericName, karigarName][] tuples
-  const masterDesignsMap = useMemo(() => {
-    const map = new Map<string, { genericName: string; karigarName: string }>();
-    masterDesignsRaw.forEach(([designCode, genericName, karigarName]) => {
-      map.set(designCode.toUpperCase().trim(), { genericName, karigarName });
-    });
-    return map;
-  }, [masterDesignsRaw]);
+  const allOrders = propOrders ?? fetchedOrders ?? [];
 
-  const enrichedOrders = useMemo(() => {
-    return orders.map((order) => {
-      const normalizedDesign = order.design.toUpperCase().trim();
-      const mapping = masterDesignsMap.get(normalizedDesign);
-      return {
-        ...order,
-        genericName: mapping?.genericName || order.genericName,
-        karigarName: mapping?.karigarName || order.karigarName,
-      };
-    });
-  }, [orders, masterDesignsMap]);
-
-  const karigarGroups = useMemo(() => {
-    const pendingOrders = enrichedOrders.filter((order) => order.status === OrderStatus.Pending);
-
-    const groups: Record<string, typeof pendingOrders> = {};
-
-    pendingOrders.forEach((order) => {
-      const karigar = order.karigarName || 'Unmapped';
-      if (!groups[karigar]) {
-        groups[karigar] = [];
+  // Build karigar name map from live design mappings
+  const karigarByDesign = useMemo(() => {
+    const map = new Map<string, string>();
+    if (designMappings) {
+      for (const [code, mapping] of designMappings) {
+        map.set(code, mapping.karigarName);
       }
-      groups[karigar].push(order);
+    }
+    return map;
+  }, [designMappings]);
+
+  const pendingOrders = useMemo(() =>
+    allOrders.filter(o => o.status === OrderStatus.Pending),
+    [allOrders]
+  );
+
+  // Group pending orders by karigar name (using live mapping first)
+  const karigarGroups = useMemo(() => {
+    const groups = new Map<string, {
+      orders: Order[];
+      designs: Set<string>;
+      totalWeight: number;
+      genericNames: Set<string>;
+    }>();
+
+    pendingOrders.forEach(order => {
+      // Always prefer live mapping karigar name
+      const karigarName = karigarByDesign.get(order.design) || order.karigarName || "Unassigned";
+      if (!groups.has(karigarName)) {
+        groups.set(karigarName, {
+          orders: [],
+          designs: new Set(),
+          totalWeight: 0,
+          genericNames: new Set(),
+        });
+      }
+      const group = groups.get(karigarName)!;
+      group.orders.push(order);
+      group.designs.add(order.design);
+      group.totalWeight += order.weight;
+      if (order.genericName) group.genericNames.add(order.genericName);
     });
 
-    return Object.entries(groups)
-      .map(([name, groupOrders]) => ({
-        name,
-        orders: groupOrders,
-        totalOrders: groupOrders.length,
-        totalWeight: groupOrders.reduce((sum, o) => sum + o.weight, 0),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [enrichedOrders]);
+    return groups;
+  }, [pendingOrders, karigarByDesign]);
 
   const handleKarigarClick = (karigarName: string) => {
-    navigate({ to: `/karigar/${encodeURIComponent(karigarName)}` });
+    // Encode the karigar name for URL safety
+    navigate({ to: "/karigar/$name", params: { name: encodeURIComponent(karigarName) } });
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-muted-foreground">Loading karigars...</div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (karigarGroups.size === 0) {
+    return (
+      <div className="text-center py-12 text-white/50">
+        No active karigars with pending orders.
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {karigarGroups.map((karigar) => (
-          <Card
-            key={karigar.name}
-            className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
-            onClick={() => handleKarigarClick(karigar.name)}
+    <div className="space-y-3">
+      {Array.from(karigarGroups.entries()).map(([karigarName, data]) => {
+        const designCodes = Array.from(data.designs);
+        const previewCodes = designCodes.slice(0, 6);
+        const remaining = designCodes.length - previewCodes.length;
+        const genericNamesArr = Array.from(data.genericNames);
+
+        return (
+          <div
+            key={karigarName}
+            className="rounded-lg border border-white/10 bg-zinc-900 p-4 cursor-pointer hover:bg-zinc-800 transition-colors"
+            onClick={() => handleKarigarClick(karigarName)}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-semibold">{karigar.name}</CardTitle>
-              <Users className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Total Orders:</span>
-                  <span className="font-medium">{karigar.totalOrders}</span>
+            <div className="flex items-start justify-between gap-4">
+              {/* Left: karigar name + design codes + generic names */}
+              <div className="flex-1 min-w-0">
+                {/* Karigar name pill */}
+                <div className="mb-2">
+                  <span className="inline-block bg-white/10 text-white text-sm font-semibold px-3 py-1 rounded-full border border-white/20">
+                    {karigarName}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Total Weight:</span>
-                  <span className="font-medium">{karigar.totalWeight.toFixed(2)}g</span>
+                {/* Design codes */}
+                <div className="flex flex-wrap gap-1 mb-1">
+                  {previewCodes.map(code => (
+                    <span key={code} className="text-xs font-bold text-orange-400">{code}</span>
+                  ))}
+                  {remaining > 0 && (
+                    <span className="text-xs text-white/50">+{remaining} more</span>
+                  )}
+                </div>
+                {/* Generic names */}
+                {genericNamesArr.length > 0 && (
+                  <div className="text-xs text-white/50">
+                    {genericNamesArr.slice(0, 3).join(", ")}
+                    {genericNamesArr.length > 3 && ` +${genericNamesArr.length - 3} more`}
+                  </div>
+                )}
+              </div>
+
+              {/* Right: stats */}
+              <div className="text-right flex-shrink-0 space-y-1">
+                <div>
+                  <div className="text-xs text-white/50">Orders</div>
+                  <div className="text-lg font-bold text-orange-400">{data.orders.length}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-white/50">Weight</div>
+                  <div className="text-sm font-semibold text-white">{data.totalWeight.toFixed(2)}g</div>
+                </div>
+                <div>
+                  <div className="text-xs text-white/50">Designs</div>
+                  <div className="text-sm font-semibold text-white">{data.designs.size}</div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="w-full mt-4">
-                <Package className="mr-2 h-4 w-4" />
-                View Orders
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {karigarGroups.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No pending orders assigned to karigars
-        </div>
-      )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

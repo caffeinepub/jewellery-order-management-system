@@ -1,147 +1,137 @@
-import React, { useState, useMemo } from "react";
-import { Order, OrderStatus, OrderType } from "../../backend";
-import { Badge } from "@/components/ui/badge";
+import { useState, useMemo, useRef } from "react";
+import { Order, OrderType, OrderStatus } from "../../backend";
+import { useGetAllOrders, useDeleteOrder, useGetAllMasterDesignMappings } from "../../hooks/useQueries";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search, ChevronDown, ChevronRight, X } from "lucide-react";
-import { AgeingBadge } from "@/utils/ageingBadge";
-import DesignImageModal from "./DesignImageModal";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronDown, ChevronRight, Search, FileSpreadsheet, FileText, Image, X } from "lucide-react";
+import { exportToExcel, exportToPDF, exportToJPEG } from "../../utils/exportUtils";
+import { AgeingBadge } from "../../utils/ageingBadge";
 import SuppliedQtyDialog from "./SuppliedQtyDialog";
-import {
-  useDeleteOrder,
-  useMarkOrdersAsReady,
-} from "../../hooks/useQueries";
 
 interface TotalOrdersTabProps {
-  orders: Order[];
+  orders?: Order[];
   isError?: boolean;
 }
 
-interface GroupedOrders {
-  designCode: string;
-  genericName: string;
-  karigarName: string;
-  orders: Order[];
-  totalQty: number;
-  totalWeight: number;
+function getOrderTypeBadgeStyle(type: OrderType) {
+  switch (type) {
+    case OrderType.SO: return "bg-purple-600 text-white";
+    case OrderType.CO: return "bg-blue-600 text-white";
+    case OrderType.RB: return "bg-green-700 text-white";
+    default: return "bg-gray-600 text-white";
+  }
 }
 
-function groupOrders(orders: Order[]): GroupedOrders[] {
-  const map = new Map<string, GroupedOrders>();
-  for (const order of orders) {
-    const key = order.design;
-    if (!map.has(key)) {
-      map.set(key, {
-        designCode: order.design,
-        genericName: order.genericName ?? "",
-        karigarName: order.karigarName ?? "",
-        orders: [],
-        totalQty: 0,
-        totalWeight: 0,
-      });
-    }
-    const group = map.get(key)!;
-    group.orders.push(order);
-    group.totalQty += Number(order.quantity);
-    group.totalWeight += order.weight;
-  }
-
-  // Sort orders within each group: oldest orderDate first (ascending), then by weight
-  for (const group of map.values()) {
-    group.orders.sort((a, b) => {
-      const dateA = a.orderDate ? Number(a.orderDate) : 0;
-      const dateB = b.orderDate ? Number(b.orderDate) : 0;
-      if (dateA !== dateB) return dateA - dateB; // oldest first
-      return a.weight - b.weight; // then by weight ascending
-    });
-  }
-
-  return Array.from(map.values());
-}
-
-function formatDate(time: bigint | undefined): string {
-  if (!time) return "";
-  const ms = Number(time) / 1_000_000;
+function formatOrderDate(orderDate?: bigint): string {
+  if (!orderDate) return "";
+  const ms = Number(orderDate) / 1_000_000;
   const d = new Date(ms);
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
 }
 
-function orderTypeBadge(type: OrderType) {
-  const colors: Record<OrderType, string> = {
-    [OrderType.RB]: "bg-blue-600 text-white",
-    [OrderType.SO]: "bg-purple-600 text-white",
-    [OrderType.CO]: "bg-green-600 text-white",
-  };
-  return (
-    <span className={`text-xs font-bold px-2 py-0.5 rounded ${colors[type]}`}>
-      {type}
-    </span>
-  );
-}
+export function TotalOrdersTab({ orders: propOrders, isError: propIsError }: TotalOrdersTabProps) {
+  const { data: fetchedOrders, isLoading, isError: fetchError } = useGetAllOrders();
+  const { data: designMappings } = useGetAllMasterDesignMappings();
+  const deleteOrderMutation = useDeleteOrder();
 
-const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const [searchText, setSearchText] = useState("");
+  const allOrders = propOrders ?? fetchedOrders ?? [];
+  const isError = propIsError ?? fetchError;
+
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [karigarFilter, setKarigarFilter] = useState<string>("all");
-  const [designModalCode, setDesignModalCode] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
   const [supplyOrders, setSupplyOrders] = useState<Order[]>([]);
+  const tableRef = useRef<HTMLDivElement>(null);
 
-  const deleteOrderMutation = useDeleteOrder();
-  const markReadyMutation = useMarkOrdersAsReady();
+  // Build karigar name map from live design mappings
+  const karigarByDesign = useMemo(() => {
+    const map = new Map<string, string>();
+    if (designMappings) {
+      for (const [code, mapping] of designMappings) {
+        map.set(code, mapping.karigarName);
+      }
+    }
+    return map;
+  }, [designMappings]);
 
-  // Filter only Pending orders
-  const pendingOrders = useMemo(
-    () => orders.filter((o) => o.status === OrderStatus.Pending),
-    [orders]
+  // Build generic name map from live design mappings
+  const genericNameByDesign = useMemo(() => {
+    const map = new Map<string, string>();
+    if (designMappings) {
+      for (const [code, mapping] of designMappings) {
+        map.set(code, mapping.genericName);
+      }
+    }
+    return map;
+  }, [designMappings]);
+
+  const pendingOrders = useMemo(() =>
+    allOrders.filter(o => o.status === OrderStatus.Pending),
+    [allOrders]
   );
 
-  // Unique karigars for filter
-  const karigars = useMemo(() => {
-    const set = new Set<string>();
-    pendingOrders.forEach((o) => { if (o.karigarName) set.add(o.karigarName); });
-    return Array.from(set).sort();
-  }, [pendingOrders]);
-
-  // Apply filters
-  const filteredOrders = useMemo(() => {
-    return pendingOrders.filter((o) => {
-      const search = searchText.toLowerCase();
-      const matchesSearch =
-        !search ||
-        o.orderNo.toLowerCase().includes(search) ||
-        o.design.toLowerCase().includes(search) ||
-        (o.genericName ?? "").toLowerCase().includes(search) ||
-        (o.karigarName ?? "").toLowerCase().includes(search);
-      const matchesType = typeFilter === "all" || o.orderType === typeFilter;
-      const matchesKarigar = karigarFilter === "all" || o.karigarName === karigarFilter;
-      return matchesSearch && matchesType && matchesKarigar;
+  // Unique karigars from live design mappings
+  const uniqueKarigars = useMemo(() => {
+    const names = new Set<string>();
+    pendingOrders.forEach(o => {
+      // Prefer live mapping karigar name over stored order karigar name
+      const name = karigarByDesign.get(o.design) || o.karigarName;
+      if (name) names.add(name);
     });
-  }, [pendingOrders, searchText, typeFilter, karigarFilter]);
+    return Array.from(names).sort();
+  }, [pendingOrders, karigarByDesign]);
 
-  const grouped = useMemo(() => groupOrders(filteredOrders), [filteredOrders]);
+  const filteredOrders = useMemo(() => {
+    return pendingOrders.filter(o => {
+      // Always use live mapping karigar name first
+      const karigarName = karigarByDesign.get(o.design) || o.karigarName || "";
+      const matchSearch = !search ||
+        o.orderNo.toLowerCase().includes(search.toLowerCase()) ||
+        o.design.toLowerCase().includes(search.toLowerCase()) ||
+        (o.genericName || "").toLowerCase().includes(search.toLowerCase()) ||
+        (genericNameByDesign.get(o.design) || "").toLowerCase().includes(search.toLowerCase()) ||
+        karigarName.toLowerCase().includes(search.toLowerCase());
+      const matchType = typeFilter === "all" || o.orderType === typeFilter;
+      const matchKarigar = karigarFilter === "all" || karigarName === karigarFilter;
+      return matchSearch && matchType && matchKarigar;
+    });
+  }, [pendingOrders, search, typeFilter, karigarFilter, karigarByDesign, genericNameByDesign]);
 
-  const toggleGroup = (designCode: string) => {
-    setExpandedGroups((prev) => {
+  // Group by design code
+  const groupedOrders = useMemo(() => {
+    const groups = new Map<string, Order[]>();
+    filteredOrders.forEach(o => {
+      const key = o.design;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(o);
+    });
+    return groups;
+  }, [filteredOrders]);
+
+  const toggleGroup = (design: string) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(designCode)) next.delete(designCode);
-      else next.add(designCode);
+      if (next.has(design)) next.delete(design);
+      else next.add(design);
       return next;
     });
   };
 
-  const toggleOrderSelection = (orderId: string) => {
-    setSelectedOrders((prev) => {
+  const toggleSelectAll = () => {
+    if (selectedOrders.size === filteredOrders.length) {
+      setSelectedOrders(new Set());
+    } else {
+      setSelectedOrders(new Set(filteredOrders.map(o => o.orderId)));
+    }
+  };
+
+  const toggleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => {
       const next = new Set(prev);
       if (next.has(orderId)) next.delete(orderId);
       else next.add(orderId);
@@ -149,89 +139,63 @@ const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
     });
   };
 
-  const toggleGroupSelection = (group: GroupedOrders, checked: boolean) => {
-    setSelectedOrders((prev) => {
+  const toggleSelectGroup = (orders: Order[]) => {
+    const allSelected = orders.every(o => selectedOrders.has(o.orderId));
+    setSelectedOrders(prev => {
       const next = new Set(prev);
-      group.orders.forEach((o) => {
-        if (checked) next.add(o.orderId);
-        else next.delete(o.orderId);
-      });
+      if (allSelected) {
+        orders.forEach(o => next.delete(o.orderId));
+      } else {
+        orders.forEach(o => next.add(o.orderId));
+      }
       return next;
     });
   };
 
-  const toggleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedOrders(new Set(filteredOrders.map((o) => o.orderId)));
-    } else {
-      setSelectedOrders(new Set());
+  const handleDelete = async (orderId: string) => {
+    if (confirm("Delete this order?")) {
+      await deleteOrderMutation.mutateAsync(orderId);
     }
   };
 
-  const isGroupFullySelected = (group: GroupedOrders) =>
-    group.orders.every((o) => selectedOrders.has(o.orderId));
-  const isGroupPartiallySelected = (group: GroupedOrders) =>
-    group.orders.some((o) => selectedOrders.has(o.orderId)) && !isGroupFullySelected(group);
+  const handleOpenSupplyDialog = (order: Order) => {
+    setSupplyOrders([order]);
+    setSupplyDialogOpen(true);
+  };
 
-  const allSelected =
-    filteredOrders.length > 0 &&
-    filteredOrders.every((o) => selectedOrders.has(o.orderId));
+  const handleExportExcel = () => exportToExcel(filteredOrders, "total_orders");
+  const handleExportPDF = () => exportToPDF(filteredOrders, "total_orders");
+  const handleExportJPEG = () => exportToJPEG(filteredOrders, "total_orders");
 
-  const handleMarkReady = async () => {
-    const ids = Array.from(selectedOrders);
-    if (ids.length === 0) return;
+  const totalOrders = filteredOrders.length;
+  const totalDesigns = groupedOrders.size;
 
-    // Separate RB orders for supply dialog
-    const rbOrders = filteredOrders.filter(
-      (o) => selectedOrders.has(o.orderId) && o.orderType === OrderType.RB
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
     );
-    const nonRbIds = filteredOrders
-      .filter((o) => selectedOrders.has(o.orderId) && o.orderType !== OrderType.RB)
-      .map((o) => o.orderId);
-
-    if (rbOrders.length > 0) {
-      setSupplyOrders(rbOrders);
-      setSupplyDialogOpen(true);
-    }
-
-    if (nonRbIds.length > 0) {
-      await markReadyMutation.mutateAsync(nonRbIds);
-      setSelectedOrders((prev) => {
-        const next = new Set(prev);
-        nonRbIds.forEach((id) => next.delete(id));
-        return next;
-      });
-    }
-  };
-
-  const handleDeleteOrder = async (orderId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    await deleteOrderMutation.mutateAsync(orderId);
-    setSelectedOrders((prev) => {
-      const next = new Set(prev);
-      next.delete(orderId);
-      return next;
-    });
-  };
+  }
 
   if (isError) {
     return (
-      <div className="p-4 text-center text-destructive">
+      <div className="text-center py-12 text-destructive">
         Failed to load orders. Please try again.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Search and filters */}
-      <div className="flex flex-col gap-2">
+    <div className="space-y-4">
+      {/* Search & Filters */}
+      <div className="space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by order no, generic name..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -242,9 +206,9 @@ const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value={OrderType.RB}>RB</SelectItem>
               <SelectItem value={OrderType.SO}>SO</SelectItem>
               <SelectItem value={OrderType.CO}>CO</SelectItem>
+              <SelectItem value={OrderType.RB}>RB</SelectItem>
             </SelectContent>
           </Select>
           <Select value={karigarFilter} onValueChange={setKarigarFilter}>
@@ -253,176 +217,161 @@ const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Karigars</SelectItem>
-              {karigars.map((k) => (
+              {uniqueKarigars.map(k => (
                 <SelectItem key={k} value={k}>{k}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      {/* Select all + Mark Ready */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            checked={allSelected}
-            onCheckedChange={(v) => toggleSelectAll(!!v)}
-          />
-          <span className="text-sm text-muted-foreground">
-            {filteredOrders.length} orders
-          </span>
+        {/* Export buttons */}
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-1">
+            <FileSpreadsheet className="h-4 w-4" /> Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1">
+            <FileText className="h-4 w-4" /> PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportJPEG} className="gap-1">
+            <Image className="h-4 w-4" /> JPEG
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleMarkReady}
-          disabled={selectedOrders.size === 0 || markReadyMutation.isPending}
-          className="border-gold text-gold hover:bg-gold hover:text-white"
-        >
-          ✓ Mark Ready ({selectedOrders.size})
-        </Button>
       </div>
 
-      {/* Grouped order rows */}
-      <div className="flex flex-col gap-2">
-        {grouped.length === 0 && (
-          <div className="text-center text-muted-foreground py-8">No orders found</div>
-        )}
-        {grouped.map((group) => {
-          const isExpanded = expandedGroups.has(group.designCode);
-          const groupSelected = isGroupFullySelected(group);
-          const groupPartial = isGroupPartiallySelected(group);
+      {/* Summary */}
+      <div className="flex items-center gap-2">
+        <Checkbox
+          checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
+          onCheckedChange={toggleSelectAll}
+        />
+        <span className="text-sm text-foreground/70">
+          {totalOrders} order(s) across {totalDesigns} design(s)
+        </span>
+      </div>
+
+      {/* Groups */}
+      <div ref={tableRef} className="space-y-2">
+        {Array.from(groupedOrders.entries()).map(([design, groupOrds]) => {
+          const isExpanded = expandedGroups.has(design);
+          const totalQty = groupOrds.reduce((s, o) => s + Number(o.quantity), 0);
+          const totalWeight = groupOrds.reduce((s, o) => s + o.weight, 0);
+          const allGroupSelected = groupOrds.every(o => selectedOrders.has(o.orderId));
+          // Always prefer live mapping karigar name
+          const karigarName = karigarByDesign.get(design) || groupOrds[0]?.karigarName || "";
+          // Always prefer live mapping generic name
+          const genericName = genericNameByDesign.get(design) || groupOrds[0]?.genericName || "";
 
           return (
-            <div key={group.designCode} className="border border-border rounded-lg overflow-hidden">
-              {/* Group header */}
+            <div key={design} className="rounded-lg border border-white/10 bg-zinc-900 overflow-hidden">
+              {/* Group header row */}
               <div
-                className="flex items-center gap-2 px-3 py-2.5 bg-card cursor-pointer select-none"
-                onClick={() => toggleGroup(group.designCode)}
+                className="flex items-center gap-2 px-3 py-3 cursor-pointer hover:bg-white/5 transition-colors"
+                onClick={() => toggleGroup(design)}
               >
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center"
-                >
+                <div onClick={e => e.stopPropagation()}>
                   <Checkbox
-                    checked={groupPartial ? "indeterminate" : groupSelected}
-                    onCheckedChange={(v) => toggleGroupSelection(group, !!v)}
+                    checked={allGroupSelected}
+                    onCheckedChange={() => toggleSelectGroup(groupOrds)}
                   />
                 </div>
-                <span className="text-muted-foreground">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </span>
-                {/* Design code — bold orange, clickable for image */}
-                <button
-                  className="font-bold text-sm text-orange-500 hover:text-orange-400 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDesignModalCode(group.designCode);
-                  }}
-                >
-                  {group.designCode}
+                <button className="text-white/50" onClick={e => { e.stopPropagation(); toggleGroup(design); }}>
+                  {isExpanded
+                    ? <ChevronDown className="h-4 w-4" />
+                    : <ChevronRight className="h-4 w-4" />
+                  }
                 </button>
-                {group.genericName && (
-                  <span className="text-xs text-muted-foreground">{group.genericName}</span>
+                {/* Design code in orange */}
+                <span className="font-bold text-orange-400 text-sm">{design}</span>
+                {/* Generic name */}
+                {genericName && (
+                  <span className="text-xs text-white/60">{genericName}</span>
                 )}
-                {group.karigarName && (
-                  <Badge variant="outline" className="text-xs ml-1">
-                    {group.karigarName}
-                  </Badge>
+                {/* Karigar name pill — live from backend */}
+                {karigarName && (
+                  <span className="text-xs border border-white/20 rounded-full px-2 py-0.5 font-semibold text-white/90 bg-white/10">
+                    {karigarName}
+                  </span>
                 )}
-                <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{group.orders.length} orders</span>
-                  <span>{group.totalQty} qty</span>
-                  <span>{group.totalWeight.toFixed(2)}g</span>
+                {/* Stats pushed to right */}
+                <div className="ml-auto flex items-center gap-3 text-xs text-white/60">
+                  <span>{groupOrds.length} orders</span>
+                  <span>{totalQty} qty</span>
+                  <span>{totalWeight.toFixed(2)}g</span>
                 </div>
               </div>
 
-              {/* Child rows */}
+              {/* Individual order rows */}
               {isExpanded && (
-                <div className="divide-y divide-border">
-                  {group.orders.map((order) => {
-                    const isSelected = selectedOrders.has(order.orderId);
-                    return (
-                      <div
-                        key={order.orderId}
-                        className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
-                          isSelected ? "bg-gold/10" : "bg-background hover:bg-muted/30"
-                        }`}
-                        onClick={() => toggleOrderSelection(order.orderId)}
-                      >
-                        {/* Checkbox */}
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center"
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleOrderSelection(order.orderId)}
-                          />
-                        </div>
-
-                        {/* Left: order number + qty/wt */}
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {order.orderNo}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Qty: {String(order.quantity)} &nbsp; Wt: {order.weight.toFixed(2)}g
-                          </span>
-                        </div>
-
-                        {/* Center: generic name / type label */}
-                        <div className="flex flex-col items-center gap-0.5 min-w-[60px]">
-                          {order.genericName && (
-                            <span className="text-xs font-medium text-foreground text-center">
-                              {order.genericName}
+                <div className="border-t border-white/10 divide-y divide-white/5">
+                  {groupOrds.map(order => (
+                    <div key={order.orderId} className="flex items-center gap-2 px-3 py-3 bg-zinc-950/50">
+                      <Checkbox
+                        checked={selectedOrders.has(order.orderId)}
+                        onCheckedChange={() => toggleSelectOrder(order.orderId)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-white">{order.orderNo}</span>
+                          {(genericNameByDesign.get(order.design) || order.genericName) && (
+                            <span className="text-xs text-white/50">
+                              {genericNameByDesign.get(order.design) || order.genericName}
                             </span>
                           )}
-                          {orderTypeBadge(order.orderType)}
                         </div>
-
-                        {/* Right: date + ageing badge */}
-                        <div className="flex flex-col items-end gap-0.5 min-w-[80px]">
-                          {order.orderDate && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(order.orderDate)}
-                            </span>
-                          )}
+                        <div className="text-xs text-white/50 mt-0.5">
+                          Qty: {Number(order.quantity)} &nbsp; Wt: {order.weight.toFixed(2)}g
+                        </div>
+                      </div>
+                      {/* Right side: type badge + date + ageing + supply + delete */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Order type colored badge */}
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${getOrderTypeBadgeStyle(order.orderType)}`}>
+                          {order.orderType}
+                        </span>
+                        {/* Order date */}
+                        {order.orderDate && (
+                          <span className="text-xs text-white/50 whitespace-nowrap">
+                            {formatOrderDate(order.orderDate)}
+                          </span>
+                        )}
+                        {/* Ageing badge */}
+                        {order.orderDate && (
                           <AgeingBadge orderDate={order.orderDate} />
-                        </div>
-
-                        {/* Far right: delete */}
+                        )}
+                        {/* RB supply button */}
+                        {order.orderType === OrderType.RB && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-xs px-2 border-white/20 text-white hover:bg-white/10"
+                            onClick={e => { e.stopPropagation(); handleOpenSupplyDialog(order); }}
+                          >
+                            Supply
+                          </Button>
+                        )}
+                        {/* Delete */}
                         <button
-                          className="ml-1 text-destructive hover:text-red-400 transition-colors p-1"
-                          onClick={(e) => handleDeleteOrder(order.orderId, e)}
-                          disabled={deleteOrderMutation.isPending}
+                          onClick={e => { e.stopPropagation(); handleDelete(order.orderId); }}
+                          className="text-red-400 hover:text-red-300 transition-colors p-1"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           );
         })}
+
+        {groupedOrders.size === 0 && (
+          <div className="text-center py-12 text-white/50">
+            No pending orders found.
+          </div>
+        )}
       </div>
 
-      {/* Design Image Modal */}
-      {designModalCode && (
-        <DesignImageModal
-          designCode={designModalCode}
-          open={!!designModalCode}
-          onClose={() => setDesignModalCode(null)}
-        />
-      )}
-
-      {/* Supply Qty Dialog for RB orders */}
+      {/* RB Supply Dialog */}
       <SuppliedQtyDialog
         open={supplyDialogOpen}
         onOpenChange={setSupplyDialogOpen}
@@ -430,6 +379,6 @@ const TotalOrdersTab: React.FC<TotalOrdersTabProps> = ({ orders, isError }) => {
       />
     </div>
   );
-};
+}
 
 export default TotalOrdersTab;

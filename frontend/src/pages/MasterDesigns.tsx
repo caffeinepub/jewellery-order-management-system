@@ -13,10 +13,7 @@ import {
   useUpdateMasterDesignKarigars,
   useGetAllMasterDesignMappings,
   useGetAllOrders,
-  useReassignDesign,
-  useGetUniqueKarigarsFromDesignMappings,
   useAddKarigar,
-  useUpdateDesignMapping,
 } from "@/hooks/useQueries";
 import { MappingRecord, DesignMapping, ExternalBlob } from "@/backend";
 import { normalizeDesignCode } from "@/utils/excelParser";
@@ -45,17 +42,13 @@ export default function MasterDesigns() {
   const uploadDesignMappingMutation = useUploadDesignMapping();
   const assignOrdersToKarigarMutation = useAssignOrdersToKarigar();
   const updateMasterDesignKarigarsMutation = useUpdateMasterDesignKarigars();
-  const reassignDesignMutation = useReassignDesign();
-  const updateDesignMappingMutation = useUpdateDesignMapping();
   const addKarigarMutation = useAddKarigar();
   const { data: masterDesignExcel } = useGetMasterDesignExcel();
   const { data: masterDesignMappings = [] } = useGetAllMasterDesignMappings();
   const { data: allOrders = [] } = useGetAllOrders();
-  const { data: availableKarigars = [] } = useGetUniqueKarigarsFromDesignMappings();
 
-  // Suppress unused variable warnings for mutations not directly called in JSX
+  // Suppress unused variable warnings
   void assignOrdersToKarigarMutation;
-  void reassignDesignMutation;
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -72,7 +65,6 @@ export default function MasterDesigns() {
     try {
       const arrayBuffer = await file.arrayBuffer();
 
-      // Dynamically import XLSX from CDN
       const XLSX: any = await import("https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any);
 
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
@@ -117,15 +109,12 @@ export default function MasterDesigns() {
 
       setUploadProgress(60);
 
-      // Upload design mappings
       await uploadDesignMappingMutation.mutateAsync(mappings);
 
       setUploadProgress(80);
 
-      // Update master design karigars list
       await updateMasterDesignKarigarsMutation.mutateAsync(Array.from(uniqueKarigars));
 
-      // Upload the raw Excel file for reference — wrap in ExternalBlob as required by the hook
       const uint8Data = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
       const externalBlob = ExternalBlob.fromBytes(uint8Data);
       await uploadMasterDesignExcelMutation.mutateAsync(externalBlob);
@@ -146,22 +135,6 @@ export default function MasterDesigns() {
 
   const handleEditMapping = (designCode: string, genericName: string, karigarName: string) => {
     setEditingMapping({ designCode, genericName, karigarName });
-  };
-
-  const handleSaveMapping = async (
-    designCode: string,
-    genericName: string,
-    newKarigar: string
-  ) => {
-    await updateDesignMappingMutation.mutateAsync({
-      designCode,
-      newGenericName: genericName,
-      newKarigarName: newKarigar,
-    });
-  };
-
-  const handleAddKarigar = async (name: string) => {
-    await addKarigarMutation.mutateAsync(name);
   };
 
   // Count orders per design code
@@ -304,9 +277,6 @@ export default function MasterDesigns() {
           designCode={editingMapping.designCode}
           genericName={editingMapping.genericName}
           currentKarigar={editingMapping.karigarName}
-          availableKarigars={availableKarigars}
-          onSave={handleSaveMapping}
-          onAddKarigar={handleAddKarigar}
         />
       )}
     </div>

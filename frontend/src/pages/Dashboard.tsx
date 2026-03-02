@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import TotalOrdersTab from "../components/dashboard/TotalOrdersTab";
+import { TotalOrdersTab } from "../components/dashboard/TotalOrdersTab";
 import ReadyTab from "../components/dashboard/ReadyTab";
-import HallmarkTab from "../components/dashboard/HallmarkTab";
+import { HallmarkTab } from "../components/dashboard/HallmarkTab";
 import CustomerOrdersTab from "../components/dashboard/CustomerOrdersTab";
 import KarigarsTab from "../components/dashboard/KarigarsTab";
 import SummaryCards from "../components/dashboard/SummaryCards";
@@ -18,7 +18,6 @@ const TAB_VALUES = {
   KARIGARS: "karigars",
 } as const;
 
-// Map tab value to the activeTab key expected by SummaryCards
 function tabValueToSummaryKey(tabValue: string): string {
   switch (tabValue) {
     case TAB_VALUES.READY:
@@ -40,17 +39,14 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {/* Summary cards — pass activeTab so metrics update per tab */}
       <SummaryCards
         orders={allOrders}
         isError={isError}
         activeTab={tabValueToSummaryKey(activeTab)}
       />
 
-      {/* Unmapped section */}
       <UnmappedSection />
 
-      {/* Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}

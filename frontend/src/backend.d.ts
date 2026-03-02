@@ -115,6 +115,7 @@ export interface backendInterface {
     getUnreturnedOrders(): Promise<Array<Order>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
     markAllAsReady(): Promise<void>;
+    markOrdersAsPending(orderIds: Array<string>): Promise<void>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
     persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
     reassignDesign(designCode: string, newKarigar: string): Promise<void>;

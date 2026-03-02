@@ -1,115 +1,92 @@
 {
   "kind": "build_request",
-  "title": "Fix summary tabs, RB partial supply row, total orders sorting, bold orange design codes, remove image icon",
-  "projectName": "Jewellery Order Manager",
+  "title": "Fix dashboard design group rows invisible content and related bugs",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Restore the summary tab value computation logic to match v158 behaviour so that metric values (order counts, weight, quantity, CO orders) update correctly and reflect the appropriate subset of orders when switching between dashboard tabs (Total Orders, Ready, Hallmark, Customer Orders, Karigars).",
+      "text": "Fix the design group row cards in the Total Orders tab (and all other dashboard tabs) where card content is invisible due to dark text rendering on a dark background. Ensure all text, labels, design codes, weights, quantities, and action elements inside each row card are visible with appropriate contrast against the dark card background.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-4",
+          "msg-5"
         ],
         "quotes": [
-          "The summary tabs are not changing values across tabs. It was working fine with all supply logic behaviour in v158"
+          "the design group rows below the tabs are rendering as dark empty boxes with no visible content",
+          "Row card content invisible — dark text on dark background in design group rows (the empty dark boxes in IMG_6556)"
         ]
       },
       "acceptanceCriteria": [
-        "Switching to the Ready tab shows summary card values computed only from Ready-status orders.",
-        "Switching to the Hallmark tab shows summary card values computed from Hallmark-status orders.",
-        "Switching to the Total Orders tab shows summary card values for all Pending orders.",
-        "Summary card values visibly change when navigating between tabs, matching v158 behaviour.",
-        "No regression in supply logic or ghost-row filtering in SummaryCards.tsx."
+        "Design group row cards in Total Orders tab display all text content (design code, generic name, order count, weight) visibly",
+        "Row card content is readable with sufficient contrast against the dark card background",
+        "All other tabs (Ready, Hallmark, Customer Orders, Karigars) also render row card content visibly",
+        "No dark-on-dark text rendering anywhere in the dashboard row cards"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Fix the RB partial supplied row so it appears in the Ready tab after a partial supply action is performed. When an RB order is partially supplied, the supplied portion must be visible as a row in the Ready tab.",
+      "text": "Fix the Totals tab karigar name display so it shows the correct karigar name (e.g., ZYRA FACTORY) from the live design mappings instead of a stale/incorrect name (e.g., SANTU). Ensure karigar names in grouped rows reflect the current mapping data.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "RB partial supplied row doesn't show yet in the ready tab"
+          "Karigar name sync — still showing SANTU instead of ZYRA FACTORY in Totals tab"
         ]
       },
       "acceptanceCriteria": [
-        "After submitting a partial supply for an RB order via SuppliedQtyDialog, the supplied portion appears as a row in the Ready tab.",
-        "The remaining un-supplied portion stays in the Pending/Total Orders tab.",
-        "No other rows are affected or hidden in the Ready tab."
+        "Totals tab groups orders using the latest karigar name from the live design mappings query",
+        "Updated karigar names (e.g., ZYRA FACTORY) are reflected immediately after mappings are refreshed",
+        "No stale karigar name (e.g., SANTU) appears when the mapping has been updated"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Within each design group in the Total Orders tab, sort the rows from longest due (oldest order date) to least due (most recent order date), top to bottom, grouped by weight.",
+      "text": "Fix the Karigars tab so that clicking a karigar card navigates to the karigar detail page and loads that karigar's pending orders correctly. The click handler must pass the correct karigar name and route parameters.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "inside each design group in total orders tab, show data from longest due to least due from top to bottom & weight wise together"
+          "Karigar tab click — not loading pending orders when clicking a karigar card"
         ]
       },
       "acceptanceCriteria": [
-        "Inside each expanded design group in TotalOrdersTab, rows are sorted so the oldest due date appears at the top and the most recent at the bottom.",
-        "Rows with the same weight are grouped together within this sort order.",
-        "The sort applies consistently to all design groups.",
-        "No other tab ordering is affected."
+        "Clicking a karigar card in the Karigars tab navigates to the karigar detail page",
+        "The karigar detail page loads and displays the correct pending orders for the selected karigar",
+        "No empty or broken state appears after clicking a karigar card"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "In the design group header row in the Total Orders tab, display the design code text in bold orange color.",
+      "text": "Fix the Ready tab to display export buttons (Excel, PDF, JPEG) so users can export orders from that tab. Ensure the export controls are rendered and functional in the Ready tab UI.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "In design group header where design code is showed, can u display all such design codes in bold orange color"
+          "Export buttons on Ready tab — missing export options"
         ]
       },
       "acceptanceCriteria": [
-        "Every design group header in TotalOrdersTab renders the design code in bold font weight.",
-        "The design code text color is orange (matching the app's orange accent, e.g., Tailwind orange-500 or equivalent).",
-        "The styling applies to all design group headers, not just selected ones.",
-        "No other text in the header is unintentionally changed."
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "text": "Remove the image icon from the design group header row in the Total Orders tab.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "remove that image icon on the design group in the totals tab"
-        ]
-      },
-      "acceptanceCriteria": [
-        "No image icon is rendered in any design group header row in TotalOrdersTab.",
-        "The rest of the header layout (design code, counts, expand/collapse control) remains intact.",
-        "No other tabs or components have their image icons removed."
+        "Ready tab shows Excel, PDF, and JPEG export buttons",
+        "Export buttons trigger their respective export actions (download CSV/Excel, generate PDF, generate JPEG)",
+        "Export buttons are visible and accessible without scrolling or additional interactions"
       ]
     }
   ],
   "constraints": [
-    "Only modify code directly related to the 5 specified fixes. All other app behaviour, logic, and UI must remain exactly as-is.",
-    "Do not alter backend/main.mo or backend/migration.mo unless strictly required by one of the 5 fixes.",
-    "Do not modify any immutable frontend paths: useInternetIdentity.ts, useActor.ts, main.tsx, or components/ui.",
-    "The draft deployment must not fail — ensure no TypeScript errors, import issues, or build-breaking changes are introduced."
+    "Do not change backend data models or Motoko actor logic",
+    "Do not modify files under frontend/src/hooks/ or frontend/src/components/ui/"
   ],
   "nonGoals": [
-    "Any new features or UI changes beyond the 5 specified fixes.",
-    "Changes to the Hallmark, Customer Orders, Karigars, or Ready tab layouts beyond what is needed for REQ-1 and REQ-2.",
-    "Backend schema or data model changes.",
-    "Changes to export utilities, barcode scanning, tag printing, or any other page not involved in the fixes."
+    "Adding new dashboard tabs or features",
+    "Changing the overall dark theme or color palette",
+    "Backend schema migrations"
   ],
   "imageRequirements": {
     "required": [],

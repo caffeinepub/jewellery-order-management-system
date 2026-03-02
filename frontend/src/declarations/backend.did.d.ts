@@ -150,6 +150,7 @@ export interface _SERVICE {
   'getUnreturnedOrders' : ActorMethod<[], Array<Order>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
   'markAllAsReady' : ActorMethod<[], undefined>,
+  'markOrdersAsPending' : ActorMethod<[Array<string>], undefined>,
   'markOrdersAsReady' : ActorMethod<[Array<string>], undefined>,
   'persistMasterDataRows' : ActorMethod<
     [Array<MasterDataRow>],
