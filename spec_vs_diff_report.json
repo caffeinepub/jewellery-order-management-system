@@ -1,35 +1,61 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-03-02T15:06:22.349Z",
-  "summary": "The diff addresses all three requirements. REQ-1 (karigar PDF export format) is implemented in KarigarDetail.tsx with grouped-by-design HTML-based PDF export including design images. REQ-2 (karigar name sync) is implemented by enriching orders via useGetAllMasterDesignMappings in TotalOrdersTab.tsx and KarigarsTab.tsx, with query cache invalidation in useQueries.ts. REQ-3 (desktop sidebar overlap) is fixed in App.tsx using a flex layout with SidebarInset. All three requirements appear to be addressed.",
-  "missing_requirements": [],
+  "generatedAt": "2026-03-03T02:17:29.258Z",
+  "summary": "The diff introduces backend changes (main.mo) with OrderType including #RB, OrderStatus stages (Pending/Ready/Hallmark/ReturnFromHallmark), supplyOrder logic for partial supply, and an rbTotalTracker. However, the diff is truncated and there is no evidence of frontend changes — TotalOrdersTab grouped view, SuppliedQtyDialog UI integration, or frontend distinguishing of RB vs CO orders. The project_state.json marks AR-5/REQ-1 as still 'pending'. The backend structures appear partially correct, but several acceptance criteria cannot be verified.",
+  "missing_requirements": [
+    {
+      "id": "REQ-1",
+      "requirement": "RB-type orders appear in TotalOrdersTab and can be distinguished from CO-type orders (frontend grouped view).",
+      "reason": "No frontend files (TotalOrdersTab component or equivalent) are present in the diff. Only backend main.mo was modified.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-1",
+      "requirement": "Selecting RB orders and triggering supply opens the SuppliedQtyDialog, allowing partial quantities to be supplied while remaining units remain as Pending.",
+      "reason": "No frontend SuppliedQtyDialog component changes are present in the diff. The UI flow for partial supply is not implemented in the provided changes.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-1",
+      "requirement": "project_state.json marks REQ-1 as pending, suggesting the task was not completed.",
+      "reason": "The project_state.json shows AR-5 (REQ-1: Restore RB Order Logic) with status 'pending', indicating the feature was not marked as done.",
+      "evidence": [
+        "project_state.json"
+      ]
+    }
+  ],
   "hallucinated_features": [
     {
-      "description": "A backend migration module (migration.mo) was added that migrates the actor state by removing designImages and masterDesignExcel blob storage fields from the stable state.",
-      "reason": "The build request only asked for three frontend/UI fixes: PDF export format, karigar name sync, and sidebar overlap. No backend migration or removal of blob storage fields from the actor was requested.",
+      "description": "A migration.mo module was added that performs a no-op migration (returns old state unchanged).",
+      "reason": "The build request does not mention adding a migration module. While it may be a necessary infrastructure piece, it was not requested in the requirements.",
       "evidence": [
-        "backend/migration.mo",
+        "backend/migration.mo"
+      ]
+    },
+    {
+      "description": "An #SO (Special Order) variant was added to the OrderType type with a comment for future use.",
+      "reason": "The build request only mentions restoring RB and CO order logic. The #SO type was not requested and is explicitly marked as future/unplanned.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "description": "An rbTotalTracker map (Map<Text, (Nat, Nat)>) was added to the actor state.",
+      "reason": "The build request does not specify a total tracker data structure for RB orders. This appears to be an additional implementation detail not described in the requirements.",
+      "evidence": [
         "backend/main.mo"
       ]
     }
   ],
-  "confidence": 0.82,
+  "confidence": 0.62,
   "changed_files": [
     "backend/main.mo",
     "backend/migration.mo",
-    "frontend-file-summaries.txt",
-    "frontend/src/App.tsx",
-    "frontend/src/components/dashboard/KarigarsTab.tsx",
-    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/components/dashboard/UnmappedSection.tsx",
-    "frontend/src/components/layout/AppSidebar.tsx",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/DesignImages.tsx",
-    "frontend/src/pages/KarigarDetail.tsx",
-    "frontend/src/pages/MasterDesigns.tsx",
-    "frontend/src/pages/UnmappedCodes.tsx",
     "project_state.json"
   ]
 }

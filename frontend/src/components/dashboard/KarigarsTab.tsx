@@ -1,115 +1,182 @@
-import { useState, useMemo } from "react";
-import { User, ChevronRight, Loader2 } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
-import { useGetAllOrders, useGetAllMasterDesignMappings } from "@/hooks/useQueries";
+import { useMemo } from 'react';
+import { useGetAllOrders, useGetMasterDesigns } from '@/hooks/useQueries';
+import { OrderStatus } from '@/backend';
+import { useNavigate } from '@tanstack/react-router';
+import { User, ChevronRight } from 'lucide-react';
 
 export default function KarigarsTab() {
+  const { data: orders = [], isLoading } = useGetAllOrders();
+  const { data: masterDesignsRaw = [] } = useGetMasterDesigns();
   const navigate = useNavigate();
-  const { data: allOrders = [], isLoading: ordersLoading } = useGetAllOrders();
-  const { data: masterDesigns = [], isLoading: mappingsLoading } = useGetAllMasterDesignMappings();
 
-  // Build design mapping lookup from master designs (source of truth for karigar names)
-  const designMappingMap = useMemo(() => {
+  // Build a Map from the raw [designCode, genericName, karigarName][] tuples
+  const masterDesignsMap = useMemo(() => {
     const map = new Map<string, { genericName: string; karigarName: string }>();
-    for (const [code, mapping] of masterDesigns) {
-      map.set(code, { genericName: mapping.genericName, karigarName: mapping.karigarName });
-    }
+    masterDesignsRaw.forEach(([designCode, genericName, karigarName]) => {
+      map.set(designCode.toUpperCase().trim(), { genericName, karigarName });
+    });
     return map;
-  }, [masterDesigns]);
+  }, [masterDesignsRaw]);
 
-  // Enrich orders with latest karigar/generic from master designs
   const enrichedOrders = useMemo(() => {
-    return allOrders
-      .filter((o) => o.status === "Pending")
-      .map((order) => {
-        const mapping = designMappingMap.get(order.design);
-        if (mapping) {
-          return { ...order, karigarName: mapping.karigarName, genericName: mapping.genericName };
-        }
-        return order;
-      });
-  }, [allOrders, designMappingMap]);
+    return orders.map((order) => {
+      const normalizedDesign = order.design.toUpperCase().trim();
+      const mapping = masterDesignsMap.get(normalizedDesign);
+      return {
+        ...order,
+        genericName: mapping?.genericName || order.genericName,
+        karigarName: mapping?.karigarName || order.karigarName,
+      };
+    });
+  }, [orders, masterDesignsMap]);
 
-  // Group by karigar name
   const karigarGroups = useMemo(() => {
-    const groups = new Map<
-      string,
-      { karigarName: string; designCodes: Set<string>; totalOrders: number; totalQty: number; totalWeight: number }
-    >();
+    const pendingOrders = enrichedOrders.filter((order) => order.status === OrderStatus.Pending);
 
-    for (const order of enrichedOrders) {
-      const kn = order.karigarName || "Unassigned";
-      if (!groups.has(kn)) {
-        groups.set(kn, {
-          karigarName: kn,
-          designCodes: new Set(),
-          totalOrders: 0,
-          totalQty: 0,
-          totalWeight: 0,
-        });
+    const groups: Record<string, typeof pendingOrders> = {};
+
+    pendingOrders.forEach((order) => {
+      const karigar = order.karigarName || 'Unmapped';
+      if (!groups[karigar]) {
+        groups[karigar] = [];
       }
-      const g = groups.get(kn)!;
-      g.designCodes.add(order.design);
-      g.totalOrders += 1;
-      g.totalQty += Number(order.quantity);
-      g.totalWeight += order.weight;
-    }
+      groups[karigar].push(order);
+    });
 
-    return Array.from(groups.values()).sort((a, b) => a.karigarName.localeCompare(b.karigarName));
+    return Object.entries(groups)
+      .map(([name, groupOrders]) => ({
+        name,
+        orders: groupOrders,
+        totalOrders: groupOrders.length,
+        totalQty: groupOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
+        totalWeight: groupOrders.reduce((sum, o) => sum + o.weight, 0),
+        uniqueDesigns: new Set(groupOrders.map((o) => o.design.toUpperCase().trim())).size,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [enrichedOrders]);
 
-  const isLoading = ordersLoading || mappingsLoading;
+  const handleKarigarClick = (karigarName: string) => {
+    navigate({ to: `/karigar/${encodeURIComponent(karigarName)}` });
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (karigarGroups.length === 0) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        No karigar assignments found. Upload a master design file to get started.
+      <div
+        className="flex items-center justify-center py-12"
+        style={{ backgroundColor: '#000000', minHeight: '400px' }}
+      >
+        <div style={{ color: '#6b7280' }}>Loading karigars...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {karigarGroups.map((group) => (
+    <div
+      className="space-y-4 p-3"
+      style={{ backgroundColor: '#000000', minHeight: '400px' }}
+    >
+      {karigarGroups.length === 0 && (
+        <div className="flex items-center justify-center py-12">
+          <div style={{ color: '#6b7280' }}>No pending orders found</div>
+        </div>
+      )}
+
+      {karigarGroups.map((karigar) => (
         <div
-          key={group.karigarName}
-          className="bg-[#141414] border border-white/10 rounded-2xl p-4 cursor-pointer hover:border-primary/40 transition-colors"
-          onClick={() => navigate({ to: "/karigar/$name", params: { name: group.karigarName } })}
+          key={karigar.name}
+          className="rounded-2xl cursor-pointer transition-all active:scale-[0.99]"
+          style={{
+            backgroundColor: '#141414',
+            border: '1px solid #2a2a2a',
+          }}
+          onClick={() => handleKarigarClick(karigar.name)}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-              <User className="w-5 h-5 text-primary" />
+          {/* Card Header */}
+          <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+            {/* Orange person icon */}
+            <div className="shrink-0">
+              <User
+                size={22}
+                style={{ color: '#f97316' }}
+                strokeWidth={2}
+              />
             </div>
+
+            {/* Name + designs count */}
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-white uppercase tracking-wide text-sm">
-                {group.karigarName}
+              <div
+                className="text-base font-bold tracking-wide uppercase leading-tight"
+                style={{ color: '#ffffff' }}
+              >
+                {karigar.name}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                {group.designCodes.size} design{group.designCodes.size !== 1 ? "s" : ""}
+              <div
+                className="text-xs mt-0.5"
+                style={{ color: '#6b7280' }}
+              >
+                {karigar.uniqueDesigns} {karigar.uniqueDesigns === 1 ? 'design' : 'designs'}
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-500 shrink-0" />
+
+            {/* Chevron */}
+            <ChevronRight
+              size={18}
+              style={{ color: '#4b5563' }}
+              strokeWidth={2}
+            />
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10">
-            <div className="text-center">
-              <div className="text-xl font-bold text-primary">{group.totalOrders}</div>
-              <div className="text-xs text-gray-400">Orders</div>
+
+          {/* Divider */}
+          <div style={{ height: '1px', backgroundColor: '#1f1f1f', marginLeft: '16px', marginRight: '16px' }} />
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-3 px-4 py-4 gap-2">
+            {/* Orders */}
+            <div className="flex flex-col items-center">
+              <div
+                className="text-3xl font-bold leading-none"
+                style={{ color: '#f97316' }}
+              >
+                {karigar.totalOrders}
+              </div>
+              <div
+                className="text-xs mt-1.5 font-medium"
+                style={{ color: '#6b7280' }}
+              >
+                Orders
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-primary">{group.totalQty}</div>
-              <div className="text-xs text-gray-400">Qty</div>
+
+            {/* Qty */}
+            <div className="flex flex-col items-center">
+              <div
+                className="text-3xl font-bold leading-none"
+                style={{ color: '#f97316' }}
+              >
+                {karigar.totalQty}
+              </div>
+              <div
+                className="text-xs mt-1.5 font-medium"
+                style={{ color: '#6b7280' }}
+              >
+                Qty
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-primary">{group.totalWeight.toFixed(2)}g</div>
-              <div className="text-xs text-gray-400">Weight</div>
+
+            {/* Weight */}
+            <div className="flex flex-col items-center">
+              <div
+                className="text-3xl font-bold leading-none"
+                style={{ color: '#f97316' }}
+              >
+                {karigar.totalWeight.toFixed(1)}g
+              </div>
+              <div
+                className="text-xs mt-1.5 font-medium"
+                style={{ color: '#6b7280' }}
+              >
+                Weight
+              </div>
             </div>
           </div>
         </div>

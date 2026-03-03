@@ -1,22 +1,23 @@
+import Map "mo:core/Map";
 import Time "mo:core/Time";
 import List "mo:core/List";
-import Map "mo:core/Map";
-import Float "mo:core/Float";
-import Runtime "mo:core/Runtime";
-import Iter "mo:core/Iter";
 import Nat "mo:core/Nat";
 import Array "mo:core/Array";
+import Runtime "mo:core/Runtime";
+import Iter "mo:core/Iter";
 import Text "mo:core/Text";
 import Migration "migration";
+import Float "mo:core/Float";
 
 import MixinStorage "blob-storage/Mixin";
+import Storage "blob-storage/Storage";
 
 (with migration = Migration.run)
 actor {
   type OrderType = {
     #CO;
     #RB;
-    #SO;
+    #SO; // Special Order, for future use
   };
 
   type OrderStatus = {
@@ -49,10 +50,13 @@ actor {
 
   let orders = Map.empty<Text, Order>();
   let designMappings = Map.empty<Text, DesignMapping>();
+  let designImages = Map.empty<Text, Storage.ExternalBlob>();
   let karigars = Map.empty<Text, Karigar>();
   let masterDesignKarigars = Map.empty<Text, Nat>();
   let filteredOutKarigars = Map.empty<Text, Bool>();
+  var masterDesignExcel : ?Storage.ExternalBlob = null;
   var activeKarigar : ?Text = null;
+  let rbTotalTracker = Map.empty<Text, (Nat, Nat)>();
 
   type DesignMapping = {
     designCode : Text;
@@ -363,6 +367,18 @@ actor {
     orders.clear();
   };
 
+  public shared ({ caller }) func uploadDesignImage(designCode : Text, blob : Storage.ExternalBlob) : async () {
+    designImages.add(designCode, blob);
+  };
+
+  public shared ({ caller }) func batchUploadDesignImages(images : [(Text, Storage.ExternalBlob)]) : async () {
+    images.forEach(func((designCode, blob)) { designImages.add(designCode, blob) });
+  };
+
+  public query ({ caller }) func getDesignImage(designCode : Text) : async ?Storage.ExternalBlob {
+    designImages.get(designCode);
+  };
+
   public type MasterDesignMapping = {
     designCode : Text;
     genericName : Text;
@@ -371,6 +387,14 @@ actor {
     updatedBy : ?Text;
     createdAt : Time.Time;
     updatedAt : Time.Time;
+  };
+
+  public shared ({ caller }) func uploadMasterDesignExcel(blob : Storage.ExternalBlob) : async () {
+    masterDesignExcel := ?blob;
+  };
+
+  public query ({ caller }) func getMasterDesignExcel() : async ?Storage.ExternalBlob {
+    masterDesignExcel;
   };
 
   public shared ({ caller }) func uploadDesignMapping(mappingData : [MappingRecord]) : async () {
@@ -533,6 +557,10 @@ actor {
         (mapping.designCode, mapping.genericName, mapping.karigarName);
       }
     );
+  };
+
+  public query ({ caller }) func getDesignImageMapping() : async [(Text, Storage.ExternalBlob)] {
+    designImages.toArray();
   };
 
   public query ({ caller }) func getUnreturnedOrders() : async [Order] {
@@ -733,4 +761,3 @@ actor {
     };
   };
 };
-

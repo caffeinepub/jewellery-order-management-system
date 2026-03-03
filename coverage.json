@@ -1,54 +1,31 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-03-02T15:06:22.352Z",
+  "generatedAt": "2026-03-03T02:17:29.262Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 3,
+    "total": 1,
+    "implemented": 0,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Restore the karigar PDF export format in KarigarDetail.tsx so that the exported PDF groups orders by design code, displays the design image above each group, and lists all orders belonging to that design code below the image — matching the original KASI_orders_2026-02-27.pdf layout.",
-        "status": "implemented",
+        "summary": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle: they must be distinguishable from CO-type orders, display correctly in the TotalOrdersTab grouped view, support the SuppliedQtyDialog partial-supply flow (remaining units stay as Pending), and transition through status stages (Pending → Ready → Hallmark → ReturnFromHallmark) without regression.",
+        "status": "missing",
         "plannedFiles": [
-          "frontend/src/pages/KarigarDetail.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/pages/KarigarDetail.tsx"
-        ]
-      },
-      {
-        "id": "REQ-2",
-        "summary": "Fix the karigar name sync so that when a karigar name is updated on the Master Designs page (MasterDesigns.tsx / EditDesignModal.tsx), the updated name (e.g., Prasanna for design code CHTMN40046) is immediately reflected in the Total Orders tab and the Karigar tab. The karigar tab for Prasanna must show all orders mapped to that design code, and the Total Orders tab must display Prasanna instead of the old name SANTU for CHTMN40046.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/masterdesigns/EditDesignModal.tsx",
-          "frontend/src/hooks/useQueries.ts",
           "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/KarigarsTab.tsx"
+          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "frontend/src/components/dashboard/OrderTable.tsx",
+          "frontend/src/components/dashboard/ReadyTab.tsx",
+          "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "frontend/src/pages/Dashboard.tsx",
+          "frontend/src/pages/AgeingStock.tsx",
+          "frontend/src/pages/KarigarDetail.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ],
-        "matchedFiles": [
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/KarigarsTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-3",
-        "summary": "Fix the desktop layout in App.tsx and AppSidebar.tsx so the sidebar and the main dashboard content do not overlap. The sidebar should occupy its own fixed or sticky column and the main content area should be offset correctly to sit beside the sidebar without any overlap.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/components/layout/AppSidebar.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/App.tsx",
-          "frontend/src/components/layout/AppSidebar.tsx"
-        ]
+        "matchedFiles": []
       }
     ]
   },
@@ -57,23 +34,7 @@
     "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
-    "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/components/dashboard/KarigarsTab.tsx",
-    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-    "frontend/src/components/dashboard/UnmappedSection.tsx",
-    "frontend/src/components/layout/AppSidebar.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/declarations/backend.did.js",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/DesignImages.tsx",
-    "frontend/src/pages/KarigarDetail.tsx",
-    "frontend/src/pages/MasterDesigns.tsx",
-    "frontend/src/pages/UnmappedCodes.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

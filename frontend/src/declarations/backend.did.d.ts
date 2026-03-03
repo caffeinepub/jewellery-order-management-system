@@ -19,6 +19,7 @@ export interface DesignMapping {
   'genericName' : string,
   'designCode' : string,
 }
+export type ExternalBlob = Uint8Array;
 export interface Karigar {
   'name' : string,
   'createdAt' : Time,
@@ -118,6 +119,10 @@ export interface _SERVICE {
     [Array<string>, OrderStatus],
     undefined
   >,
+  'batchUploadDesignImages' : ActorMethod<
+    [Array<[string, ExternalBlob]>],
+    undefined
+  >,
   'clearAllDesignMappings' : ActorMethod<[], undefined>,
   'deleteOrder' : ActorMethod<[string], undefined>,
   'deleteReadyOrder' : ActorMethod<[string], undefined>,
@@ -127,9 +132,12 @@ export interface _SERVICE {
   >,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
   'getDesignCountByKarigar' : ActorMethod<[string], [] | [bigint]>,
+  'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
+  'getDesignImageMapping' : ActorMethod<[], Array<[string, ExternalBlob]>>,
   'getDesignMapping' : ActorMethod<[string], DesignMapping>,
   'getFilteredOutKarigars' : ActorMethod<[], Array<string>>,
   'getKarigars' : ActorMethod<[], Array<Karigar>>,
+  'getMasterDesignExcel' : ActorMethod<[], [] | [ExternalBlob]>,
   'getMasterDesignKarigars' : ActorMethod<[], Array<string>>,
   'getMasterDesigns' : ActorMethod<[], Array<[string, string, string]>>,
   'getOrder' : ActorMethod<[string], [] | [Order]>,
@@ -180,7 +188,9 @@ export interface _SERVICE {
   'updateDesignGroupStatus' : ActorMethod<[Array<string>], undefined>,
   'updateDesignMapping' : ActorMethod<[string, string, string], undefined>,
   'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
+  'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,
   'uploadDesignMapping' : ActorMethod<[Array<MappingRecord>], undefined>,
+  'uploadMasterDesignExcel' : ActorMethod<[ExternalBlob], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

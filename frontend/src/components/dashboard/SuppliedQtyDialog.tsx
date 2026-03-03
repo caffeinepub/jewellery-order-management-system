@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Order } from "../../backend";
+import { Order, OrderType, OrderStatus } from "../../backend";
 import {
   Dialog,
   DialogContent,
@@ -14,11 +14,10 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { useBatchSupplyRBOrders } from "../../hooks/useQueries";
 import { useQueryClient } from "@tanstack/react-query";
 
-export interface SuppliedQtyDialogProps {
+interface SuppliedQtyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  rbOrders?: Order[];
-  orders?: Order[];
+  rbOrders: Order[];
 }
 
 interface SupplyEntry {
@@ -32,19 +31,15 @@ const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
   open,
   onOpenChange,
   rbOrders,
-  orders,
 }) => {
-  // Accept either rbOrders or orders prop for backward compatibility
-  const ordersToProcess = rbOrders ?? orders ?? [];
-
   const [entries, setEntries] = useState<SupplyEntry[]>([]);
   const supplyMutation = useBatchSupplyRBOrders();
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (open && ordersToProcess.length > 0) {
+    if (open && rbOrders.length > 0) {
       setEntries(
-        ordersToProcess.map((o) => ({
+        rbOrders.map((o) => ({
           orderId: o.orderId,
           orderNo: o.orderNo,
           originalQty: Number(o.quantity),
@@ -52,7 +47,7 @@ const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
         }))
       );
     }
-  }, [open, ordersToProcess.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, rbOrders]);
 
   const handleQtyChange = (orderId: string, value: string) => {
     const num = parseInt(value, 10);
@@ -70,12 +65,13 @@ const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
   const handleConfirm = async () => {
     try {
       await supplyMutation.mutateAsync(
-        entries.map((e) => ({ orderId: e.orderId, suppliedQuantity: BigInt(e.suppliedQty) }))
+        entries.map((e) => ({ orderId: e.orderId, suppliedQty: e.suppliedQty }))
       );
+      // Invalidate all order queries so Ready tab and Total Orders both refresh
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["allOrders"] });
       onOpenChange(false);
-    } catch {
+    } catch (err) {
       // error handled by mutation
     }
   };
@@ -84,7 +80,7 @@ const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Supply Orders</DialogTitle>
+          <DialogTitle>Supply RB Orders</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3 max-h-80 overflow-y-auto py-1">
@@ -120,9 +116,6 @@ const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
               </div>
             );
           })}
-          {entries.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">No orders to supply.</p>
-          )}
         </div>
 
         {hasPartialSupply && (
@@ -141,7 +134,7 @@ const SuppliedQtyDialog: React.FC<SuppliedQtyDialogProps> = ({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={supplyMutation.isPending || entries.length === 0 || entries.some((e) => e.suppliedQty <= 0)}
+            disabled={supplyMutation.isPending || entries.some((e) => e.suppliedQty <= 0)}
           >
             {supplyMutation.isPending ? (
               <>

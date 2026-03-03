@@ -1,46 +1,50 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Order management app with karigar (craftsperson) tracking, design management, and PDF export functionality. Fixing three issues: karigar export PDF format (design image + grouped orders per design code), karigar name sync from Master Design page not reflecting in Total Orders and Karigar tabs, and desktop sidebar/dashboard overlap.",
+  "summary": "Project with known deployment size issues; applying fixes one at a time. Currently working on Task 4: Restore RB Order Logic (from Draft 175). Pending tasks: Master Design → Karigar Sync, Karigar Export PDF, Desktop Sidebar Layout Fix.",
   "architectural_notes": [
-    "Karigar names are managed via a Master Design page (design code, generic name, karigar name) and updates must sync to Total Orders tab and Karigar tab",
-    "Karigar export PDF format groups orders by design code with design image displayed above each group"
+    "Project is large/complex; applying fixes one at a time to avoid hitting max_tool_iterations budget limit during deployment."
   ],
   "known_issues": [
-    "Karigar export PDF no longer includes design images with grouped orders per design code after recent updates",
-    "Karigar mapping update (Prasanna) not reflected in Total Orders tab — CHTMN40046 still shows SANTU; Prasanna tab in Karigar section shows no orders",
-    "Desktop sidebar and main dashboard content are overlapping"
+    "Deploying multiple tasks at once causes build failures due to max_tool_iterations budget exceeded."
   ],
   "isFixRequest": true,
-  "existing_features": [
+  "existing_features": [],
+  "new_feature_requests": [
     {
-      "id": "feature-restore-the-karigar-pdf-export-format-in-karigardetail-tsx-so-that-the-exported-pdf-groups-orders-by-design-code-displays-the-design-image-above-each-group-and-lists-all-orders-belonging-to-that-design-code-below-the-image-matching-the-original-kasi-orders-2026-02-27-pdf-layout",
-      "title": "Restore the karigar PDF export format in KarigarDetail.tsx so that the exported PDF groups orders by design code, displays the design image above each group, and lists all orders belonging to that design code below the image — matching the original KASI_orders_2026-02-27.pdf layout.",
+      "id": "AR-1",
+      "summary": "Master Design → Karigar Sync",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Karigar Export PDF (grouping fix)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Desktop Sidebar Layout Fix",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Restore RB Order Logic",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle: they must be distinguishable from CO-type orders, display correctly in the TotalOrdersTab grouped view, support the SuppliedQtyDialog partial-supply flow (remaining units stay as Pending), and transition through status stages (Pending → Ready → Hallmark → ReturnFromHallmark) without regression.",
       "reqIds": [
         "REQ-1"
       ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-karigar-name-sync-so-that-when-a-karigar-name-is-updated-on-the-master-designs-page-masterdesigns-tsx-editdesignmodal-tsx-the-updated-name-e-g-prasanna-for-design-code-chtmn40046-is-immediately-reflected-in-the-total-orders-tab-and-the-karigar-tab-the-karigar-tab-for-prasanna-must-show-all-orders-mapped-to-that-design-code-and-the-total-orders-tab-must-display-prasanna-instead-of-the-old-name-santu-for-chtmn40046",
-      "title": "Fix the karigar name sync so that when a karigar name is updated on the Master Designs page (MasterDesigns.tsx / EditDesignModal.tsx), the updated name (e.g., Prasanna for design code CHTMN40046) is immediately reflected in the Total Orders tab and the Karigar tab. The karigar tab for Prasanna must show all orders mapped to that design code, and the Total Orders tab must display Prasanna instead of the old name SANTU for CHTMN40046.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-fix-the-desktop-layout-in-app-tsx-and-appsidebar-tsx-so-the-sidebar-and-the-main-dashboard-content-do-not-overlap-the-sidebar-should-occupy-its-own-fixed-or-sticky-column-and-the-main-content-area-should-be-offset-correctly-to-sit-beside-the-sidebar-without-any-overlap",
-      "title": "Fix the desktop layout in App.tsx and AppSidebar.tsx so the sidebar and the main dashboard content do not overlap. The sidebar should occupy its own fixed or sticky column and the main content area should be offset correctly to sit beside the sidebar without any overlap.",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "version": 1
+      "status": "pending"
     }
   ],
-  "new_feature_requests": [],
-  "gameProjectType": "none",
-  "projectName": "Jewellery Order Manager",
+  "projectName": "Jewellery OMS",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

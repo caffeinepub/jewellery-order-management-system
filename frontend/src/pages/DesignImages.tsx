@@ -5,6 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FolderOpen, FileArchive, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useActor } from '@/hooks/useActor';
+import { ExternalBlob } from '@/backend';
 import { toast } from 'sonner';
 
 interface UploadResult {
@@ -13,49 +15,8 @@ interface UploadResult {
   error?: string;
 }
 
-// The ExternalBlob class is provided by the blob-storage platform component at
-// runtime and is not a resolvable TypeScript module. We access it via a helper.
-function getExternalBlobClass(): {
-  fromBytes(data: Uint8Array<ArrayBuffer>): {
-    getDirectURL(): string;
-    getBytes(): Promise<Uint8Array<ArrayBuffer>>;
-    withUploadProgress(cb: (pct: number) => void): unknown;
-  };
-} | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (window as any).__ExternalBlob ?? null;
-}
-
-async function uploadDesignImageBlob(
-  designCode: string,
-  data: Uint8Array<ArrayBuffer>,
-  onProgress?: (pct: number) => void
-): Promise<void> {
-  const ExternalBlobClass = getExternalBlobClass();
-  if (!ExternalBlobClass) {
-    // Fallback: store as a data URL in sessionStorage for demo purposes
-    // In production the platform always provides ExternalBlob
-    const blob = new Blob([data]);
-    const url = URL.createObjectURL(blob);
-    sessionStorage.setItem(`design-image-${designCode}`, url);
-    return;
-  }
-
-  let blobInstance = ExternalBlobClass.fromBytes(data);
-  if (onProgress) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    blobInstance = (blobInstance as any).withUploadProgress(onProgress);
-  }
-
-  // Use the blob-storage upload mechanism
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const uploadable = blobInstance as any;
-  if (typeof uploadable.upload === 'function') {
-    await uploadable.upload(`design-images/${designCode}`);
-  }
-}
-
 export default function DesignImages() {
+  const { actor } = useActor();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
@@ -70,6 +31,7 @@ export default function DesignImages() {
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+
     await processImageFiles(Array.from(files));
     e.target.value = '';
   };
@@ -84,25 +46,25 @@ export default function DesignImages() {
     setCurrentFile('Extracting ZIP...');
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const JSZip: any = await import('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js' as string);
+      const JSZip: any = await import('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js' as any);
+      
       const zip = new JSZip.default();
       const zipContent = await zip.loadAsync(file);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const entries = Object.entries(zipContent.files) as any[];
-      const imageFiles: { name: string; data: Uint8Array<ArrayBuffer> }[] = [];
-
+      
+      const imageFiles: { name: string; data: Uint8Array }[] = [];
+      const entries = Object.entries(zipContent.files) as any;
+      
       for (let i = 0; i < entries.length; i++) {
         const [filename, zipEntry] = entries[i];
         if (!zipEntry.dir && /\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
           const data: ArrayBuffer = await zipEntry.async('arraybuffer');
-          const newBuf = new ArrayBuffer(data.byteLength);
-          new Uint8Array(newBuf).set(new Uint8Array(data));
-          const uint8Data = new Uint8Array(newBuf) as Uint8Array<ArrayBuffer>;
-          const name = (filename as string).split('/').pop() || filename;
+          // Create a new Uint8Array with ArrayBuffer type
+          const uint8Data = new Uint8Array(data);
+          const name = filename.split('/').pop() || filename;
           imageFiles.push({ name, data: uint8Data });
         }
+        
+        // Update extraction progress
         setUploadProgress(Math.floor((i / entries.length) * 20));
       }
 
@@ -123,11 +85,16 @@ export default function DesignImages() {
   };
 
   const processImageFiles = async (files: File[]) => {
+    if (!actor) {
+      toast.error('Backend not initialized');
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
     setUploadResults([]);
 
-    const imageFiles = files.filter(file =>
+    const imageFiles = files.filter(file => 
       /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
     );
 
@@ -139,24 +106,26 @@ export default function DesignImages() {
 
     const results: UploadResult[] = [];
     const totalFiles = imageFiles.length;
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 5; // Process 5 images concurrently
 
     for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
       const batch = imageFiles.slice(i, Math.min(i + BATCH_SIZE, imageFiles.length));
-
+      
       const batchPromises = batch.map(async (file) => {
         const designCode = extractFilenameAsDesignCode(file.name);
         setCurrentFile(file.name);
 
         try {
           const arrayBuffer = await file.arrayBuffer();
-          const newBuf = new ArrayBuffer(arrayBuffer.byteLength);
-          new Uint8Array(newBuf).set(new Uint8Array(arrayBuffer));
-          const uint8Array = new Uint8Array(newBuf) as Uint8Array<ArrayBuffer>;
-
-          await uploadDesignImageBlob(designCode, uint8Array);
-
-          return { designCode, success: true };
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const blob = ExternalBlob.fromBytes(uint8Array);
+          
+          await actor.uploadDesignImage(designCode, blob);
+          
+          return {
+            designCode,
+            success: true,
+          };
         } catch (error) {
           console.error(`Failed to upload ${file.name}:`, error);
           return {
@@ -169,7 +138,7 @@ export default function DesignImages() {
 
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-
+      
       const progress = Math.floor(((i + batch.length) / totalFiles) * 100);
       setUploadProgress(progress);
     }
@@ -188,21 +157,37 @@ export default function DesignImages() {
     }
   };
 
-  const processExtractedImages = async (imageFiles: { name: string; data: Uint8Array<ArrayBuffer> }[]) => {
+  const processExtractedImages = async (imageFiles: { name: string; data: Uint8Array }[]) => {
+    if (!actor) {
+      toast.error('Backend not initialized');
+      setIsUploading(false);
+      return;
+    }
+
     const results: UploadResult[] = [];
     const totalFiles = imageFiles.length;
     const BATCH_SIZE = 5;
 
     for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
       const batch = imageFiles.slice(i, Math.min(i + BATCH_SIZE, imageFiles.length));
-
+      
       const batchPromises = batch.map(async ({ name, data }) => {
         const designCode = extractFilenameAsDesignCode(name);
         setCurrentFile(name);
 
         try {
-          await uploadDesignImageBlob(designCode, data);
-          return { designCode, success: true };
+          // Create a new ArrayBuffer and Uint8Array to ensure correct type
+          const newArrayBuffer = new ArrayBuffer(data.length);
+          const newUint8Array = new Uint8Array(newArrayBuffer);
+          newUint8Array.set(data);
+          
+          const blob = ExternalBlob.fromBytes(newUint8Array);
+          await actor.uploadDesignImage(designCode, blob);
+          
+          return {
+            designCode,
+            success: true,
+          };
         } catch (error) {
           console.error(`Failed to upload ${name}:`, error);
           return {
@@ -215,7 +200,7 @@ export default function DesignImages() {
 
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-
+      
       const progress = 20 + Math.floor(((i + batch.length) / totalFiles) * 80);
       setUploadProgress(progress);
     }
@@ -244,7 +229,6 @@ export default function DesignImages() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Folder Upload */}
         <Card className="border shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-medium flex items-center gap-2">
@@ -260,45 +244,35 @@ export default function DesignImages() {
                   Select a folder containing design images
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Supports JPG, PNG, GIF, WebP
+                  Filename will be used as design code
                 </p>
               </div>
-              <div>
-                <Label htmlFor="folder-upload" className="cursor-pointer">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    disabled={isUploading}
-                    onClick={() => folderInputRef.current?.click()}
-                    type="button"
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Select Folder
-                  </Button>
-                </Label>
-                <input
-                  ref={folderInputRef}
-                  id="folder-upload"
-                  type="file"
-                  // @ts-expect-error webkitdirectory is not in standard types
-                  webkitdirectory=""
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFolderUpload}
-                  disabled={isUploading}
-                />
-              </div>
+              <input
+                ref={folderInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFolderUpload}
+                className="hidden"
+                disabled={isUploading}
+              />
+              <Button
+                onClick={() => folderInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Select Folder
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* ZIP Upload */}
         <Card className="border shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-medium flex items-center gap-2">
               <FileArchive className="h-5 w-5" />
-              Upload from ZIP
+              Upload ZIP File
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -309,42 +283,40 @@ export default function DesignImages() {
                   Upload a ZIP file containing design images
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Images will be extracted automatically
+                  Supports nested folders
                 </p>
               </div>
-              <div>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  disabled={isUploading}
-                  onClick={() => zipInputRef.current?.click()}
-                  type="button"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Select ZIP File
-                </Button>
-                <input
-                  ref={zipInputRef}
-                  type="file"
-                  accept=".zip"
-                  className="hidden"
-                  onChange={handleZipUpload}
-                  disabled={isUploading}
-                />
-              </div>
+              <input
+                ref={zipInputRef}
+                type="file"
+                accept=".zip"
+                onChange={handleZipUpload}
+                className="hidden"
+                disabled={isUploading}
+              />
+              <Button
+                onClick={() => zipInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Select ZIP File
+              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Upload Progress */}
       {isUploading && (
-        <Card className="mt-6">
-          <CardContent className="pt-6">
+        <Card className="mt-6 border shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-medium">Upload Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {currentFile ? `Uploading: ${currentFile}` : 'Processing...'}
+                  {currentFile || 'Processing...'}
                 </span>
                 <span className="font-medium">{uploadProgress}%</span>
               </div>
@@ -354,57 +326,38 @@ export default function DesignImages() {
         </Card>
       )}
 
-      {/* Upload Results */}
-      {uploadResults.length > 0 && !isUploading && (
-        <Card className="mt-6">
+      {uploadResults.length > 0 && (
+        <Card className="mt-6 border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base">Upload Results</CardTitle>
+            <CardTitle className="text-lg font-medium">Upload Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {uploadResults.map((result) => (
-                <div
-                  key={result.designCode}
-                  className={`flex items-center gap-2 p-2 rounded text-sm ${
-                    result.success ? 'bg-green-500/10' : 'bg-destructive/10'
-                  }`}
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {uploadResults.map((result, idx) => (
+                <Alert
+                  key={idx}
+                  variant={result.success ? 'default' : 'destructive'}
+                  className="py-3"
                 >
-                  {result.success ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
-                  )}
-                  <span className="font-mono font-medium">{result.designCode}</span>
-                  {result.error && (
-                    <span className="text-destructive text-xs ml-auto">{result.error}</span>
-                  )}
-                </div>
+                  <div className="flex items-center gap-3">
+                    {result.success ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                    <div className="flex-1">
+                      <AlertDescription className="text-sm">
+                        <strong>{result.designCode}</strong>
+                        {result.error && ` - ${result.error}`}
+                      </AlertDescription>
+                    </div>
+                  </div>
+                </Alert>
               ))}
-            </div>
-            <div className="mt-3 pt-3 border-t flex gap-4 text-sm">
-              <span className="text-green-600 font-medium">
-                ✓ {uploadResults.filter((r) => r.success).length} succeeded
-              </span>
-              {uploadResults.filter((r) => !r.success).length > 0 && (
-                <span className="text-destructive font-medium">
-                  ✗ {uploadResults.filter((r) => !r.success).length} failed
-                </span>
-              )}
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Instructions */}
-      <Alert className="mt-6">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Naming convention:</strong> Image filenames should match the design code exactly
-          (e.g., <code className="font-mono text-xs">CHTMN40046.jpg</code> for design code{' '}
-          <code className="font-mono text-xs">CHTMN40046</code>). The file extension is removed
-          automatically.
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }

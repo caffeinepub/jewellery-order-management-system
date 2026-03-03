@@ -1,77 +1,64 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix karigar PDF export format, karigar name sync, and desktop sidebar overlap",
+  "title": "Restore RB Order Logic",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Restore the karigar PDF export format in KarigarDetail.tsx so that the exported PDF groups orders by design code, displays the design image above each group, and lists all orders belonging to that design code below the image",
+      "summary": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle, distinguishable from CO-type orders, display correctly in TotalOrdersTab grouped view, support SuppliedQtyDialog partial-supply flow, and transition through status stages without regression",
       "acceptanceCriteria": [
-        "Exporting a karigar's orders as PDF produces one section per design code",
-        "Each section shows the design image (fetched from blob storage by design code) above the order rows",
-        "All orders for a design code are listed beneath that design's image in a table or list",
-        "The layout matches the grouped-by-design format of KASI_orders_2026-02-27.pdf"
+        "RB-type orders appear in TotalOrdersTab and can be distinguished from CO-type orders.",
+        "Selecting RB orders and triggering supply opens the SuppliedQtyDialog, allowing partial quantities to be supplied while remaining units remain as Pending.",
+        "Fully supplied RB orders transition to Ready status correctly.",
+        "RB orders flow through Hallmark and ReturnFromHallmark status stages without errors.",
+        "CO-type order flows are unaffected by the RB logic restoration.",
+        "No regression in existing order status transitions or filtering."
       ],
       "file_operations": [
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Restore RB order type visibility and handling in the grouped order view. Ensure RB orders are displayed alongside CO orders with appropriate visual distinction (badge or column indicator). Add or restore the 'Supply RB Orders' action button that opens SuppliedQtyDialog when RB-type orders are selected. Verify that the existing delete and mark-ready actions continue to work for both CO and RB order types. Ensure filtering and grouping logic accommodates both order types without conflict."
+        },
+        {
+          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "operation": "modify",
+          "description": "Ensure the dialog correctly handles RB orders by allowing users to enter supplied quantities for each selected order. Validate that partial supply logic is intact: if supplied quantity is less than total order quantity, remaining units must stay as Pending status orders. On submission, call the backend supplyOrder method for each order with the user-entered quantity. After successful submission, invalidate relevant query caches (orders, pending orders) to reflect the updated state. Confirm that the dialog closes properly after submission and displays appropriate success or error feedback."
+        },
+        {
+          "path": "frontend/src/components/dashboard/OrderTable.tsx",
+          "operation": "modify",
+          "description": "Add an order type column or badge to visually distinguish RB orders from CO orders in the table view. Ensure that bulk actions (mark as ready, delete) work seamlessly for both order types without introducing regressions. Verify that the table correctly displays RB orders retrieved from the backend alongside CO orders, and that selection state is maintained across order types."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
+          "operation": "modify",
+          "description": "Ensure that RB orders that have been fully supplied and transitioned to Ready status appear correctly in the Ready tab alongside CO orders. Verify that the grouped-by-design view and multi-select functionality work for RB orders. Confirm that bulk actions (revert to Pending, export) apply to RB orders without errors. Add visual distinction (order type badge or column) if not already present."
+        },
+        {
+          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
+          "operation": "modify",
+          "description": "Verify that RB orders can transition to Hallmark status and are displayed correctly in the Hallmark tab. Ensure the grouped view, search/filter by karigar and order type, and batch status update to ReturnFromHallmark work for RB orders without regression. Add order type filtering support if not already present, allowing users to filter by RB or CO. Confirm that export to JPEG/PDF includes RB orders appropriately."
+        },
+        {
+          "path": "frontend/src/pages/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Ensure the Dashboard page correctly loads and displays RB orders across all tabs (Total Orders, Ready, Hallmark). Verify that summary cards (order count, weight, quantity, CO count) account for RB orders in their calculations where appropriate. Confirm that the tabbed interface switches between views without losing RB order data or causing layout issues."
+        },
+        {
+          "path": "frontend/src/pages/AgeingStock.tsx",
+          "operation": "modify",
+          "description": "Ensure that RB orders are included in the ageing stock view and are displayed with the correct age-based color coding (green/yellow/red). Verify that bulk selection and the supplied-quantity dialog work for RB orders. Confirm that marking RB orders as ready via the supplied-quantity flow functions correctly on this page."
+        },
         {
           "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Modify the handleExportPDF function to group orders by design code, fetch design images from blob storage using ExternalBlob for each design code, render each design image above its corresponding order rows, and generate a PDF that matches the grouped-by-design layout shown in KASI_orders_2026-02-27.pdf. Use the blob-storage component's ExternalBlob class to fetch images via getDirectURL() or getBytes(). Verify the component's usage instructions before implementing."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Fix the karigar name sync so that when a karigar name is updated on the Master Designs page, the updated name is immediately reflected in the Total Orders tab and the Karigar tab",
-      "acceptanceCriteria": [
-        "After updating a karigar name on the Master Designs page, the Total Orders tab reflects the new karigar name for the affected design code without requiring a page reload",
-        "After updating the karigar name for CHTMN40046 to Prasanna, the Total Orders tab shows Prasanna (not SANTU) for that design code",
-        "Selecting the Prasanna tab in the Karigar section displays all orders mapped to CHTMN40046",
-        "The old karigar name SANTU no longer appears for CHTMN40046 in any tab after the update",
-        "Query cache for orders, karigars, and design mappings is invalidated after a karigar name update on the Master Designs page"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/masterdesigns/EditDesignModal.tsx",
-          "operation": "modify",
-          "description": "After successfully calling actor.reassignDesign or actor.updateDesignMapping, ensure the mutation's onSuccess callback invalidates the query cache for 'orders', 'karigars', 'designMappings', and 'ordersWithMappings' using queryClient.invalidateQueries(). This ensures the Total Orders tab and Karigar tab reflect the updated karigar name immediately."
+          "description": "Ensure that RB orders assigned to a specific karigar are displayed correctly on the KarigarDetail page. Verify that selection, mark as ready, and export actions work for RB orders without regression. Add visual distinction for order type if not already present."
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Review the useReassignDesignMutation and useUpdateDesignMappingMutation hooks to ensure they invalidate all relevant query keys on success: ['orders'], ['karigars'], ['designMappings'], ['ordersWithMappings'], and ['masterDesigns']. If any of these invalidations are missing, add them to the onSuccess callback."
-        },
-        {
-          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "operation": "modify",
-          "description": "Ensure the component subscribes to the 'ordersWithMappings' query (or equivalent) so that when the query cache is invalidated after a karigar name update, the component automatically refetches and displays the updated karigar name for each design code. Confirm that the karigar name displayed in the table comes from the enriched order data that includes the latest design mapping."
-        },
-        {
-          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
-          "operation": "modify",
-          "description": "Ensure the component subscribes to both the 'orders' and 'designMappings' queries so that when the query cache is invalidated after a karigar name update, the component refetches and correctly groups orders under the new karigar name. Verify that the grouping logic uses the latest design mappings to resolve karigar names for each order."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Fix the desktop layout in App.tsx and AppSidebar.tsx so the sidebar and the main dashboard content do not overlap",
-      "acceptanceCriteria": [
-        "On desktop viewport widths, the sidebar and main content area are displayed side by side with no overlap",
-        "The main content area begins where the sidebar ends and uses the remaining width",
-        "No content is hidden behind the sidebar on desktop",
-        "Mobile layout remains unaffected"
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/App.tsx",
-          "operation": "modify",
-          "description": "Adjust the layout container for the main content area to include proper left margin or padding that accounts for the sidebar width on desktop viewports. Use Tailwind responsive utilities (e.g., md:ml-[sidebar-width]) to ensure the main content is offset correctly when the sidebar is visible on desktop, while keeping the mobile layout unchanged."
-        },
-        {
-          "path": "frontend/src/components/layout/AppSidebar.tsx",
-          "operation": "modify",
-          "description": "Ensure the sidebar has a fixed or sticky position on desktop (e.g., fixed left-0 top-0 h-screen) with a consistent width, and that it does not overlay the main content. Use Tailwind responsive utilities to apply these styles only on desktop breakpoints (md: and above), preserving the existing mobile drawer behavior."
+          "description": "Review and ensure that all query hooks (e.g., useGetOrders, useGetOrdersWithMappings) correctly fetch and return RB orders alongside CO orders. Verify that mutations (e.g., useSupplyOrder, useBatchUpdateOrderStatus) handle RB orders correctly and invalidate the appropriate query caches after operations. Confirm that the supplyOrder mutation logic supports partial supply for RB orders, maintaining Pending status for unsupplied units."
         }
       ]
     }

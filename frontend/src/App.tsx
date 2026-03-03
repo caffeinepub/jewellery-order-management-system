@@ -1,9 +1,13 @@
-import { RouterProvider, createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+  Outlet,
+} from "@tanstack/react-router";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { Toaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "next-themes";
-import AppSidebar from "@/components/layout/AppSidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import Dashboard from "@/pages/Dashboard";
 import IngestOrders from "@/pages/IngestOrders";
 import UnmappedCodes from "@/pages/UnmappedCodes";
@@ -11,32 +15,32 @@ import MasterDesigns from "@/pages/MasterDesigns";
 import DesignImages from "@/pages/DesignImages";
 import TagPrinting from "@/pages/TagPrinting";
 import BarcodeScanning from "@/pages/BarcodeScanning";
-import KarigarDetail from "@/pages/KarigarDetail";
 import Reconciliation from "@/pages/Reconciliation";
 import AgeingStock from "@/pages/AgeingStock";
+import KarigarDetail from "@/pages/KarigarDetail";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 30,
-      retry: 2,
+      retry: 1,
+      staleTime: 30000,
     },
   },
 });
 
-// Layout component with sidebar
-function Layout() {
+function RootLayout() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset className="flex-1 min-w-0 overflow-auto">
-          {/* Mobile header with sidebar trigger */}
-          <header className="flex md:hidden items-center gap-2 p-3 border-b border-border bg-background sticky top-0 z-10">
-            <SidebarTrigger />
-            <span className="font-semibold text-sm text-foreground">KASI Jewellers</span>
+        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {/* Mobile-only header with sidebar trigger */}
+          <header className="flex h-12 shrink-0 items-center gap-2 px-3 md:hidden border-b border-border">
+            <SidebarTrigger className="-ml-1" />
           </header>
-          <main className="p-0">
+          <main className="flex-1 min-w-0 overflow-auto">
             <Outlet />
           </main>
         </SidebarInset>
@@ -45,9 +49,8 @@ function Layout() {
   );
 }
 
-// Root route
 const rootRoute = createRootRoute({
-  component: Layout,
+  component: RootLayout,
 });
 
 const indexRoute = createRoute({
@@ -56,15 +59,21 @@ const indexRoute = createRoute({
   component: Dashboard,
 });
 
-const ingestRoute = createRoute({
+const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/ingest",
+  path: "/dashboard",
+  component: Dashboard,
+});
+
+const ingestOrdersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ingest-orders",
   component: IngestOrders,
 });
 
-const unmappedRoute = createRoute({
+const unmappedCodesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/unmapped",
+  path: "/unmapped-codes",
   component: UnmappedCodes,
 });
 
@@ -92,12 +101,6 @@ const barcodeScanningRoute = createRoute({
   component: BarcodeScanning,
 });
 
-const karigarDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/karigar/$name",
-  component: KarigarDetail,
-});
-
 const reconciliationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reconciliation",
@@ -110,17 +113,24 @@ const ageingStockRoute = createRoute({
   component: AgeingStock,
 });
 
+const karigarDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/karigar/$name",
+  component: KarigarDetail,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  ingestRoute,
-  unmappedRoute,
+  dashboardRoute,
+  ingestOrdersRoute,
+  unmappedCodesRoute,
   masterDesignsRoute,
   designImagesRoute,
   tagPrintingRoute,
   barcodeScanningRoute,
-  karigarDetailRoute,
   reconciliationRoute,
   ageingStockRoute,
+  karigarDetailRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -131,7 +141,7 @@ declare module "@tanstack/react-router" {
   }
 }
 
-export default function App() {
+function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
@@ -141,3 +151,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+export default App;
