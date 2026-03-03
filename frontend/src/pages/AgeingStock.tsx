@@ -85,7 +85,7 @@ export default function AgeingStock() {
   const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
 
   const groups = useMemo<DesignGroup[]>(() => {
-    const pending = allOrders.filter(o => o.status === OrderStatus.Pending);
+    const pending = allOrders.filter(o => o.status === OrderStatus.Pending && Number(o.quantity) > 0);
 
     const enriched: EnrichedOrder[] = pending.map(o => {
       const ageMs = safeOrderDateMs(o);
@@ -455,13 +455,11 @@ export default function AgeingStock() {
         })}
       </div>
 
-      {/* SuppliedQtyDialog for RB orders */}
+      {/* Supply dialog for RB orders — uses `orders` prop (not `rbOrders`) */}
       <SuppliedQtyDialog
         open={supplyDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) handleDialogClose();
-        }}
-        rbOrders={rbOrdersForDialog}
+        onOpenChange={handleDialogClose}
+        orders={rbOrdersForDialog}
       />
     </div>
   );

@@ -1,16 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useActor } from "./useActor";
-import {
-  Order,
-  OrderStatus,
-  OrderType,
-  DesignMapping,
-  MasterDataRow,
-  ExternalBlob,
-  MappingRecord,
-} from "../backend";
+import { Order, OrderStatus, OrderType, DesignMapping, MappingRecord } from "../backend";
+import { resolveKarigar, buildDesignMappingsMap } from "../utils/karigarResolver";
 
-// ─── Orders ──────────────────────────────────────────────────────────────────
+// ─── Query Hooks ────────────────────────────────────────────────────────────
 
 export function useGetAllOrders() {
   const { actor, isFetching } = useActor();
@@ -34,7 +27,11 @@ export function useGetOrders(
     queryKey: ["orders", statusFilter, typeFilter, searchText],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getOrders(statusFilter ?? null, typeFilter ?? null, searchText ?? null);
+      return actor.getOrders(
+        statusFilter ?? null,
+        typeFilter ?? null,
+        searchText ?? null
+      );
     },
     enabled: !!actor && !isFetching,
   });
@@ -52,6 +49,57 @@ export function useGetReadyOrders() {
   });
 }
 
+export function useGetKarigars() {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["karigars"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getKarigars();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetUniqueKarigarsFromDesignMappings() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string[]>({
+    queryKey: ["uniqueKarigars"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getUniqueKarigarsFromDesignMappings();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetMasterDesigns() {
+  const { actor, isFetching } = useActor();
+  return useQuery<[string, string, string][]>({
+    queryKey: ["masterDesigns"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMasterDesigns();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetAllDesignMappings() {
+  const { actor, isFetching } = useActor();
+  return useQuery<[string, DesignMapping][]>({
+    queryKey: ["designMappings"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getAllMasterDesignMappings();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+// Alias used by MasterDesigns.tsx
+export const useGetAllMasterDesignMappings = useGetAllDesignMappings;
+
 export function useGetOrdersWithMappings() {
   const { actor, isFetching } = useActor();
   return useQuery<Order[]>({
@@ -64,6 +112,7 @@ export function useGetOrdersWithMappings() {
   });
 }
 
+// Used by UnmappedSection
 export function useGetUnmappedOrders() {
   const { actor, isFetching } = useActor();
   return useQuery<Order[]>({
@@ -71,36 +120,133 @@ export function useGetUnmappedOrders() {
     queryFn: async () => {
       if (!actor) return [];
       const orders = await actor.getOrdersWithMappings();
-      return orders.filter((order) => !order.genericName || !order.karigarName);
+      return orders.filter((o) => !o.genericName || !o.karigarName);
     },
     enabled: !!actor && !isFetching,
   });
 }
 
-export function useGetOrdersByKarigar(karigarName: string) {
+export function useGetDesignImage(designCode: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["designImage", designCode],
+    queryFn: async () => {
+      if (!actor || !designCode) return null;
+      const blob = await actor.getDesignImage(designCode);
+      if (!blob) return null;
+      const mapping = await actor.getAllMasterDesignMappings();
+      const entry = mapping.find(([code]) => code === designCode);
+      const genericName = entry?.[1]?.genericName ?? "";
+      const karigarName = entry?.[1]?.karigarName ?? "";
+      return { blob, genericName, karigarName };
+    },
+    enabled: !!actor && !isFetching && !!designCode,
+  });
+}
+
+export function useGetDesignImageMapping() {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["designImageMapping"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getDesignImageMapping();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetUnreturnedOrders() {
   const { actor, isFetching } = useActor();
   return useQuery<Order[]>({
-    queryKey: ["orders", "karigar", karigarName],
+    queryKey: ["unreturnedOrders"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getUnreturnedOrders();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetReadyOrdersByDateRange() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      startDate,
+      endDate,
+    }: {
+      startDate: bigint;
+      endDate: bigint;
+    }) => {
+      if (!actor) return [];
+      return actor.getReadyOrdersByDateRange(startDate, endDate);
+    },
+  });
+}
+
+export function useGetMasterDesignExcel() {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["masterDesignExcel"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getMasterDesignExcel();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+/**
+ * Returns a Map<normalizedDesignCode, DesignMapping> built from the latest
+ * master design mappings. Used by karigar resolver hooks.
+ */
+export function useDesignMappingsMap() {
+  const { data: rawMappings = [] } = useGetAllDesignMappings();
+  return buildDesignMappingsMap(rawMappings);
+}
+
+/**
+ * Returns a resolver function: (designCode: string) => string
+ * that dynamically resolves karigar from master design mappings.
+ * Always uses the latest master design data — never the stored order field.
+ */
+export function useKarigarResolver() {
+  const mappingsMap = useDesignMappingsMap();
+  return (designCode: string): string => resolveKarigar(designCode, mappingsMap);
+}
+
+export function useGetOrdersByKarigar(karigarName: string) {
+  const { actor, isFetching } = useActor();
+  const { data: rawMappings = [] } = useGetAllDesignMappings();
+
+  return useQuery<Order[]>({
+    queryKey: ["orders", "karigar", karigarName, rawMappings.length],
     queryFn: async () => {
       if (!actor) return [];
       const allOrders = await actor.getAllOrders();
+      const mappingsMap = buildDesignMappingsMap(rawMappings);
       return allOrders.filter(
-        (o) => o.karigarName === karigarName && o.status === OrderStatus.Pending
+        (o) =>
+          resolveKarigar(o.design, mappingsMap) === karigarName &&
+          o.status === OrderStatus.Pending
       );
     },
     enabled: !!actor && !isFetching && !!karigarName,
   });
 }
 
-export function useGetReadyOrdersByDateRange() {
-  const { actor } = useActor();
-  return useMutation<Order[], Error, { startDate: bigint; endDate: bigint }>({
-    mutationFn: async ({ startDate, endDate }) => {
-      if (!actor) return [];
-      return actor.getReadyOrdersByDateRange(startDate, endDate);
-    },
-  });
+// ─── Cache invalidation helper ───────────────────────────────────────────────
+
+function invalidateOrderCaches(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ["allOrders"] });
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
+  queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+  queryClient.invalidateQueries({ queryKey: ["unreturnedOrders"] });
+  queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
 }
+
+// ─── Mutation Hooks ──────────────────────────────────────────────────────────
 
 export function useSaveOrder() {
   const { actor } = useActor();
@@ -132,12 +278,7 @@ export function useSaveOrder() {
         params.orderDate
       );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
@@ -149,13 +290,7 @@ export function useDeleteOrder() {
       if (!actor) throw new Error("Actor not initialized");
       return actor.deleteOrder(orderId);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
@@ -167,11 +302,7 @@ export function useMarkOrdersAsReady() {
       if (!actor) throw new Error("Actor not initialized");
       return actor.markOrdersAsReady(orderIds);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
@@ -183,11 +314,7 @@ export function useMarkOrdersAsPending() {
       if (!actor) throw new Error("Actor not initialized");
       return actor.markOrdersAsPending(orderIds);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
@@ -195,48 +322,17 @@ export function useBatchUpdateOrderStatus() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { orderIds: string[]; newStatus: OrderStatus }) => {
+    mutationFn: async ({
+      orderIds,
+      newStatus,
+    }: {
+      orderIds: string[];
+      newStatus: OrderStatus;
+    }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.batchUpdateOrderStatus(params.orderIds, params.newStatus);
+      return actor.batchUpdateOrderStatus(orderIds, newStatus);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    },
-  });
-}
-
-export function useBatchDeleteOrders() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (orderIds: string[]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.batchDeleteOrders(orderIds);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    },
-  });
-}
-
-export function useBatchSupplyRBOrders() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (entries: { orderId: string; suppliedQty: number }[]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      for (const entry of entries) {
-        await actor.supplyOrder(entry.orderId, BigInt(entry.suppliedQty));
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
@@ -249,39 +345,9 @@ export function useResetActiveOrders() {
       return actor.resetActiveOrders();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
+      invalidateOrderCaches(queryClient);
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
     },
-  });
-}
-
-// ─── Design Mappings ──────────────────────────────────────────────────────────
-
-export function useGetAllDesignMappings() {
-  const { actor, isFetching } = useActor();
-  return useQuery<[string, DesignMapping][]>({
-    queryKey: ["designMappings"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllMasterDesignMappings();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-// Alias for backward compatibility
-export const useGetAllMasterDesignMappings = useGetAllDesignMappings;
-
-export function useGetDesignMapping(designCode: string) {
-  const { actor, isFetching } = useActor();
-  return useQuery<DesignMapping>({
-    queryKey: ["designMapping", designCode],
-    queryFn: async () => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.getDesignMapping(designCode);
-    },
-    enabled: !!actor && !isFetching && !!designCode,
   });
 }
 
@@ -295,15 +361,18 @@ export function useSaveDesignMapping() {
       karigarName: string;
     }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.saveDesignMapping(params.designCode, params.genericName, params.karigarName);
+      return actor.saveDesignMapping(
+        params.designCode,
+        params.genericName,
+        params.karigarName
+      );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      invalidateOrderCaches(queryClient);
     },
   });
 }
@@ -325,16 +394,37 @@ export function useUpdateDesignMapping() {
       );
     },
     onSuccess: () => {
-      // Invalidate all caches that depend on design mappings so
-      // TotalOrdersTab and KarigarsTab both refresh immediately
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
       queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      invalidateOrderCaches(queryClient);
+    },
+  });
+}
+
+export function useReassignDesign() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      designCode: string;
+      newKarigar: string;
+      movedBy?: string;
+    }) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.reassignDesign(
+        params.designCode,
+        params.newKarigar,
+        params.movedBy ?? "user"
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      invalidateOrderCaches(queryClient);
     },
   });
 }
@@ -348,11 +438,29 @@ export function useBatchSaveDesignMappings() {
       return actor.batchSaveDesignMappings(mappings);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      invalidateOrderCaches(queryClient);
+    },
+  });
+}
+
+export function useAssignOrdersToKarigar() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (mappings: MappingRecord[]) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.assignOrdersToKarigar(mappings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      invalidateOrderCaches(queryClient);
     },
   });
 }
@@ -366,54 +474,60 @@ export function useUploadDesignMapping() {
       return actor.uploadDesignMapping(mappingData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
       queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
+      queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      invalidateOrderCaches(queryClient);
     },
   });
 }
 
-export function useClearAllDesignMappings() {
+export function useUploadDesignImage() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (params: {
+      designCode: string;
+      blob: import("../backend").ExternalBlob;
+    }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.clearAllDesignMappings();
+      return actor.uploadDesignImage(params.designCode, params.blob);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
+      queryClient.invalidateQueries({ queryKey: ["designImageMapping"] });
     },
   });
 }
 
-// ─── Karigars ─────────────────────────────────────────────────────────────────
-
-export function useGetKarigars() {
-  const { actor, isFetching } = useActor();
-  return useQuery({
-    queryKey: ["karigars"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getKarigars();
+export function useBatchUploadDesignImages() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      images: [string, import("../backend").ExternalBlob][]
+    ) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.batchUploadDesignImages(images);
     },
-    enabled: !!actor && !isFetching,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["designImageMapping"] });
+    },
   });
 }
 
-export function useGetUniqueKarigarsFromDesignMappings() {
-  const { actor, isFetching } = useActor();
-  return useQuery<string[]>({
-    queryKey: ["uniqueKarigars"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getUniqueKarigarsFromDesignMappings();
+export function useRegisterKarigar() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string) => {
+      if (!actor) throw new Error("Actor not initialized");
+      return actor.registerKarigar(name);
     },
-    enabled: !!actor && !isFetching,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["karigars"] });
+      queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
+    },
   });
 }
 
@@ -432,45 +546,17 @@ export function useAddKarigar() {
   });
 }
 
-export function useAssignOrdersToKarigar() {
+export function useUpdateMasterDesignKarigars() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (mappings: MappingRecord[]) => {
+    mutationFn: async (karigars: string[]) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.assignOrdersToKarigar(mappings);
+      return actor.updateMasterDesignKarigars(karigars);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["karigars"] });
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-    },
-  });
-}
-
-export function useReassignDesign() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (params: { designCode: string; newKarigar: string; movedBy?: string }) => {
-      if (!actor) throw new Error("Actor not initialized");
-      // Backend requires movedBy as third argument
-      return actor.reassignDesign(params.designCode, params.newKarigar, params.movedBy ?? "user");
-    },
-    onSuccess: () => {
-      // Invalidate all relevant caches so KarigarsTab and TotalOrdersTab
-      // both reflect the reassignment immediately without page reload
-      queryClient.invalidateQueries({ queryKey: ["designMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["masterDesigns"] });
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-      queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["masterDesignKarigars"] });
       queryClient.invalidateQueries({ queryKey: ["uniqueKarigars"] });
-      queryClient.invalidateQueries({ queryKey: ["karigars"] });
     },
   });
 }
@@ -487,107 +573,11 @@ export function useGetMasterDesignKarigars() {
   });
 }
 
-export function useUpdateMasterDesignKarigars() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (karigars: string[]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.updateMasterDesignKarigars(karigars);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["masterDesignKarigars"] });
-    },
-  });
-}
-
-// ─── Master Designs ───────────────────────────────────────────────────────────
-
-export function useGetMasterDesigns() {
-  const { actor, isFetching } = useActor();
-  return useQuery<[string, string, string][]>({
-    queryKey: ["masterDesigns"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getMasterDesigns();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-// ─── Design Images ────────────────────────────────────────────────────────────
-
-export function useGetDesignImage(designCode: string) {
-  const { actor, isFetching } = useActor();
-  return useQuery<{ blob: ExternalBlob; genericName: string; karigarName: string } | null>({
-    queryKey: ["designImage", designCode],
-    queryFn: async () => {
-      if (!actor || !designCode) return null;
-      const blob = await actor.getDesignImage(designCode);
-      if (!blob) return null;
-      let genericName = "";
-      let karigarName = "";
-      try {
-        const mapping = await actor.getDesignMapping(designCode);
-        genericName = mapping.genericName;
-        karigarName = mapping.karigarName;
-      } catch {
-        // no mapping
-      }
-      return { blob, genericName, karigarName };
-    },
-    enabled: !!actor && !isFetching && !!designCode,
-  });
-}
-
-export function useUploadDesignImage() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (params: { designCode: string; blob: ExternalBlob }) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.uploadDesignImage(params.designCode, params.blob);
-    },
-    onSuccess: (_, params) => {
-      queryClient.invalidateQueries({ queryKey: ["designImage", params.designCode] });
-      queryClient.invalidateQueries({ queryKey: ["designImages"] });
-    },
-  });
-}
-
-export function useBatchUploadDesignImages() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (images: [string, ExternalBlob][]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.batchUploadDesignImages(images);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["designImages"] });
-    },
-  });
-}
-
-export function useGetDesignImageMapping() {
-  const { actor, isFetching } = useActor();
-  return useQuery<[string, ExternalBlob][]>({
-    queryKey: ["designImages"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getDesignImageMapping();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-// ─── Master Design Excel ──────────────────────────────────────────────────────
-
 export function useUploadMasterDesignExcel() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (blob: ExternalBlob) => {
+    mutationFn: async (blob: import("../backend").ExternalBlob) => {
       if (!actor) throw new Error("Actor not initialized");
       return actor.uploadMasterDesignExcel(blob);
     },
@@ -597,24 +587,12 @@ export function useUploadMasterDesignExcel() {
   });
 }
 
-export function useGetMasterDesignExcel() {
-  const { actor, isFetching } = useActor();
-  return useQuery<ExternalBlob | null>({
-    queryKey: ["masterDesignExcel"],
-    queryFn: async () => {
-      if (!actor) return null;
-      return actor.getMasterDesignExcel();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-// ─── Reconciliation ───────────────────────────────────────────────────────────
-
 export function useReconcileMasterFile() {
   const { actor } = useActor();
   return useMutation({
-    mutationFn: async (masterDataRows: MasterDataRow[]) => {
+    mutationFn: async (
+      masterDataRows: import("../backend").MasterDataRow[]
+    ) => {
       if (!actor) throw new Error("Actor not initialized");
       return actor.reconcileMasterFile(masterDataRows);
     },
@@ -625,19 +603,15 @@ export function usePersistMasterDataRows() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (masterRows: MasterDataRow[]) => {
+    mutationFn: async (
+      masterRows: import("../backend").MasterDataRow[]
+    ) => {
       if (!actor) throw new Error("Actor not initialized");
       return actor.persistMasterDataRows(masterRows);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
-
-// ─── Tag Printing ─────────────────────────────────────────────────────────────
 
 export function useUpdateDesignGroupStatus() {
   const { actor } = useActor();
@@ -647,65 +621,40 @@ export function useUpdateDesignGroupStatus() {
       if (!actor) throw new Error("Actor not initialized");
       return actor.updateDesignGroupStatus(designCodes);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
-// ─── Misc ─────────────────────────────────────────────────────────────────────
-
-export function useIsExistingDesignCodes() {
-  const { actor } = useActor();
-  return useMutation({
-    mutationFn: async (designCodes: string[]) => {
-      if (!actor) throw new Error("Actor not initialized");
-      return actor.isExistingDesignCodes(designCodes);
-    },
-  });
-}
-
-export function useGetFilteredOutKarigars() {
-  const { actor, isFetching } = useActor();
-  return useQuery<string[]>({
-    queryKey: ["filteredOutKarigars"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getFilteredOutKarigars();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useSaveModifiedOrder() {
+export function useBatchSupplyRBOrders() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { count: bigint; startQty: bigint; order: Order }) => {
+    mutationFn: async (
+      supplies: { orderId: string; suppliedQty: number }[]
+    ) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.saveModifiedOrder(params.count, params.startQty, params.order);
+      for (const { orderId, suppliedQty } of supplies) {
+        await actor.supplyOrder(orderId, BigInt(suppliedQty));
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }
 
-export function useMarkAllAsReady() {
+export function useReturnReadyOrderToPending() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({
+      orderId,
+      returnedQty,
+    }: {
+      orderId: string;
+      returnedQty: number;
+    }) => {
       if (!actor) throw new Error("Actor not initialized");
-      return actor.markAllAsReady();
+      await actor.markOrdersAsPending([orderId]);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["readyOrders"] });
-    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
   });
 }

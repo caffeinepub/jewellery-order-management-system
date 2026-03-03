@@ -6,13 +6,12 @@ import Array "mo:core/Array";
 import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
 import Text "mo:core/Text";
-import Migration "migration";
 import Float "mo:core/Float";
-
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 
-(with migration = Migration.run)
+
+
 actor {
   type OrderType = {
     #CO;
@@ -73,6 +72,7 @@ actor {
     createdBy : Text;
     createdAt : Time.Time;
   };
+
   type MappingRecord = {
     designCode : Text;
     genericName : Text;
@@ -142,6 +142,9 @@ actor {
     orders.get(orderId);
   };
 
+  /////////////////////////////////////////////////////
+  ///// Key updated logic for partial supply in RB /////
+  /////////////////////////////////////////////////////
   public shared ({ caller }) func supplyOrder(orderId : Text, suppliedQuantity : Nat) : async () {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
@@ -149,6 +152,7 @@ actor {
         if (suppliedQuantity > originalOrder.quantity) {
           Runtime.trap("Supplied quantity cannot be greater than original order quantity");
         };
+
         if (suppliedQuantity > 0) {
           let readyOrder : Order = {
             originalOrder with
@@ -160,6 +164,7 @@ actor {
           };
           orders.add(orderId, readyOrder);
         };
+
         switch (Nat.compare(originalOrder.quantity, suppliedQuantity)) {
           case (#less) {};
           case (#equal) {};
@@ -235,6 +240,7 @@ actor {
     if (not karigars.containsKey(karigarName)) {
       Runtime.trap("Karigar does not exist");
     };
+
     let timestamp = Time.now();
     let mapping : DesignMapping = {
       designCode;
@@ -283,6 +289,7 @@ actor {
         designMappings.add(mapping.designCode, newMapping);
       };
     };
+
     activeKarigar := null;
   };
 
@@ -293,6 +300,7 @@ actor {
         if (not karigars.containsKey(newKarigar)) {
           Runtime.trap("Karigar does not exist");
         };
+
         let updatedMapping : DesignMapping = {
           mapping with
           karigarName = newKarigar;
@@ -476,9 +484,7 @@ actor {
   public shared ({ caller }) func resetActiveOrders() : async () {
     let remainingOrders = orders.filter(
       func(_orderId, order) {
-        order.status != #Pending and
-        order.status != #Ready and
-        order.status != #ReturnFromHallmark
+        order.status != #Pending and order.status != #Ready and order.status != #ReturnFromHallmark
       }
     );
     orders.clear();
@@ -519,8 +525,7 @@ actor {
   public query ({ caller }) func getReadyOrdersByDateRange(startDate : Time.Time, endDate : Time.Time) : async [Order] {
     orders.values().toArray().filter(
       func(order) {
-        order.status == #Ready and
-        (switch (order.readyDate) {
+        order.status == #Ready and (switch (order.readyDate) {
           case (null) { false };
           case (?date) { date >= startDate and date <= endDate };
         });
@@ -610,7 +615,6 @@ actor {
   };
 
   public shared ({ caller }) func returnOrdersToPending(_orderNo : Text, _returnedQty : Nat) : async () {};
-
   public shared ({ caller }) func batchReturnOrdersToPending(_orderRequests : [(Text, Nat)]) : async () {};
 
   type MasterDataRow = {

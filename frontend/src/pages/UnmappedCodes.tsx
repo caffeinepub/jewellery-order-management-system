@@ -100,9 +100,11 @@ export default function UnmappedCodes() {
 
       if (group?.genericName && group?.karigarName) {
         // Both fields already exist — reassign karigar
+        // movedBy is optional in useReassignDesign (defaults to "user")
         await reassignDesignMutation.mutateAsync({
           designCode,
           newKarigar: editKarigarName.trim(),
+          movedBy: "user",
         });
       } else {
         // Use updateDesignMapping to set both fields
@@ -118,7 +120,8 @@ export default function UnmappedCodes() {
       setEditGenericName("");
       setEditKarigarName("");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to update design mapping";
+      const message =
+        error instanceof Error ? error.message : "Failed to update design mapping";
       toast.error(message);
     }
   };
@@ -126,7 +129,7 @@ export default function UnmappedCodes() {
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center py-12">Loading unmapped orders...</div>
+        <p className="text-muted-foreground">Loading unmapped orders...</p>
       </div>
     );
   }
@@ -136,7 +139,7 @@ export default function UnmappedCodes() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Unmapped Design Codes</h1>
         <p className="text-muted-foreground mt-2">
-          Design codes with missing generic names or karigar assignments
+          Orders with missing Generic Name or Karigar assignments
         </p>
       </div>
 
@@ -144,17 +147,16 @@ export default function UnmappedCodes() {
         <Card>
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">
-              All design codes are properly mapped!
+              All design codes are mapped. No action required.
             </p>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Unmapped Designs</CardTitle>
+            <CardTitle>Unmapped Designs ({unmappedGroups.length})</CardTitle>
             <CardDescription>
-              {unmappedGroups.length} design code{unmappedGroups.length !== 1 ? "s" : ""} need
-              attention
+              Click Edit to assign Generic Name and Karigar for each design code
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -165,9 +167,9 @@ export default function UnmappedCodes() {
                     <TableHead>Design Code</TableHead>
                     <TableHead>Generic Name</TableHead>
                     <TableHead>Karigar</TableHead>
-                    <TableHead>Missing Fields</TableHead>
+                    <TableHead>Missing</TableHead>
                     <TableHead className="text-right">Orders</TableHead>
-                    <TableHead className="w-24">Actions</TableHead>
+                    <TableHead className="w-28">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -181,12 +183,12 @@ export default function UnmappedCodes() {
                           <Input
                             value={editGenericName}
                             onChange={(e) => setEditGenericName(e.target.value)}
-                            placeholder="Generic Name"
-                            className="h-8 text-sm"
+                            className="h-8 text-sm w-40"
+                            placeholder="Generic name"
                           />
                         ) : (
-                          <span className={!group.genericName ? "text-destructive italic" : ""}>
-                            {group.genericName || "Missing"}
+                          <span className={group.genericName ? "" : "text-muted-foreground italic"}>
+                            {group.genericName || "—"}
                           </span>
                         )}
                       </TableCell>
@@ -196,11 +198,11 @@ export default function UnmappedCodes() {
                             value={editKarigarName}
                             onValueChange={setEditKarigarName}
                           >
-                            <SelectTrigger className="h-8 text-sm">
+                            <SelectTrigger className="h-8 text-sm w-40">
                               <SelectValue placeholder="Select karigar" />
                             </SelectTrigger>
                             <SelectContent>
-                              {karigars.map((k) => (
+                              {karigars.filter(Boolean).map((k) => (
                                 <SelectItem key={k} value={k}>
                                   {k}
                                 </SelectItem>
@@ -208,8 +210,8 @@ export default function UnmappedCodes() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <span className={!group.karigarName ? "text-destructive italic" : ""}>
-                            {group.karigarName || "Missing"}
+                          <span className={group.karigarName ? "" : "text-muted-foreground italic"}>
+                            {group.karigarName || "—"}
                           </span>
                         )}
                       </TableCell>
@@ -223,31 +225,30 @@ export default function UnmappedCodes() {
                         {editingRow === group.designCode ? (
                           <div className="flex gap-1">
                             <Button
-                              size="icon"
+                              size="sm"
                               variant="ghost"
-                              className="h-7 w-7 text-green-600"
                               onClick={() => handleSave(group.designCode)}
                               disabled={
                                 updateDesignMappingMutation.isPending ||
                                 reassignDesignMutation.isPending
                               }
+                              className="h-7 w-7 p-0"
                             >
-                              <Check className="h-4 w-4" />
+                              <Check className="h-4 w-4 text-green-500" />
                             </Button>
                             <Button
-                              size="icon"
+                              size="sm"
                               variant="ghost"
-                              className="h-7 w-7 text-destructive"
                               onClick={handleCancel}
+                              className="h-7 w-7 p-0"
                             >
-                              <X className="h-4 w-4" />
+                              <X className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
                         ) : (
                           <Button
-                            size="icon"
+                            size="sm"
                             variant="ghost"
-                            className="h-7 w-7"
                             onClick={() =>
                               handleEdit(
                                 group.designCode,
@@ -255,8 +256,10 @@ export default function UnmappedCodes() {
                                 group.karigarName
                               )
                             }
+                            className="h-7 px-2"
                           >
-                            <Edit2 className="h-4 w-4" />
+                            <Edit2 className="h-3.5 w-3.5 mr-1" />
+                            Edit
                           </Button>
                         )}
                       </TableCell>

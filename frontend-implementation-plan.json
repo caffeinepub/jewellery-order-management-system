@@ -1,64 +1,97 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Restore RB Order Logic",
+  "title": "Fix Karigar Mapping: Dynamic Resolution via design_code → master_design",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle, distinguishable from CO-type orders, display correctly in TotalOrdersTab grouped view, support SuppliedQtyDialog partial-supply flow, and transition through status stages without regression",
+      "summary": "Establish a single source of truth for karigar resolution: at render time, always derive karigar_name by looking up order.design_code in the master_design mappings, never from any stored karigar field on the order record itself.",
       "acceptanceCriteria": [
-        "RB-type orders appear in TotalOrdersTab and can be distinguished from CO-type orders.",
-        "Selecting RB orders and triggering supply opens the SuppliedQtyDialog, allowing partial quantities to be supplied while remaining units remain as Pending.",
-        "Fully supplied RB orders transition to Ready status correctly.",
-        "RB orders flow through Hallmark and ReturnFromHallmark status stages without errors.",
-        "CO-type order flows are unaffected by the RB logic restoration.",
-        "No regression in existing order status transitions or filtering."
+        "No component reads karigar_name directly from the order record for display, filtering, or grouping purposes.",
+        "Karigar is always resolved by looking up the order's design_code in the master design map at render time.",
+        "Updating karigar in Master Design causes all affected views to reflect the new karigar without requiring an order record mutation or page reload."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add a new hook useKarigarResolver that returns a function (order: Order) => string which looks up order.design in the master design mappings and returns the resolved karigar_name or 'Unassigned' if no mapping exists. This hook depends on useDesignMappings query and always returns the latest master design data."
+        },
+        {
+          "path": "frontend/src/utils/karigarResolver.ts",
+          "operation": "create",
+          "description": "Create a utility function resolveKarigar(designCode: string, mappings: Map<string, DesignMapping>) => string that performs the lookup logic. Returns the karigar name from the mapping or 'Unassigned' if the design code is not found. This utility is used by the useKarigarResolver hook and can be imported directly where needed."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Fix the Total Orders tab (TotalOrdersTab.tsx) so that karigar display and karigar-based filtering both use the dynamically resolved karigar (from master_design lookup), not any cached or stored karigar value on the order.",
+      "acceptanceCriteria": [
+        "After updating karigar in Master Design, Total Orders tab shows affected orders under the new karigar without any manual refresh of order records.",
+        "Karigar filter in Total Orders tab resolves against the dynamic karigar lookup, not stored order data.",
+        "No order appears under both old and new karigar simultaneously.",
+        "No order disappears from the tab after a karigar update."
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
           "operation": "modify",
-          "description": "Restore RB order type visibility and handling in the grouped order view. Ensure RB orders are displayed alongside CO orders with appropriate visual distinction (badge or column indicator). Add or restore the 'Supply RB Orders' action button that opens SuppliedQtyDialog when RB-type orders are selected. Verify that the existing delete and mark-ready actions continue to work for both CO and RB order types. Ensure filtering and grouping logic accommodates both order types without conflict."
-        },
+          "description": "Replace all usage of order.karigarName with the useKarigarResolver hook. Update the karigar filter logic to resolve karigar names dynamically at filter time using resolveKarigar. Ensure grouping, display, and filtering all use the resolved karigar from master_design mappings. Remove any references to stored order.karigarName field in display, filtering, or grouping logic."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Fix the Karigar tab (KarigarsTab.tsx and KarigarDetail.tsx) so that orders are grouped by dynamically resolved karigar from Master Design. When karigar changes in Master Design, orders must automatically move to the new karigar group.",
+      "acceptanceCriteria": [
+        "Karigar tab groups orders by dynamically resolved karigar_name from master_design, not from any stored order field.",
+        "After a karigar change in Master Design, the affected order appears under the new karigar group in the Karigar tab.",
+        "The affected order no longer appears under the old karigar group.",
+        "No order is lost or duplicated in the Karigar tab after a karigar update."
+      ],
+      "file_operations": [
         {
-          "path": "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
           "operation": "modify",
-          "description": "Ensure the dialog correctly handles RB orders by allowing users to enter supplied quantities for each selected order. Validate that partial supply logic is intact: if supplied quantity is less than total order quantity, remaining units must stay as Pending status orders. On submission, call the backend supplyOrder method for each order with the user-entered quantity. After successful submission, invalidate relevant query caches (orders, pending orders) to reflect the updated state. Confirm that the dialog closes properly after submission and displays appropriate success or error feedback."
-        },
-        {
-          "path": "frontend/src/components/dashboard/OrderTable.tsx",
-          "operation": "modify",
-          "description": "Add an order type column or badge to visually distinguish RB orders from CO orders in the table view. Ensure that bulk actions (mark as ready, delete) work seamlessly for both order types without introducing regressions. Verify that the table correctly displays RB orders retrieved from the backend alongside CO orders, and that selection state is maintained across order types."
-        },
-        {
-          "path": "frontend/src/components/dashboard/ReadyTab.tsx",
-          "operation": "modify",
-          "description": "Ensure that RB orders that have been fully supplied and transitioned to Ready status appear correctly in the Ready tab alongside CO orders. Verify that the grouped-by-design view and multi-select functionality work for RB orders. Confirm that bulk actions (revert to Pending, export) apply to RB orders without errors. Add visual distinction (order type badge or column) if not already present."
-        },
-        {
-          "path": "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "operation": "modify",
-          "description": "Verify that RB orders can transition to Hallmark status and are displayed correctly in the Hallmark tab. Ensure the grouped view, search/filter by karigar and order type, and batch status update to ReturnFromHallmark work for RB orders without regression. Add order type filtering support if not already present, allowing users to filter by RB or CO. Confirm that export to JPEG/PDF includes RB orders appropriately."
-        },
-        {
-          "path": "frontend/src/pages/Dashboard.tsx",
-          "operation": "modify",
-          "description": "Ensure the Dashboard page correctly loads and displays RB orders across all tabs (Total Orders, Ready, Hallmark). Verify that summary cards (order count, weight, quantity, CO count) account for RB orders in their calculations where appropriate. Confirm that the tabbed interface switches between views without losing RB order data or causing layout issues."
-        },
-        {
-          "path": "frontend/src/pages/AgeingStock.tsx",
-          "operation": "modify",
-          "description": "Ensure that RB orders are included in the ageing stock view and are displayed with the correct age-based color coding (green/yellow/red). Verify that bulk selection and the supplied-quantity dialog work for RB orders. Confirm that marking RB orders as ready via the supplied-quantity flow functions correctly on this page."
+          "description": "Replace all usage of order.karigarName with the useKarigarResolver hook to derive karigar names at render time. Update the grouping logic to group orders by resolved karigar_name from master_design mappings. Ensure that the karigar list and order counts reflect the dynamically resolved karigar, including the 'Unassigned' group for orders with missing design codes."
         },
         {
           "path": "frontend/src/pages/KarigarDetail.tsx",
           "operation": "modify",
-          "description": "Ensure that RB orders assigned to a specific karigar are displayed correctly on the KarigarDetail page. Verify that selection, mark as ready, and export actions work for RB orders without regression. Add visual distinction for order type if not already present."
+          "description": "Replace all usage of order.karigarName with the useKarigarResolver hook. Filter orders for the current karigar by comparing the resolved karigar_name (from master_design lookup) with the karigar route parameter. Ensure display and selection logic use the resolved karigar, not stored order fields."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Handle the edge case where an order has a design_code that does not exist in Master Design: display karigar as 'Unassigned' for such orders without crashing the UI or breaking grouping logic.",
+      "acceptanceCriteria": [
+        "Orders with a design_code not found in master_design display 'Unassigned' as their karigar in all tabs.",
+        "The 'Unassigned' group is rendered correctly in the Karigar tab without crashing.",
+        "No runtime errors are thrown when a design_code has no matching master_design entry.",
+        "Total Orders tab and all filters handle 'Unassigned' karigar gracefully."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/utils/karigarResolver.ts",
+          "operation": "modify",
+          "description": "Ensure the resolveKarigar function safely returns 'Unassigned' when the design code is missing from the mappings or when the mapping exists but karigarName is empty/null. Add defensive null checks to prevent runtime errors."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/components/dashboard/KarigarsTab.tsx",
           "operation": "modify",
-          "description": "Review and ensure that all query hooks (e.g., useGetOrders, useGetOrdersWithMappings) correctly fetch and return RB orders alongside CO orders. Verify that mutations (e.g., useSupplyOrder, useBatchUpdateOrderStatus) handle RB orders correctly and invalidate the appropriate query caches after operations. Confirm that the supplyOrder mutation logic supports partial supply for RB orders, maintaining Pending status for unsupplied units."
+          "description": "Ensure the 'Unassigned' karigar group is rendered alongside other karigar groups. Test that orders with missing design codes appear under 'Unassigned' and do not cause rendering errors or break the grouping logic."
+        },
+        {
+          "path": "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "operation": "modify",
+          "description": "Ensure the karigar filter includes 'Unassigned' as a valid filter option and that orders with unresolved design codes are correctly included when 'Unassigned' is selected. Verify no crashes occur when filtering or displaying these orders."
+        },
+        {
+          "path": "frontend/src/pages/KarigarDetail.tsx",
+          "operation": "modify",
+          "description": "Ensure the KarigarDetail page can handle the 'Unassigned' karigar route parameter and correctly displays orders with missing design codes. Verify no runtime errors occur when viewing the 'Unassigned' group."
         }
       ]
     }

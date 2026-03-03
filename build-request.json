@@ -1,39 +1,115 @@
 {
   "kind": "build_request",
-  "title": "Restore RB Order Logic",
-  "projectName": "Jewellery OMS",
-  "priority": "normal",
+  "title": "Fix Karigar Mapping: Dynamic Resolution via design_code → master_design",
+  "projectName": "Jewellery Order Manager",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle: they must be distinguishable from CO-type orders, display correctly in the TotalOrdersTab grouped view, support the SuppliedQtyDialog partial-supply flow (remaining units stay as Pending), and transition through status stages (Pending → Ready → Hallmark → ReturnFromHallmark) without regression.",
-      "target": "both",
+      "text": "Establish a single source of truth for karigar resolution: at render time, always derive karigar_name by looking up order.design_code in the master_design mappings, never from any stored karigar field on the order record itself. This must apply everywhere karigar is displayed or used for filtering/grouping.",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-6"
+          "msg-3"
         ],
         "quotes": [
-          "Restore RB Order Logic"
+          "Karigar must always resolve dynamically using: order.design_code → master_design.design_code → master_design.karigar_name",
+          "DO NOT rely on stored karigar name inside order record.",
+          "Karigar must be fetched using design_code mapping at render time."
         ]
       },
       "acceptanceCriteria": [
-        "RB-type orders appear in TotalOrdersTab and can be distinguished from CO-type orders.",
-        "Selecting RB orders and triggering supply opens the SuppliedQtyDialog, allowing partial quantities to be supplied while remaining units remain as Pending.",
-        "Fully supplied RB orders transition to Ready status correctly.",
-        "RB orders flow through Hallmark and ReturnFromHallmark status stages without errors.",
-        "CO-type order flows are unaffected by the RB logic restoration.",
-        "No regression in existing order status transitions or filtering."
+        "No component reads karigar_name directly from the order record for display, filtering, or grouping purposes.",
+        "Karigar is always resolved by looking up the order's design_code in the master design map at render time.",
+        "Updating karigar in Master Design causes all affected views to reflect the new karigar without requiring an order record mutation or page reload."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Fix the Total Orders tab (TotalOrdersTab.tsx) so that karigar display and karigar-based filtering both use the dynamically resolved karigar (from master_design lookup), not any cached or stored karigar value on the order. When karigar is updated in Master Design, all orders with that design_code must instantly reflect the new karigar in this tab with no duplication and no stale values.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-3"
+        ],
+        "quotes": [
+          "When karigar is updated in Master Design: All orders with that design_code must instantly reflect new karigar",
+          "No refresh of stored order record required",
+          "No duplication",
+          "No stale cached karigar values",
+          "If filtering by karigar: It must filter based on dynamically resolved karigar"
+        ]
+      },
+      "acceptanceCriteria": [
+        "After updating karigar in Master Design, Total Orders tab shows affected orders under the new karigar without any manual refresh of order records.",
+        "Karigar filter in Total Orders tab resolves against the dynamic karigar lookup, not stored order data.",
+        "No order appears under both old and new karigar simultaneously.",
+        "No order disappears from the tab after a karigar update."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Fix the Karigar tab (KarigarsTab.tsx and KarigarDetail.tsx) so that orders are grouped by dynamically resolved karigar from Master Design. When karigar changes in Master Design, orders must automatically move to the new karigar group, must not remain under the old karigar group, and must not disappear.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-3"
+        ],
+        "quotes": [
+          "Karigar tab must: Group orders using resolved karigar from Master Design",
+          "Not from stored order field",
+          "When karigar changes → order must move automatically to new karigar group",
+          "Must NOT remain under old karigar",
+          "Must NOT disappear"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Karigar tab groups orders by dynamically resolved karigar_name from master_design, not from any stored order field.",
+        "After a karigar change in Master Design, the affected order appears under the new karigar group in the Karigar tab.",
+        "The affected order no longer appears under the old karigar group.",
+        "No order is lost or duplicated in the Karigar tab after a karigar update."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Handle the edge case where an order has a design_code that does not exist in Master Design: display karigar as 'Unassigned' for such orders. This must not crash the UI, must not break grouping logic, and must not cause rendering errors in any tab.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-3"
+        ],
+        "quotes": [
+          "If: A design_code exists in order But no matching design exists in Master Design Then: Show karigar as 'Unassigned'",
+          "Do NOT break UI",
+          "Do NOT crash grouping"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Orders with a design_code not found in master_design display 'Unassigned' as their karigar in all tabs.",
+        "The 'Unassigned' group is rendered correctly in the Karigar tab without crashing.",
+        "No runtime errors are thrown when a design_code has no matching master_design entry.",
+        "Total Orders tab and all filters handle 'Unassigned' karigar gracefully."
       ]
     }
   ],
   "constraints": [
-    "Apply only Task 4 (Restore RB Order Logic) — do not bundle other pending tasks (Master Design → Karigar Sync, Karigar Export PDF, Desktop Sidebar Layout Fix) into this build.",
-    "Base changes on Draft 175 as the starting point."
+    "Do NOT mutate order records during karigar update — order data must remain unchanged.",
+    "Do NOT modify partial supply logic or RB resupply flow.",
+    "Do NOT modify Ready tab logic.",
+    "Do NOT modify summary card calculations.",
+    "Do NOT modify split row logic.",
+    "Do NOT modify ageing logic.",
+    "Do NOT change any filter logic beyond fixing karigar resolution.",
+    "Do NOT duplicate order entries.",
+    "Only fix karigar resolution and tab display consistency."
   ],
   "nonGoals": [
-    "Master Design → Karigar Sync fix",
-    "Karigar Export PDF grouping fix",
-    "Desktop Sidebar Layout Fix"
+    "Storing resolved karigar back into order records.",
+    "Backend schema changes to orders.",
+    "Any changes to supply, resupply, or hallmark flows.",
+    "Modifying summary card counts or weight calculations.",
+    "Changing ageing badge or ageing stock logic.",
+    "Modifying split row rendering."
   ],
   "imageRequirements": {
     "required": [],

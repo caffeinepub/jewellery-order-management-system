@@ -1,37 +1,84 @@
 import { useState, useMemo } from "react";
-import { Order, OrderStatus } from "@/backend";
-import { useGetAllOrders, useMarkOrdersAsPending } from "@/hooks/useQueries";
+import { Order, OrderStatus } from "../../backend";
+import {
+  useMarkOrdersAsPending,
+  useReturnReadyOrderToPending,
+} from "../../hooks/useQueries";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChevronDown, ChevronRight, FileDown } from "lucide-react";
-import DesignImageModal from "@/components/dashboard/DesignImageModal";
-import { exportOrdersToImage, exportAllToPDF, exportSelectedToPDF } from "@/utils/exportUtils";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  ChevronDown,
+  ChevronRight,
+  Image as ImageIcon,
+  Loader2,
+  AlertTriangle,
+  RotateCcw,
+} from "lucide-react";
+import { exportAllToPDF, exportSelectedToPDF, exportOrdersToImage } from "../../utils/exportUtils";
+import DesignImageModal from "./DesignImageModal";
+import { AgeingBadge } from "../../utils/ageingBadge";
 
 interface ReadyTabProps {
-  orders?: Order[];
+  orders: Order[];
   isError?: boolean;
-  searchQuery?: string;
 }
 
-export function ReadyTab({ orders: propOrders, isError, searchQuery = "" }: ReadyTabProps) {
-  const { data: fetchedOrders = [], isLoading } = useGetAllOrders();
-  const allOrders = propOrders ?? fetchedOrders;
-  const markAsPendingMutation = useMarkOrdersAsPending();
+// Helper: compute dynamic weight
+function dynamicWeight(order: Order): number {
+  return order.weight * Number(order.quantity);
+}
 
+// Helper: count unique order numbers
+function uniqueOrderCount(orders: Order[]): number {
+  return new Set(orders.map((o) => o.orderNo)).size;
+}
+
+interface ReturnDialogState {
+  open: boolean;
+  order: Order | null;
+}
+
+export function ReadyTab({ orders, isError }: ReadyTabProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [searchText, setSearchText] = useState("");
   const [imageModalDesign, setImageModalDesign] = useState<string | null>(null);
-  const [isExportingJpeg, setIsExportingJpeg] = useState(false);
+  const [returnDialog, setReturnDialog] = useState<ReturnDialogState>({
+    open: false,
+    order: null,
+  });
+  const [returnQty, setReturnQty] = useState<number>(0);
+  const [returnError, setReturnError] = useState<string | null>(null);
 
+  const markAsPending = useMarkOrdersAsPending();
+  const returnToPending = useReturnReadyOrderToPending();
+
+  // Filter: only Ready orders with qty > 0
   const readyOrders = useMemo(
-    () => allOrders.filter((o) => o.status === OrderStatus.Ready),
-    [allOrders]
+    () =>
+      orders.filter(
+        (o) =>
+          o.status === OrderStatus.Ready &&
+          Number(o.quantity) > 0
+      ),
+    [orders]
   );
 
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return readyOrders;
-    const q = searchQuery.toLowerCase();
+  // Search filter
+  const filteredOrders = useMemo(() => {
+    if (!searchText.trim()) return readyOrders;
+    const q = searchText.toLowerCase();
     return readyOrders.filter(
       (o) =>
         o.orderNo.toLowerCase().includes(q) ||
@@ -39,17 +86,18 @@ export function ReadyTab({ orders: propOrders, isError, searchQuery = "" }: Read
         (o.genericName ?? "").toLowerCase().includes(q) ||
         (o.karigarName ?? "").toLowerCase().includes(q)
     );
-  }, [readyOrders, searchQuery]);
+  }, [readyOrders, searchText]);
 
-  const grouped = useMemo(() => {
+  // Group by design code
+  const groups = useMemo(() => {
     const map = new Map<string, Order[]>();
-    for (const o of filtered) {
+    for (const o of filteredOrders) {
       const key = o.design;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(o);
     }
     return map;
-  }, [filtered]);
+  }, [filteredOrders]);
 
   const toggleGroup = (design: string) => {
     setExpandedGroups((prev) => {
@@ -60,187 +108,360 @@ export function ReadyTab({ orders: propOrders, isError, searchQuery = "" }: Read
     });
   };
 
-  const toggleSelectAll = (design: string, orders: Order[]) => {
-    const ids = orders.map((o) => o.orderId);
-    const allSelected = ids.every((id) => selectedIds.has(id));
+  const toggleSelect = (orderId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (allSelected) ids.forEach((id) => next.delete(id));
-      else ids.forEach((id) => next.add(id));
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
       return next;
     });
   };
 
-  const toggleOne = (id: string) => {
+  const toggleSelectGroup = (design: string) => {
+    const groupOrders = groups.get(design) ?? [];
+    const allSelected = groupOrders.every((o) => selectedIds.has(o.orderId));
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (allSelected) {
+        groupOrders.forEach((o) => next.delete(o.orderId));
+      } else {
+        groupOrders.forEach((o) => next.add(o.orderId));
+      }
       return next;
     });
   };
 
-  const handleMarkAsPending = () => {
-    if (!selectedIds.size) return;
-    markAsPendingMutation.mutate(Array.from(selectedIds), {
-      onSuccess: () => setSelectedIds(new Set()),
-    });
-  };
-
-  const handleExportJpeg = async () => {
-    setIsExportingJpeg(true);
-    try {
-      await exportOrdersToImage(filtered, "Ready Orders", "ready-orders.jpg");
-    } finally {
-      setIsExportingJpeg(false);
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredOrders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredOrders.map((o) => o.orderId)));
     }
   };
 
-  const handleExportPDFAll = () => {
-    exportAllToPDF(filtered, "ready-orders-all.pdf");
+  const handleMarkAsPending = async () => {
+    if (selectedIds.size === 0) return;
+    await markAsPending.mutateAsync(Array.from(selectedIds));
+    setSelectedIds(new Set());
   };
 
-  const handleExportPDFSelected = () => {
-    const sel = filtered.filter((o) => selectedIds.has(o.orderId));
-    exportSelectedToPDF(sel, "ready-orders-selected.pdf");
+  // ── Return dialog ──
+  const openReturnDialog = (order: Order) => {
+    setReturnDialog({ open: true, order });
+    setReturnQty(Number(order.quantity));
+    setReturnError(null);
   };
+
+  const closeReturnDialog = () => {
+    setReturnDialog({ open: false, order: null });
+    setReturnQty(0);
+    setReturnError(null);
+  };
+
+  const handleReturn = async () => {
+    if (!returnDialog.order) return;
+    setReturnError(null);
+
+    const readyQty = Number(returnDialog.order.quantity);
+
+    // Strict validation
+    if (returnQty <= 0) {
+      setReturnError("Return quantity must be greater than 0.");
+      return;
+    }
+    if (returnQty > readyQty) {
+      setReturnError(
+        `Return quantity (${returnQty}) exceeds ready quantity (${readyQty}).`
+      );
+      return;
+    }
+
+    try {
+      await returnToPending.mutateAsync({
+        orderId: returnDialog.order.orderId,
+        returnedQty: returnQty,
+      });
+      closeReturnDialog();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setReturnError(msg);
+    }
+  };
+
+  // ── Summary stats ──
+  const totalQty = filteredOrders.reduce((s, o) => s + Number(o.quantity), 0);
+  const totalWeight = filteredOrders.reduce((s, o) => s + dynamicWeight(o), 0);
+  const orderCount = uniqueOrderCount(filteredOrders);
+
+  const selectedOrders = filteredOrders.filter((o) => selectedIds.has(o.orderId));
 
   if (isError) {
     return (
-      <div className="p-4 text-center text-destructive">
+      <div className="p-4 text-destructive">
         Failed to load orders. Please try again.
       </div>
     );
   }
 
-  if (isLoading && !propOrders) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      {/* Action bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        {selectedIds.size > 0 && (
+    <div className="space-y-3">
+      {/* Search + actions */}
+      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+        <Input
+          placeholder="Search order, design, karigar…"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="h-8 text-sm max-w-xs"
+        />
+        <div className="flex gap-2 flex-wrap">
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleMarkAsPending}
+              disabled={markAsPending.isPending}
+              className="h-8 text-xs"
+            >
+              {markAsPending.isPending ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : null}
+              Mark as Pending ({selectedIds.size})
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
-            onClick={handleMarkAsPending}
-            disabled={markAsPendingMutation.isPending}
+            onClick={() => exportOrdersToImage(filteredOrders, "Ready Orders", "ready-orders.jpg")}
+            className="h-8 text-xs"
           >
-            {markAsPendingMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            Mark as Pending ({selectedIds.size})
-          </Button>
-        )}
-
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={handleExportJpeg} disabled={isExportingJpeg}>
-            {isExportingJpeg ? (
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-            ) : (
-              <FileDown className="mr-1 h-4 w-4" />
-            )}
             Export JPEG
           </Button>
-          <Button size="sm" variant="outline" onClick={handleExportPDFAll}>
-            <FileDown className="mr-1 h-4 w-4" />
-            Export PDF (All)
-          </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={handleExportPDFSelected}
-            disabled={selectedIds.size === 0}
+            onClick={() => exportAllToPDF(filteredOrders, "ready-orders-all.pdf")}
+            className="h-8 text-xs"
           >
-            <FileDown className="mr-1 h-4 w-4" />
-            Export PDF (Selected)
+            Export PDF (All)
           </Button>
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportSelectedToPDF(selectedOrders, "ready-orders-selected.pdf")}
+              className="h-8 text-xs"
+            >
+              Export PDF (Selected)
+            </Button>
+          )}
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">No ready orders found.</div>
+      {/* Summary row */}
+      <div className="flex gap-4 text-xs text-muted-foreground px-1">
+        <span>
+          <span className="font-semibold text-foreground">{orderCount}</span>{" "}
+          orders
+        </span>
+        <span>
+          <span className="font-semibold text-foreground">{totalQty}</span> qty
+        </span>
+        <span>
+          <span className="font-semibold text-foreground">
+            {totalWeight.toFixed(2)}g
+          </span>{" "}
+          weight
+        </span>
+        {selectedIds.size > 0 && (
+          <span className="text-primary">
+            {selectedIds.size} selected
+          </span>
+        )}
+      </div>
+
+      {/* Select all */}
+      {filteredOrders.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <Checkbox
+            checked={
+              selectedIds.size === filteredOrders.length &&
+              filteredOrders.length > 0
+            }
+            onCheckedChange={toggleSelectAll}
+            id="select-all-ready"
+          />
+          <label
+            htmlFor="select-all-ready"
+            className="text-xs text-muted-foreground cursor-pointer"
+          >
+            Select all
+          </label>
+        </div>
+      )}
+
+      {/* Groups */}
+      {filteredOrders.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 text-sm">
+          No ready orders found.
+        </div>
       ) : (
         <div className="space-y-2">
-          {Array.from(grouped.entries()).map(([design, orders]) => {
+          {Array.from(groups.entries()).map(([design, groupOrders]) => {
             const isExpanded = expandedGroups.has(design);
-            const allSelected = orders.every((o) => selectedIds.has(o.orderId));
-            const someSelected = orders.some((o) => selectedIds.has(o.orderId));
-            const totalWeight = orders.reduce((s, o) => s + o.weight, 0);
-            const totalQty = orders.reduce((s, o) => s + Number(o.quantity), 0);
+            const groupQty = groupOrders.reduce(
+              (s, o) => s + Number(o.quantity),
+              0
+            );
+            const groupWeight = groupOrders.reduce(
+              (s, o) => s + dynamicWeight(o),
+              0
+            );
+            const allSelected = groupOrders.every((o) =>
+              selectedIds.has(o.orderId)
+            );
+            const someSelected = groupOrders.some((o) =>
+              selectedIds.has(o.orderId)
+            );
+            const genericName = groupOrders[0]?.genericName ?? "";
+            const karigarName = groupOrders[0]?.karigarName ?? "";
 
             return (
-              <div key={design} className="border border-border rounded-lg overflow-hidden">
+              <div
+                key={design}
+                className="border border-border rounded-lg overflow-hidden"
+              >
                 {/* Group header */}
                 <div
-                  className="flex items-center gap-3 px-4 py-3 bg-card cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-card cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleGroup(design)}
                 >
-                  <Checkbox
-                    checked={allSelected}
-                    data-state={someSelected && !allSelected ? "indeterminate" : undefined}
-                    onCheckedChange={() => toggleSelectAll(design, orders)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelectGroup(design);
+                    }}
+                  >
+                    <Checkbox
+                      checked={allSelected}
+                      data-state={
+                        someSelected && !allSelected ? "indeterminate" : undefined
+                      }
+                      onCheckedChange={() => toggleSelectGroup(design)}
+                    />
+                  </div>
+
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   )}
-                  <span
-                    className="font-bold text-orange-500 cursor-pointer hover:underline"
+
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setImageModalDesign(design);
                     }}
+                    className="text-muted-foreground hover:text-primary transition-colors"
                   >
+                    <ImageIcon className="h-4 w-4" />
+                  </button>
+
+                  <span className="font-bold text-sm text-amber-500">
                     {design}
                   </span>
-                  <span className="text-sm text-muted-foreground">
-                    {orders[0]?.genericName ?? ""}
-                  </span>
-                  <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{orders.length} orders</span>
-                    <span>{totalWeight.toFixed(2)}g</span>
-                    <span>Qty: {totalQty}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {orders[0]?.karigarName ?? "—"}
+                  {genericName && (
+                    <span className="text-xs text-muted-foreground">
+                      {genericName}
+                    </span>
+                  )}
+                  {karigarName && (
+                    <Badge variant="outline" className="text-xs h-5">
+                      {karigarName}
                     </Badge>
+                  )}
+
+                  <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Qty: {groupQty}</span>
+                    <span>{groupWeight.toFixed(2)}g</span>
+                    <span className="text-muted-foreground">
+                      {groupOrders.length} row{groupOrders.length !== 1 ? "s" : ""}
+                    </span>
                   </div>
                 </div>
 
-                {/* Expanded rows */}
+                {/* Group rows */}
                 {isExpanded && (
                   <div className="divide-y divide-border">
-                    {orders.map((order) => (
-                      <div
-                        key={order.orderId}
-                        className="flex items-center gap-3 px-4 py-2 bg-background hover:bg-muted/30 transition-colors"
-                      >
-                        <Checkbox
-                          checked={selectedIds.has(order.orderId)}
-                          onCheckedChange={() => toggleOne(order.orderId)}
-                        />
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                          <span className="font-medium text-foreground">{order.orderNo}</span>
-                          <span className="text-muted-foreground">
-                            Wt: <span className="text-foreground">{order.weight}g</span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Qty: <span className="text-foreground">{Number(order.quantity)}</span>
-                          </span>
-                          <Badge variant="outline" className="text-xs w-fit">
-                            {order.orderType}
-                          </Badge>
+                    {groupOrders.map((order) => {
+                      const qty = Number(order.quantity);
+                      const weight = dynamicWeight(order);
+
+                      return (
+                        <div
+                          key={order.orderId}
+                          className="flex items-center gap-2 px-3 py-2 bg-background hover:bg-muted/30 transition-colors"
+                        >
+                          <Checkbox
+                            checked={selectedIds.has(order.orderId)}
+                            onCheckedChange={() => toggleSelect(order.orderId)}
+                          />
+
+                          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">Order: </span>
+                              <span className="font-medium text-foreground">
+                                {order.orderNo}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Qty: </span>
+                              <span className="font-medium text-foreground">
+                                {qty}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Wt: </span>
+                              <span className="font-medium text-foreground">
+                                {weight.toFixed(2)}g
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Size: </span>
+                              <span className="font-medium text-foreground">
+                                {order.size}
+                              </span>
+                            </div>
+                            {order.orderDate && (
+                              <div className="col-span-2 sm:col-span-1">
+                                <AgeingBadge orderDate={order.orderDate} />
+                              </div>
+                            )}
+                            {order.originalOrderId && (
+                              <div className="col-span-2 sm:col-span-2">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs h-4 border-amber-500/50 text-amber-500"
+                                >
+                                  Partial Supply
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Return button */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={() => openReturnDialog(order)}
+                            title="Return to Total Orders"
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Return
+                          </Button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -249,6 +470,91 @@ export function ReadyTab({ orders: propOrders, isError, searchQuery = "" }: Read
         </div>
       )}
 
+      {/* Return Dialog */}
+      <Dialog open={returnDialog.open} onOpenChange={closeReturnDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Return to Total Orders</DialogTitle>
+          </DialogHeader>
+
+          {returnDialog.order && (
+            <div className="space-y-4">
+              <div className="text-sm space-y-1">
+                <div>
+                  <span className="text-muted-foreground">Order: </span>
+                  <span className="font-medium">
+                    {returnDialog.order.orderNo}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Design: </span>
+                  <span className="font-medium">
+                    {returnDialog.order.design}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Ready Qty: </span>
+                  <span className="font-medium">
+                    {Number(returnDialog.order.quantity)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Return Quantity</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={Number(returnDialog.order.quantity)}
+                  value={returnQty}
+                  onChange={(e) => {
+                    setReturnQty(parseInt(e.target.value, 10) || 0);
+                    setReturnError(null);
+                  }}
+                  className="h-9"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Max: {Number(returnDialog.order.quantity)}
+                </p>
+              </div>
+
+              {returnError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    {returnError}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeReturnDialog}
+              disabled={returnToPending.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReturn}
+              disabled={returnToPending.isPending}
+            >
+              {returnToPending.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Returning…
+                </>
+              ) : (
+                "Confirm Return"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Design image modal */}
       {imageModalDesign && (
         <DesignImageModal
           designCode={imageModalDesign}

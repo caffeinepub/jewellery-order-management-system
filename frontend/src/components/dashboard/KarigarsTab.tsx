@@ -1,42 +1,34 @@
 import { useMemo } from 'react';
-import { useGetAllOrders, useGetMasterDesigns } from '@/hooks/useQueries';
+import { useGetAllOrders, useGetAllDesignMappings } from '@/hooks/useQueries';
 import { OrderStatus } from '@/backend';
 import { useNavigate } from '@tanstack/react-router';
 import { User, ChevronRight } from 'lucide-react';
+import { resolveKarigar, buildDesignMappingsMap } from '@/utils/karigarResolver';
 
 export default function KarigarsTab() {
   const { data: orders = [], isLoading } = useGetAllOrders();
-  const { data: masterDesignsRaw = [] } = useGetMasterDesigns();
+  // Use the full DesignMapping data (not just the 3-tuple) for accurate karigar resolution
+  const { data: rawMappings = [] } = useGetAllDesignMappings();
   const navigate = useNavigate();
 
-  // Build a Map from the raw [designCode, genericName, karigarName][] tuples
-  const masterDesignsMap = useMemo(() => {
-    const map = new Map<string, { genericName: string; karigarName: string }>();
-    masterDesignsRaw.forEach(([designCode, genericName, karigarName]) => {
-      map.set(designCode.toUpperCase().trim(), { genericName, karigarName });
-    });
-    return map;
-  }, [masterDesignsRaw]);
-
-  const enrichedOrders = useMemo(() => {
-    return orders.map((order) => {
-      const normalizedDesign = order.design.toUpperCase().trim();
-      const mapping = masterDesignsMap.get(normalizedDesign);
-      return {
-        ...order,
-        genericName: mapping?.genericName || order.genericName,
-        karigarName: mapping?.karigarName || order.karigarName,
-      };
-    });
-  }, [orders, masterDesignsMap]);
+  // Build a normalized Map<designCode, DesignMapping> for O(1) lookups
+  const designMappingsMap = useMemo(
+    () => buildDesignMappingsMap(rawMappings),
+    [rawMappings]
+  );
 
   const karigarGroups = useMemo(() => {
-    const pendingOrders = enrichedOrders.filter((order) => order.status === OrderStatus.Pending);
+    // Only pending orders with qty > 0
+    const pendingOrders = orders.filter(
+      (order) => order.status === OrderStatus.Pending && Number(order.quantity) > 0
+    );
 
     const groups: Record<string, typeof pendingOrders> = {};
 
     pendingOrders.forEach((order) => {
-      const karigar = order.karigarName || 'Unmapped';
+      // SINGLE SOURCE OF TRUTH: always resolve karigar from master design mappings
+      // Never use order.karigarName for grouping
+      const karigar = resolveKarigar(order.design, designMappingsMap);
       if (!groups[karigar]) {
         groups[karigar] = [];
       }
@@ -49,11 +41,22 @@ export default function KarigarsTab() {
         orders: groupOrders,
         totalOrders: groupOrders.length,
         totalQty: groupOrders.reduce((sum, o) => sum + Number(o.quantity), 0),
-        totalWeight: groupOrders.reduce((sum, o) => sum + o.weight, 0),
-        uniqueDesigns: new Set(groupOrders.map((o) => o.design.toUpperCase().trim())).size,
+        // Dynamic weight: unit_weight × qty
+        totalWeight: groupOrders.reduce(
+          (sum, o) => sum + o.weight * Number(o.quantity),
+          0
+        ),
+        uniqueDesigns: new Set(
+          groupOrders.map((o) => o.design.toUpperCase().trim())
+        ).size,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [enrichedOrders]);
+      .sort((a, b) => {
+        // Put 'Unassigned' at the end
+        if (a.name === 'Unassigned') return 1;
+        if (b.name === 'Unassigned') return -1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [orders, designMappingsMap]);
 
   const handleKarigarClick = (karigarName: string) => {
     navigate({ to: `/karigar/${encodeURIComponent(karigarName)}` });
@@ -97,7 +100,7 @@ export default function KarigarsTab() {
             <div className="shrink-0">
               <User
                 size={22}
-                style={{ color: '#f97316' }}
+                style={{ color: karigar.name === 'Unassigned' ? '#6b7280' : '#f97316' }}
                 strokeWidth={2}
               />
             </div>
@@ -106,7 +109,7 @@ export default function KarigarsTab() {
             <div className="flex-1 min-w-0">
               <div
                 className="text-base font-bold tracking-wide uppercase leading-tight"
-                style={{ color: '#ffffff' }}
+                style={{ color: karigar.name === 'Unassigned' ? '#9ca3af' : '#ffffff' }}
               >
                 {karigar.name}
               </div>
@@ -114,7 +117,8 @@ export default function KarigarsTab() {
                 className="text-xs mt-0.5"
                 style={{ color: '#6b7280' }}
               >
-                {karigar.uniqueDesigns} {karigar.uniqueDesigns === 1 ? 'design' : 'designs'}
+                {karigar.uniqueDesigns}{' '}
+                {karigar.uniqueDesigns === 1 ? 'design' : 'designs'}
               </div>
             </div>
 
@@ -127,7 +131,14 @@ export default function KarigarsTab() {
           </div>
 
           {/* Divider */}
-          <div style={{ height: '1px', backgroundColor: '#1f1f1f', marginLeft: '16px', marginRight: '16px' }} />
+          <div
+            style={{
+              height: '1px',
+              backgroundColor: '#1f1f1f',
+              marginLeft: '16px',
+              marginRight: '16px',
+            }}
+          />
 
           {/* Stats Row */}
           <div className="grid grid-cols-3 px-4 py-4 gap-2">
@@ -135,7 +146,7 @@ export default function KarigarsTab() {
             <div className="flex flex-col items-center">
               <div
                 className="text-3xl font-bold leading-none"
-                style={{ color: '#f97316' }}
+                style={{ color: karigar.name === 'Unassigned' ? '#9ca3af' : '#f97316' }}
               >
                 {karigar.totalOrders}
               </div>
@@ -151,7 +162,7 @@ export default function KarigarsTab() {
             <div className="flex flex-col items-center">
               <div
                 className="text-3xl font-bold leading-none"
-                style={{ color: '#f97316' }}
+                style={{ color: karigar.name === 'Unassigned' ? '#9ca3af' : '#f97316' }}
               >
                 {karigar.totalQty}
               </div>
@@ -167,7 +178,7 @@ export default function KarigarsTab() {
             <div className="flex flex-col items-center">
               <div
                 className="text-3xl font-bold leading-none"
-                style={{ color: '#f97316' }}
+                style={{ color: karigar.name === 'Unassigned' ? '#9ca3af' : '#f97316' }}
               >
                 {karigar.totalWeight.toFixed(1)}g
               </div>

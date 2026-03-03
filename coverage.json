@@ -1,40 +1,83 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-03-03T02:17:29.262Z",
+  "generatedAt": "2026-03-03T04:22:22.308Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 1,
-    "implemented": 0,
+    "total": 4,
+    "implemented": 4,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle: they must be distinguishable from CO-type orders, display correctly in the TotalOrdersTab grouped view, support the SuppliedQtyDialog partial-supply flow (remaining units stay as Pending), and transition through status stages (Pending → Ready → Hallmark → ReturnFromHallmark) without regression.",
-        "status": "missing",
+        "summary": "Establish a single source of truth for karigar resolution: at render time, always derive karigar_name by looking up order.design_code in the master_design mappings, never from any stored karigar field on the order record itself. This must apply everywhere karigar is displayed or used for filtering/grouping.",
+        "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
-          "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
-          "frontend/src/components/dashboard/OrderTable.tsx",
-          "frontend/src/components/dashboard/ReadyTab.tsx",
-          "frontend/src/components/dashboard/HallmarkTab.tsx",
-          "frontend/src/pages/Dashboard.tsx",
-          "frontend/src/pages/AgeingStock.tsx",
-          "frontend/src/pages/KarigarDetail.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/utils/karigarResolver.ts"
         ],
-        "matchedFiles": []
+        "matchedFiles": [
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/utils/karigarResolver.ts"
+        ]
+      },
+      {
+        "id": "REQ-2",
+        "summary": "Fix the Total Orders tab (TotalOrdersTab.tsx) so that karigar display and karigar-based filtering both use the dynamically resolved karigar (from master_design lookup), not any cached or stored karigar value on the order. When karigar is updated in Master Design, all orders with that design_code must instantly reflect the new karigar in this tab with no duplication and no stale values.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-3",
+        "summary": "Fix the Karigar tab (KarigarsTab.tsx and KarigarDetail.tsx) so that orders are grouped by dynamically resolved karigar from Master Design. When karigar changes in Master Design, orders must automatically move to the new karigar group, must not remain under the old karigar group, and must not disappear.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Handle the edge case where an order has a design_code that does not exist in Master Design: display karigar as 'Unassigned' for such orders. This must not crash the UI, must not break grouping logic, and must not cause rendering errors in any tab.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/utils/karigarResolver.ts",
+          "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/utils/karigarResolver.ts",
+          "frontend/src/components/dashboard/KarigarsTab.tsx",
+          "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+          "frontend/src/pages/KarigarDetail.tsx"
+        ]
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
+    "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/components/dashboard/KarigarsTab.tsx",
+    "frontend/src/components/dashboard/ReadyTab.tsx",
+    "frontend/src/components/dashboard/SuppliedQtyDialog.tsx",
+    "frontend/src/components/dashboard/TotalOrdersTab.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/KarigarDetail.tsx",
+    "frontend/src/utils/karigarResolver.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

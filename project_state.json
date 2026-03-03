@@ -1,50 +1,60 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Project with known deployment size issues; applying fixes one at a time. Currently working on Task 4: Restore RB Order Logic (from Draft 175). Pending tasks: Master Design → Karigar Sync, Karigar Export PDF, Desktop Sidebar Layout Fix.",
+  "summary": "Order management application with karigar (artisan) mapping, customer order tracking, partial supply/resupply logic, and multi-tab display (Total Orders, Karigar tab). Focus is on fixing karigar resolution to use dynamic lookup via design_code → master_design rather than stored order field.",
   "architectural_notes": [
-    "Project is large/complex; applying fixes one at a time to avoid hitting max_tool_iterations budget limit during deployment."
+    "Karigar must always be resolved dynamically: order.design_code → master_design.design_code → master_design.karigar_name. Never rely on stored karigar name in order record.",
+    "Do not mutate order records during karigar update; karigar grouping/filtering must use resolved value at render time.",
+    "If design_code has no matching master_design entry, display karigar as 'Unassigned' without crashing UI or grouping."
   ],
   "known_issues": [
-    "Deploying multiple tasks at once causes build failures due to max_tool_iterations budget exceeded."
+    "Karigar update in Master Design does not reflect in Total Orders tab or Karigar tab — orders show under old karigar, go missing, or duplicate."
   ],
   "isFixRequest": true,
-  "existing_features": [],
-  "new_feature_requests": [
+  "existing_features": [
     {
-      "id": "AR-1",
-      "summary": "Master Design → Karigar Sync",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Karigar Export PDF (grouping fix)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Desktop Sidebar Layout Fix",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Restore RB Order Logic",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Restore the RB (Return/Replenishment Buy) order logic so that RB-type orders are correctly handled throughout the order lifecycle: they must be distinguishable from CO-type orders, display correctly in the TotalOrdersTab grouped view, support the SuppliedQtyDialog partial-supply flow (remaining units stay as Pending), and transition through status stages (Pending → Ready → Hallmark → ReturnFromHallmark) without regression.",
+      "id": "feature-establish-a-single-source-of-truth-for-karigar-resolution-at-render-time-always-derive-karigar-name-by-looking-up-order-design-code-in-the-master-design-mappings-never-from-any-stored-karigar-field-on-the-order-record-itself-this-must-apply-everywhere-karigar-is-displayed-or-used-for-filtering-grouping",
+      "title": "Establish a single source of truth for karigar resolution: at render time, always derive karigar_name by looking up order.design_code in the master_design mappings, never from any stored karigar field on the order record itself. This must apply everywhere karigar is displayed or used for filtering/grouping.",
       "reqIds": [
         "REQ-1"
       ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-total-orders-tab-totalorderstab-tsx-so-that-karigar-display-and-karigar-based-filtering-both-use-the-dynamically-resolved-karigar-from-master-design-lookup-not-any-cached-or-stored-karigar-value-on-the-order-when-karigar-is-updated-in-master-design-all-orders-with-that-design-code-must-instantly-reflect-the-new-karigar-in-this-tab-with-no-duplication-and-no-stale-values",
+      "title": "Fix the Total Orders tab (TotalOrdersTab.tsx) so that karigar display and karigar-based filtering both use the dynamically resolved karigar (from master_design lookup), not any cached or stored karigar value on the order. When karigar is updated in Master Design, all orders with that design_code must instantly reflect the new karigar in this tab with no duplication and no stale values.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-karigar-tab-karigarstab-tsx-and-karigardetail-tsx-so-that-orders-are-grouped-by-dynamically-resolved-karigar-from-master-design-when-karigar-changes-in-master-design-orders-must-automatically-move-to-the-new-karigar-group-must-not-remain-under-the-old-karigar-group-and-must-not-disappear",
+      "title": "Fix the Karigar tab (KarigarsTab.tsx and KarigarDetail.tsx) so that orders are grouped by dynamically resolved karigar from Master Design. When karigar changes in Master Design, orders must automatically move to the new karigar group, must not remain under the old karigar group, and must not disappear.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-handle-the-edge-case-where-an-order-has-a-design-code-that-does-not-exist-in-master-design-display-karigar-as-unassigned-for-such-orders-this-must-not-crash-the-ui-must-not-break-grouping-logic-and-must-not-cause-rendering-errors-in-any-tab",
+      "title": "Handle the edge case where an order has a design_code that does not exist in Master Design: display karigar as 'Unassigned' for such orders. This must not crash the UI, must not break grouping logic, and must not cause rendering errors in any tab.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Fix karigar mapping: resolve karigar dynamically via order.design_code → master_design.karigar_name at render time, not from stored order field. Fix Total Orders and Karigar tab to reflect updates instantly without duplication or stale values. Handle missing design_code as 'Unassigned'.",
+      "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Jewellery OMS",
+  "gameProjectType": "none",
+  "projectName": "Jewellery Order Manager",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }
