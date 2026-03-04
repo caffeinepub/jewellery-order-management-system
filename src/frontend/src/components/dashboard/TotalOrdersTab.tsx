@@ -215,10 +215,9 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
           <>
             <Button
               size="sm"
-              variant="outline"
               onClick={handleMarkAsReady}
               disabled={markAsReady.isPending}
-              className="h-8 text-xs"
+              className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white font-semibold border-0"
             >
               {markAsReady.isPending ? (
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -382,11 +381,16 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
                       return (
                         <div
                           key={order.orderId}
-                          className="flex items-center gap-2 px-3 py-2 bg-background hover:bg-muted/30 transition-colors"
+                          className="flex items-center gap-2 px-3 py-2 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => toggleSelect(order.orderId)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && toggleSelect(order.orderId)
+                          }
                         >
                           <Checkbox
                             checked={selectedIds.has(order.orderId)}
                             onCheckedChange={() => toggleSelect(order.orderId)}
+                            onClick={(e) => e.stopPropagation()}
                           />
 
                           <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">

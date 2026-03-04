@@ -221,10 +221,9 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
           {selectedIds.size > 0 && (
             <Button
               size="sm"
-              variant="outline"
               onClick={handleMarkAsPending}
               disabled={markAsPending.isPending}
-              className="h-8 text-xs"
+              className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold border-0"
             >
               {markAsPending.isPending ? (
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -236,11 +235,7 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
             size="sm"
             variant="outline"
             onClick={() =>
-              exportOrdersToImage(
-                filteredOrders,
-                "Ready Orders",
-                "ready-orders.jpg",
-              )
+              exportOrdersToImage(filteredOrders, "Ready", "ready-orders.jpg")
             }
             className="h-8 text-xs"
           >
@@ -250,7 +245,7 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
             size="sm"
             variant="outline"
             onClick={() =>
-              exportAllToPDF(filteredOrders, "ready-orders-all.pdf")
+              exportAllToPDF(filteredOrders, "ready-orders-all.pdf", "Ready")
             }
             className="h-8 text-xs"
           >
@@ -261,7 +256,11 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
               size="sm"
               variant="outline"
               onClick={() =>
-                exportSelectedToPDF(selectedOrders, "ready-orders-selected.pdf")
+                exportSelectedToPDF(
+                  selectedOrders,
+                  "ready-orders-selected.pdf",
+                  "Ready",
+                )
               }
               className="h-8 text-xs"
             >
@@ -407,11 +406,16 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
                       return (
                         <div
                           key={order.orderId}
-                          className="flex items-center gap-2 px-3 py-2 bg-background hover:bg-muted/30 transition-colors"
+                          className="flex items-center gap-2 px-3 py-2 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => toggleSelect(order.orderId)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && toggleSelect(order.orderId)
+                          }
                         >
                           <Checkbox
                             checked={selectedIds.has(order.orderId)}
                             onCheckedChange={() => toggleSelect(order.orderId)}
+                            onClick={(e) => e.stopPropagation()}
                           />
 
                           <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
@@ -469,7 +473,10 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
                             size="sm"
                             variant="ghost"
                             className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
-                            onClick={() => openReturnDialog(order)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openReturnDialog(order);
+                            }}
                             title="Return to Total Orders"
                           >
                             <RotateCcw className="h-3 w-3 mr-1" />

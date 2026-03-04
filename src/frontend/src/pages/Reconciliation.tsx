@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { type MasterDataRow, OrderType } from "../backend";
 import type { Order } from "../backend";
 import {
-  usePersistMasterDataRows,
+  usePersistReconciliationRows,
   useReconcileMasterFile,
 } from "../hooks/useQueries";
 
@@ -34,6 +34,7 @@ interface ParsedRow {
   designCode: string;
   karigar: string;
   weight: number;
+  size: number;
   quantity: number;
   orderType: OrderType; // REQ-4: preserve parsed type
   orderDate?: bigint;
@@ -114,6 +115,7 @@ async function parseMasterFile(file: File): Promise<ParsedRow[]> {
   const designIdx = colIdx(["designcode", "design code", "design"]);
   const karigarIdx = colIdx(["karigar", "karigarname", "karigar name"]);
   const weightIdx = colIdx(["weight", "wt"]);
+  const sizeIdx = colIdx(["size", "sz"]);
   const qtyIdx = colIdx(["quantity", "qty"]);
   // REQ-4: scan for order type column
   const orderTypeIdx = colIdx([
@@ -142,6 +144,8 @@ async function parseMasterFile(file: File): Promise<ParsedRow[]> {
       weightIdx >= 0
         ? Number.parseFloat(String(row[weightIdx] ?? "0")) || 0
         : 0;
+    const size =
+      sizeIdx >= 0 ? Number.parseFloat(String(row[sizeIdx] ?? "0")) || 0 : 0;
     const quantity =
       qtyIdx >= 0 ? Number.parseInt(String(row[qtyIdx] ?? "1"), 10) || 1 : 1;
 
@@ -159,6 +163,7 @@ async function parseMasterFile(file: File): Promise<ParsedRow[]> {
       designCode,
       karigar,
       weight,
+      size,
       quantity,
       orderType,
       orderDate,
@@ -188,7 +193,7 @@ const Reconciliation: React.FC = () => {
   );
 
   const reconcileMutation = useReconcileMasterFile();
-  const persistMutation = usePersistMasterDataRows();
+  const persistMutation = usePersistReconciliationRows();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -242,14 +247,34 @@ const Reconciliation: React.FC = () => {
   const handleAddToTotalOrders = async () => {
     if (!reconcileResult) return;
 
-    const rowsToAdd = reconcileResult.newLines.filter((r) =>
+    const filteredNewLines = reconcileResult.newLines.filter((r) =>
       selectedNewLines.has(`${r.orderNo}_${r.designCode}`),
     );
 
-    if (rowsToAdd.length === 0) {
+    if (filteredNewLines.length === 0) {
       toast.warning("No rows selected");
       return;
     }
+
+    // Build a lookup map from parsedRows to retrieve size per orderNo+designCode
+    const parsedRowsMap = new Map<string, ParsedRow>(
+      parsedRows.map((r) => [`${r.orderNo}_${r.designCode}`, r]),
+    );
+
+    // Merge with size from parsedRows
+    const rowsToAdd = filteredNewLines.map((r) => {
+      const parsed = parsedRowsMap.get(`${r.orderNo}_${r.designCode}`);
+      return {
+        orderNo: r.orderNo,
+        designCode: r.designCode,
+        karigar: r.karigar,
+        weight: r.weight,
+        size: parsed?.size ?? 0,
+        quantity: Number(r.quantity),
+        orderType: r.orderType,
+        orderDate: r.orderDate,
+      };
+    });
 
     try {
       const response = await persistMutation.mutateAsync(rowsToAdd);
@@ -465,12 +490,18 @@ const Reconciliation: React.FC = () => {
                         <TableHead>Karigar</TableHead>
                         <TableHead>Qty</TableHead>
                         <TableHead>Weight</TableHead>
+                        <TableHead>Size</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {reconcileResult.newLines.map((row) => {
                         const key = `${row.orderNo}_${row.designCode}`;
                         const isSelected = selectedNewLines.has(key);
+                        const parsedRow = parsedRows.find(
+                          (p) =>
+                            p.orderNo === row.orderNo &&
+                            p.designCode === row.designCode,
+                        );
                         return (
                           <TableRow
                             key={key}
@@ -506,6 +537,9 @@ const Reconciliation: React.FC = () => {
                             </TableCell>
                             <TableCell className="text-sm">
                               {row.weight.toFixed(2)}g
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {parsedRow?.size ? parsedRow.size : "—"}
                             </TableCell>
                           </TableRow>
                         );

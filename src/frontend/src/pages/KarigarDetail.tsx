@@ -3,15 +3,14 @@ import SuppliedQtyDialog from "@/components/dashboard/SuppliedQtyDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useActor } from "@/hooks/useActor";
 import {
   useGetAllDesignMappings,
   useGetAllOrders,
   useMarkOrdersAsReady,
 } from "@/hooks/useQueries";
 import {
-  exportAllToPDF,
-  exportOrdersToImage,
-  exportSelectedToPDF,
+  exportKarigarByDesignGrouped,
   exportToExcel,
 } from "@/utils/exportUtils";
 import {
@@ -30,6 +29,7 @@ export default function KarigarDetail() {
   const { data: rawMappings = [], isLoading: mappingsLoading } =
     useGetAllDesignMappings();
   const markAsReadyMutation = useMarkOrdersAsReady();
+  const { actor } = useActor();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [supplyDialogOpen, setSupplyDialogOpen] = useState(false);
@@ -106,25 +106,65 @@ export default function KarigarDetail() {
     }
   };
 
+  // Pre-fetch design image URLs for all unique design codes in this karigar's orders
+  const fetchDesignImageUrls = async (
+    orders: Order[],
+  ): Promise<Map<string, string>> => {
+    const urlMap = new Map<string, string>();
+    if (!actor) return urlMap;
+    const uniqueDesigns = Array.from(new Set(orders.map((o) => o.design)));
+    await Promise.all(
+      uniqueDesigns.map(async (design) => {
+        try {
+          const blob = await actor.getDesignImage(design);
+          if (blob) {
+            const url = blob.getDirectURL();
+            if (url) urlMap.set(design, url);
+          }
+        } catch {
+          // skip failed image fetches
+        }
+      }),
+    );
+    return urlMap;
+  };
+
   const handleExportJpeg = async () => {
     setIsExportingJpeg(true);
     try {
-      await exportOrdersToImage(
+      const imageUrls = await fetchDesignImageUrls(karigarOrders);
+      await exportKarigarByDesignGrouped(
         karigarOrders,
-        `${decodedName} - Pending Orders`,
+        decodedName,
         `${decodedName}-orders.jpg`,
+        "jpeg",
+        imageUrls,
       );
     } finally {
       setIsExportingJpeg(false);
     }
   };
 
-  const handleExportPDFAll = () => {
-    exportAllToPDF(karigarOrders, `${decodedName}-orders-all.pdf`);
+  const handleExportPDFAll = async () => {
+    const imageUrls = await fetchDesignImageUrls(karigarOrders);
+    exportKarigarByDesignGrouped(
+      karigarOrders,
+      decodedName,
+      `${decodedName}-orders-all.pdf`,
+      "pdf",
+      imageUrls,
+    );
   };
 
-  const handleExportPDFSelected = () => {
-    exportSelectedToPDF(selectedOrders, `${decodedName}-orders-selected.pdf`);
+  const handleExportPDFSelected = async () => {
+    const imageUrls = await fetchDesignImageUrls(selectedOrders);
+    exportKarigarByDesignGrouped(
+      selectedOrders,
+      decodedName,
+      `${decodedName}-orders-selected.pdf`,
+      "pdf",
+      imageUrls,
+    );
   };
 
   const handleExportExcel = async () => {
@@ -260,11 +300,14 @@ export default function KarigarDetail() {
             {karigarOrders.map((order) => (
               <div
                 key={order.orderId}
-                className="flex items-center gap-3 px-4 py-3 bg-background hover:bg-muted/30 transition-colors"
+                className="flex items-center gap-3 px-4 py-3 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                onClick={() => toggleOne(order.orderId)}
+                onKeyDown={(e) => e.key === "Enter" && toggleOne(order.orderId)}
               >
                 <Checkbox
                   checked={selectedIds.has(order.orderId)}
                   onCheckedChange={() => toggleOne(order.orderId)}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 <span className="flex-1 text-sm font-medium">
                   {order.orderNo}

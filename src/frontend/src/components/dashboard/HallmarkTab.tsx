@@ -112,12 +112,12 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
     });
   };
 
-  const handleMarkAsReturned = () => {
+  const handleReturnToPending = () => {
     if (!selectedIds.size) return;
     batchUpdateMutation.mutate(
       {
         orderIds: Array.from(selectedIds),
-        newStatus: OrderStatus.ReturnFromHallmark,
+        newStatus: OrderStatus.Pending,
       },
       { onSuccess: () => setSelectedIds(new Set()) },
     );
@@ -126,23 +126,19 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
   const handleExportJpeg = async () => {
     setIsExportingJpeg(true);
     try {
-      await exportOrdersToImage(
-        filtered,
-        "Hallmark Orders",
-        "hallmark-orders.jpg",
-      );
+      await exportOrdersToImage(filtered, "Hallmark", "hallmark-orders.jpg");
     } finally {
       setIsExportingJpeg(false);
     }
   };
 
   const handleExportPDFAll = () => {
-    exportAllToPDF(filtered, "hallmark-orders-all.pdf");
+    exportAllToPDF(filtered, "hallmark-orders-all.pdf", "Hallmark");
   };
 
   const handleExportPDFSelected = () => {
     const sel = filtered.filter((o) => selectedIds.has(o.orderId));
-    exportSelectedToPDF(sel, "hallmark-orders-selected.pdf");
+    exportSelectedToPDF(sel, "hallmark-orders-selected.pdf", "Hallmark");
   };
 
   if (isError) {
@@ -205,14 +201,14 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
         {selectedIds.size > 0 && (
           <Button
             size="sm"
-            variant="outline"
-            onClick={handleMarkAsReturned}
+            onClick={handleReturnToPending}
             disabled={batchUpdateMutation.isPending}
+            className="bg-amber-500 hover:bg-amber-600 text-white font-semibold border-0"
           >
             {batchUpdateMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : null}
-            Mark as Returned ({selectedIds.size})
+            Return to Pending ({selectedIds.size})
           </Button>
         )}
 
@@ -312,11 +308,16 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
                     {orders.map((order) => (
                       <div
                         key={order.orderId}
-                        className="flex items-center gap-3 px-4 py-2 bg-background hover:bg-muted/30 transition-colors"
+                        className="flex items-center gap-3 px-4 py-2 bg-background hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={() => toggleOne(order.orderId)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && toggleOne(order.orderId)
+                        }
                       >
                         <Checkbox
                           checked={selectedIds.has(order.orderId)}
                           onCheckedChange={() => toggleOne(order.orderId)}
+                          onClick={(e) => e.stopPropagation()}
                         />
                         <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
                           <span className="font-medium text-foreground">

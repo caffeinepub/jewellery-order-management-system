@@ -621,6 +621,46 @@ export function usePersistMasterDataRows() {
   });
 }
 
+// Persist reconciliation rows with size using saveOrder directly
+export function usePersistReconciliationRows() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      rows: Array<{
+        orderNo: string;
+        designCode: string;
+        karigar: string;
+        weight: number;
+        size: number;
+        quantity: number;
+        orderType: import("../backend").OrderType;
+        orderDate?: bigint;
+      }>,
+    ) => {
+      if (!actor) throw new Error("Actor not initialized");
+      const now = BigInt(Date.now()) * BigInt(1_000_000);
+      for (const row of rows) {
+        const orderId = `recon_${row.orderNo}_${row.designCode}_${Date.now()}`;
+        await actor.saveOrder(
+          row.orderNo,
+          row.orderType,
+          "", // product
+          row.designCode,
+          row.weight,
+          row.size,
+          BigInt(row.quantity),
+          "", // remarks
+          orderId,
+          row.orderDate ?? now,
+        );
+      }
+      return { persisted: rows };
+    },
+    onSuccess: () => invalidateOrderCaches(queryClient),
+  });
+}
+
 export function useUpdateDesignGroupStatus() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
