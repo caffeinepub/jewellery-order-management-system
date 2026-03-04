@@ -420,6 +420,33 @@ export async function exportToJPEG(
 // ─── Karigar grouped export (by Design Code) ─────────────────────────────────
 
 /**
+ * Loads an image from a URL and returns an HTMLImageElement.
+ * Resolves even on error (returns null on failure).
+ */
+function loadImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    // Only set crossOrigin for non-blob URLs to avoid CORS failures with IC HTTP gateway
+    if (!url.startsWith("blob:")) {
+      img.crossOrigin = "anonymous";
+    }
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      // If crossOrigin caused a failure, retry without it
+      if (img.crossOrigin) {
+        const retry = new Image();
+        retry.onload = () => resolve(retry);
+        retry.onerror = () => resolve(null);
+        retry.src = url;
+      } else {
+        resolve(null);
+      }
+    };
+    img.src = url;
+  });
+}
+
+/**
  * Exports karigar orders grouped by design code.
  * Each design code gets its own page (PDF) or section (JPEG).
  * Shows: Design Code, Generic Name, image (fetched via URL), order lines table.
@@ -449,337 +476,171 @@ export async function exportKarigarByDesignGrouped(
 
   if (format === "pdf") {
     // ── PDF path ──────────────────────────────────────────────────────────────
-    const PAGE_W = 595;
-    const PAGE_H = 842;
+    // Use jsPDF-style canvas-to-PDF via a hidden canvas per page, then
+    // assemble a multi-page PDF using the raw PDF spec.
+    // Images in raw PDF require XObject embedding — instead we render each
+    // page to a canvas first and embed as JPEG XObject.
+
+    // Use 2x scale for high-quality rendering (retina/print quality)
+    const SCALE = 2;
+    const PAGE_W_PX = 794; // A4 @ 96dpi ≈ 794x1123 (logical pixels)
+    const PAGE_H_PX = 1123;
     const MARGIN = 40;
-    const escapePdf = (s: string) =>
-      s
-        .replace(/[^\x20-\x7E]/g, "?")
-        .replace(/\\/g, "\\\\")
-        .replace(/\(/g, "\\(")
-        .replace(/\)/g, "\\)");
+    const BRAND_H = 70;
+    const GREEN_H = 40;
+    const IMG_AREA = Math.floor(PAGE_H_PX * 0.4); // ~40% of page height
+    const TABLE_ROW_H = 22;
+    const TABLE_HEADER_H = 26;
+    const COL_WIDTHS = [230, 100, 60, 50, 80, 80, 60]; // Order No, Karigar, Size, Qty, Unit Wt, Total Wt, Type
+    const TABLE_COLS = [
+      "Order No",
+      "Karigar",
+      "Size",
+      "Qty",
+      "Unit Wt",
+      "Total Wt",
+      "Type",
+    ];
+    const TABLE_W = PAGE_W_PX - MARGIN * 2;
 
-    const objects: string[] = [];
-    let objCount = 0;
-    function addObj(content: string): number {
-      objCount++;
-      objects.push(`${objCount} 0 obj\n${content}\nendobj`);
-      return objCount;
-    }
-
-    const boldFontId = addObj(
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
-    );
-    const fontId = addObj(
-      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
-    );
-
-    const pageContentIds: number[] = [];
-    const pageIds: number[] = [];
+    // We'll build one canvas per design group and collect JPEG data URLs + actual dimensions
+    const pageDataUrls: string[] = [];
+    const pageActualHeights: number[] = []; // actual canvas heights in scaled pixels
 
     for (const [design, groupOrders] of groups) {
-      const genericName = groupOrders[0]?.genericName ?? "—";
+      const genericName = groupOrders[0]?.genericName ?? "";
       const totalQty = groupOrders.reduce((s, o) => s + Number(o.quantity), 0);
       const totalWt = groupOrders.reduce(
         (s, o) => s + o.weight * Number(o.quantity),
         0,
       );
 
-      let y = PAGE_H - MARGIN;
-      let stream = "";
+      // Calculate required height for this page (logical pixels)
+      const contentH =
+        BRAND_H +
+        GREEN_H +
+        36 + // generic name + summary
+        IMG_AREA +
+        10 + // image gap
+        TABLE_HEADER_H +
+        groupOrders.length * TABLE_ROW_H +
+        MARGIN;
+      const pageH = Math.max(PAGE_H_PX, contentH);
 
-      // Header band background
-      stream += `q\n0.102 0.102 0.18 rg\n0 ${y - 60} m\n${PAGE_W} ${y - 60} l\n${PAGE_W} ${y} l\n0 ${y} l\nf\nQ\n`;
-      y -= 20;
+      // Create canvas at 2x resolution for crisp image quality
+      const canvas = document.createElement("canvas");
+      canvas.width = PAGE_W_PX * SCALE;
+      canvas.height = pageH * SCALE;
+      const ctx = canvas.getContext("2d")!;
 
-      // "SHREE I JEWELLERY" in brand orange
-      stream += `BT\n/F2 16 Tf\n1 0.604 0.086 rg\n${MARGIN} ${y} Td\n(SHREE I JEWELLERY) Tj\nET\n`;
-      y -= 16;
-      stream += `BT\n/F1 9 Tf\n0.9 0.9 0.9 rg\n${MARGIN} ${y} Td\n(Karigar: ${escapePdf(karigarName)}  |  ${escapePdf(today)}) Tj\nET\n`;
-      y -= 24;
+      // Scale all drawing operations by SCALE factor
+      ctx.scale(SCALE, SCALE);
+
+      // White background
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, PAGE_W_PX, pageH);
+
+      let yPos = 0;
+
+      // Brand header band
+      ctx.fillStyle = "#1a1a2e";
+      ctx.fillRect(0, yPos, PAGE_W_PX, BRAND_H);
+      ctx.fillStyle = "#f97316";
+      ctx.font = "bold 24px Arial, sans-serif";
+      ctx.fillText("SHREE I JEWELLERY", MARGIN, yPos + 38);
+      ctx.fillStyle = "#e5e7eb";
+      ctx.font = "13px Arial, sans-serif";
+      ctx.fillText(`Karigar: ${karigarName}  |  ${today}`, MARGIN, yPos + 60);
+      yPos += BRAND_H;
 
       // Design header block (green)
-      stream += `q\n0.133 0.545 0.133 rg\n${MARGIN} ${y - 28} m\n${PAGE_W - MARGIN} ${y - 28} l\n${PAGE_W - MARGIN} ${y + 4} l\n${MARGIN} ${y + 4} l\nf\nQ\n`;
-      stream += `BT\n/F2 13 Tf\n1 1 1 rg\n${MARGIN + 8} ${y - 16} Td\n(Design: ${escapePdf(design)}) Tj\nET\n`;
-      y -= 36;
-
-      // Generic name
-      stream += `BT\n/F2 11 Tf\n0.2 0.2 0.2 rg\n${MARGIN} ${y} Td\n(${escapePdf(genericName)}) Tj\nET\n`;
-      y -= 14;
-
-      // Summary line
-      stream += `BT\n/F1 9 Tf\n0.4 0.4 0.4 rg\n${MARGIN} ${y} Td\n(${groupOrders.length} orders  |  Qty: ${totalQty}  |  Total Wt: ${totalWt.toFixed(2)}g) Tj\nET\n`;
-      y -= 20;
-
-      // Image placeholder box (300 x 180)
-      const imgX = (PAGE_W - 300) / 2;
-      stream += `q\n0.93 0.93 0.93 rg\n${imgX} ${y - 180} m\n${imgX + 300} ${y - 180} l\n${imgX + 300} ${y} l\n${imgX} ${y} l\nf\nQ\n`;
-      stream += `q\n0.7 0.7 0.7 RG\n1 w\n${imgX} ${y - 180} m\n${imgX + 300} ${y - 180} l\n${imgX + 300} ${y} l\n${imgX} ${y} l\nh\nS\nQ\n`;
-      stream += `BT\n/F1 10 Tf\n0.5 0.5 0.5 rg\n${imgX + 100} ${y - 96} Td\n(Design Image: ${escapePdf(design)}) Tj\nET\n`;
-      y -= 200;
-
-      // Table header
-      const COL = [140, 80, 60, 50, 70, 70, 60];
-      const HEADERS = [
-        "Order No",
-        "Karigar",
-        "Size",
-        "Qty",
-        "Unit Wt",
-        "Total Wt",
-        "Type",
-      ];
-      stream += `q\n0.22 0.22 0.22 rg\n${MARGIN} ${y - 18} m\n${PAGE_W - MARGIN} ${y - 18} l\n${PAGE_W - MARGIN} ${y + 2} l\n${MARGIN} ${y + 2} l\nf\nQ\n`;
-      let hx = MARGIN + 6;
-      for (let h = 0; h < HEADERS.length; h++) {
-        stream += `BT\n/F2 8 Tf\n1 1 1 rg\n${hx} ${y - 12} Td\n(${HEADERS[h]}) Tj\nET\n`;
-        hx += COL[h];
-      }
-      y -= 20;
-
-      // Order rows
-      for (let ri = 0; ri < groupOrders.length; ri++) {
-        const o = groupOrders[ri];
-        if (y < MARGIN + 20) break; // skip if out of page
-        const rowBg = ri % 2 === 0 ? "1 1 1" : "0.96 0.96 0.96";
-        stream += `q\n${rowBg} rg\n${MARGIN} ${y - 16} m\n${PAGE_W - MARGIN} ${y - 16} l\n${PAGE_W - MARGIN} ${y + 2} l\n${MARGIN} ${y + 2} l\nf\nQ\n`;
-        const cells = [
-          o.orderNo,
-          o.karigarName ?? "—",
-          o.size ? String(o.size) : "—",
-          String(Number(o.quantity)),
-          `${o.weight}g`,
-          `${(o.weight * Number(o.quantity)).toFixed(1)}g`,
-          o.orderType,
-        ];
-        let rx = MARGIN + 6;
-        stream += "BT\n/F1 8 Tf\n0.1 0.1 0.1 rg\n";
-        for (let ci = 0; ci < cells.length; ci++) {
-          stream += `${rx} ${y - 10} Td\n(${escapePdf(String(cells[ci]).substring(0, 16))}) Tj\n`;
-          rx += COL[ci];
-          if (ci < cells.length - 1)
-            stream += `${-rx + MARGIN + 6 + COL.slice(0, ci + 1).reduce((a, b) => a + b, 0)} 0 Td\n`;
-        }
-        stream += "ET\n";
-        y -= 18;
-      }
-
-      const streamLen = new TextEncoder().encode(stream).length;
-      const contentId = addObj(
-        `<< /Length ${streamLen} >>\nstream\n${stream}\nendstream`,
-      );
-      pageContentIds.push(contentId);
-      const pageId = addObj(
-        `<< /Type /Page /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${fontId} 0 R /F2 ${boldFontId} 0 R >> >> >>`,
-      );
-      pageIds.push(pageId);
-    }
-
-    const kidsRef = pageIds.map((id) => `${id} 0 R`).join(" ");
-    const pagesId = addObj(
-      `<< /Type /Pages /Kids [${kidsRef}] /Count ${pageIds.length} >>`,
-    );
-    for (let i = 0; i < pageIds.length; i++) {
-      const idx = pageIds[i] - 1;
-      objects[idx] =
-        `${pageIds[i]} 0 obj\n<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents ${pageContentIds[i]} 0 R /Resources << /Font << /F1 ${fontId} 0 R /F2 ${boldFontId} 0 R >> >> >>\nendobj`;
-    }
-    const catalogId = addObj(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
-
-    let body = "%PDF-1.4\n";
-    const offsets: number[] = [];
-    for (const obj of objects) {
-      offsets.push(body.length);
-      body += `${obj}\n`;
-    }
-    const xrefOffset = body.length;
-    body += "xref\n";
-    body += `0 ${objCount + 1}\n`;
-    body += "0000000000 65535 f \n";
-    for (const off of offsets) {
-      body += `${off.toString().padStart(10, "0")} 00000 n \n`;
-    }
-    body += "trailer\n";
-    body += `<< /Size ${objCount + 1} /Root ${catalogId} 0 R >>\n`;
-    body += "startxref\n";
-    body += `${xrefOffset}\n`;
-    body += "%%EOF\n";
-
-    const encoded = new TextEncoder().encode(body);
-    triggerDownload(
-      new Blob([encoded.buffer.slice(0) as ArrayBuffer], {
-        type: "application/pdf",
-      }),
-      filename,
-    );
-  } else {
-    // ── JPEG path ─────────────────────────────────────────────────────────────
-    const SECTION_PADDING = 20;
-    const IMG_H = 160;
-    const ROW_H = 26;
-    const TABLE_HEADER_H = 24;
-    const GROUP_HEADER_H = 80;
-    const PAGE_W = 860;
-
-    // Compute total canvas height
-    let totalH = 80; // top brand header
-    for (const [, groupOrders] of groups) {
-      totalH +=
-        GROUP_HEADER_H +
-        IMG_H +
-        TABLE_HEADER_H +
-        groupOrders.length * ROW_H +
-        SECTION_PADDING;
-    }
-    totalH += 20; // bottom padding
-
-    const canvas = document.createElement("canvas");
-    canvas.width = PAGE_W;
-    canvas.height = totalH;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      alert("Canvas not supported.");
-      return;
-    }
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, PAGE_W, totalH);
-
-    // Brand header
-    ctx.fillStyle = "#1a1a2e";
-    ctx.fillRect(0, 0, PAGE_W, 70);
-    ctx.fillStyle = "#f97316";
-    ctx.font = "bold 22px Arial, sans-serif";
-    ctx.fillText("SHREE I JEWELLERY", SECTION_PADDING, 34);
-    ctx.fillStyle = "#e5e7eb";
-    ctx.font = "13px Arial, sans-serif";
-    ctx.fillText(`Karigar: ${karigarName}  |  ${today}`, SECTION_PADDING, 56);
-
-    let yPos = 80;
-
-    for (const [design, groupOrders] of groups) {
-      const genericName = groupOrders[0]?.genericName ?? "—";
-      const totalQty = groupOrders.reduce((s, o) => s + Number(o.quantity), 0);
-      const totalWt = groupOrders.reduce(
-        (s, o) => s + o.weight * Number(o.quantity),
-        0,
-      );
-
-      // Design group header (green band)
       ctx.fillStyle = "#1a8c1a";
-      ctx.fillRect(0, yPos, PAGE_W, 40);
+      ctx.fillRect(0, yPos, PAGE_W_PX, GREEN_H);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 15px Arial, sans-serif";
-      ctx.fillText(`Design: ${design}`, SECTION_PADDING, yPos + 26);
-      yPos += 40;
+      ctx.font = "bold 17px Arial, sans-serif";
+      ctx.fillText(`Design: ${design}`, MARGIN, yPos + 26);
+      yPos += GREEN_H;
 
-      // Generic name + summary
-      ctx.fillStyle = "#f3f4f6";
-      ctx.fillRect(0, yPos, PAGE_W, 36);
-      ctx.fillStyle = "#1a1a1a";
+      // Generic name + summary line
+      ctx.fillStyle = "#f8f8f8";
+      ctx.fillRect(0, yPos, PAGE_W_PX, 36);
+      ctx.fillStyle = "#111111";
       ctx.font = "bold 13px Arial, sans-serif";
-      ctx.fillText(genericName, SECTION_PADDING, yPos + 15);
+      ctx.fillText(genericName, MARGIN, yPos + 16);
       ctx.fillStyle = "#6b7280";
       ctx.font = "11px Arial, sans-serif";
       ctx.fillText(
         `${groupOrders.length} orders  |  Qty: ${totalQty}  |  Total Wt: ${totalWt.toFixed(2)}g`,
-        SECTION_PADDING,
+        MARGIN,
         yPos + 30,
       );
-      yPos += 40;
+      yPos += 36;
 
-      // Design image — use real URL if available, else placeholder
-      const imgX = (PAGE_W - 300) / 2;
+      // Design image — centered, fills ~40% of page height
       const imgUrl = designImageUrls?.get(design);
-      if (imgUrl) {
-        try {
-          await new Promise<void>((resolve) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => {
-              // Draw image fitted within 300 x IMG_H box
-              const scale = Math.min(
-                300 / img.naturalWidth,
-                IMG_H / img.naturalHeight,
-              );
-              const drawW = img.naturalWidth * scale;
-              const drawH = img.naturalHeight * scale;
-              const drawX = imgX + (300 - drawW) / 2;
-              const drawY = yPos + (IMG_H - drawH) / 2;
-              ctx.fillStyle = "#f8f8f8";
-              ctx.fillRect(imgX, yPos, 300, IMG_H);
-              ctx.drawImage(img, drawX, drawY, drawW, drawH);
-              resolve();
-            };
-            img.onerror = () => {
-              // Fallback placeholder on error
-              ctx.fillStyle = "#eeeeee";
-              ctx.fillRect(imgX, yPos, 300, IMG_H);
-              ctx.strokeStyle = "#cccccc";
-              ctx.lineWidth = 1;
-              ctx.strokeRect(imgX, yPos, 300, IMG_H);
-              ctx.fillStyle = "#aaaaaa";
-              ctx.font = "12px Arial, sans-serif";
-              ctx.fillText(`[Image: ${design}]`, imgX + 60, yPos + IMG_H / 2);
-              resolve();
-            };
-            img.src = imgUrl;
-          });
-        } catch {
-          ctx.fillStyle = "#eeeeee";
-          ctx.fillRect(imgX, yPos, 300, IMG_H);
-        }
-      } else {
-        ctx.fillStyle = "#eeeeee";
-        ctx.fillRect(imgX, yPos, 300, IMG_H);
-        ctx.strokeStyle = "#cccccc";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(imgX, yPos, 300, IMG_H);
-        ctx.fillStyle = "#aaaaaa";
-        ctx.font = "12px Arial, sans-serif";
-        ctx.fillText(`[Image: ${design}]`, imgX + 80, yPos + IMG_H / 2);
-      }
-      yPos += IMG_H + 10;
+      const imgMaxW = PAGE_W_PX - MARGIN * 2;
+      const imgMaxH = IMG_AREA;
+      const imgBoxX = MARGIN;
+      const imgBoxY = yPos;
 
-      // Table header
-      const COLS = [
-        "Order No",
-        "Karigar",
-        "Size",
-        "Qty",
-        "Unit Wt",
-        "Total Wt",
-        "Type",
-      ];
-      const COL_W = [160, 110, 70, 60, 80, 80, 70];
+      const loadedImg = imgUrl ? await loadImage(imgUrl) : null;
+      if (loadedImg) {
+        const scale = Math.min(
+          imgMaxW / loadedImg.naturalWidth,
+          imgMaxH / loadedImg.naturalHeight,
+        );
+        const drawW = loadedImg.naturalWidth * scale;
+        const drawH = loadedImg.naturalHeight * scale;
+        const drawX = imgBoxX + (imgMaxW - drawW) / 2;
+        const drawY = imgBoxY + (imgMaxH - drawH) / 2;
+        ctx.fillStyle = "#f8f8f8";
+        ctx.fillRect(imgBoxX, imgBoxY, imgMaxW, imgMaxH);
+        ctx.drawImage(loadedImg, drawX, drawY, drawW, drawH);
+      } else {
+        // Placeholder
+        ctx.fillStyle = "#eeeeee";
+        ctx.fillRect(imgBoxX, imgBoxY, imgMaxW, imgMaxH);
+        ctx.strokeStyle = "#cccccc";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(imgBoxX, imgBoxY, imgMaxW, imgMaxH);
+        ctx.fillStyle = "#aaaaaa";
+        ctx.font = "14px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          `Design Image: ${design}`,
+          PAGE_W_PX / 2,
+          imgBoxY + imgMaxH / 2,
+        );
+        ctx.textAlign = "left";
+      }
+      yPos += imgMaxH + 10;
+
+      // Table header row
       ctx.fillStyle = "#374151";
-      ctx.fillRect(
-        SECTION_PADDING,
-        yPos,
-        PAGE_W - SECTION_PADDING * 2,
-        TABLE_HEADER_H,
-      );
+      ctx.fillRect(MARGIN, yPos, TABLE_W, TABLE_HEADER_H);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 11px Arial, sans-serif";
-      let cx = SECTION_PADDING + 6;
-      for (let h = 0; h < COLS.length; h++) {
-        ctx.fillText(COLS[h], cx, yPos + 16);
-        cx += COL_W[h];
+      let hx = MARGIN + 6;
+      for (let h = 0; h < TABLE_COLS.length; h++) {
+        ctx.fillText(TABLE_COLS[h], hx, yPos + 17);
+        hx += COL_WIDTHS[h];
       }
       yPos += TABLE_HEADER_H;
 
       // Order rows
       for (let ri = 0; ri < groupOrders.length; ri++) {
         const o = groupOrders[ri];
-        ctx.fillStyle = ri % 2 === 0 ? "#ffffff" : "#f9fafb";
-        ctx.fillRect(
-          SECTION_PADDING,
-          yPos,
-          PAGE_W - SECTION_PADDING * 2,
-          ROW_H,
-        );
-        ctx.fillStyle = "#1a1a1a";
+        ctx.fillStyle = ri % 2 === 0 ? "#ffffff" : "#f3f4f6";
+        ctx.fillRect(MARGIN, yPos, TABLE_W, TABLE_ROW_H);
+        // Bottom border
+        ctx.strokeStyle = "#e5e7eb";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(MARGIN, yPos + TABLE_ROW_H);
+        ctx.lineTo(MARGIN + TABLE_W, yPos + TABLE_ROW_H);
+        ctx.stroke();
+
+        ctx.fillStyle = "#111111";
         ctx.font = "11px Arial, sans-serif";
         const cells = [
           o.orderNo,
@@ -788,19 +649,366 @@ export async function exportKarigarByDesignGrouped(
           String(Number(o.quantity)),
           `${o.weight}g`,
           `${(o.weight * Number(o.quantity)).toFixed(1)}g`,
-          o.orderType,
+          String(o.orderType),
         ];
-        let rx = SECTION_PADDING + 6;
+        let rx = MARGIN + 6;
         for (let ci = 0; ci < cells.length; ci++) {
-          ctx.fillText(String(cells[ci]).substring(0, 20), rx, yPos + 17);
-          rx += COL_W[ci];
+          // Clip text to column width
+          const maxChars = Math.floor(COL_WIDTHS[ci] / 7);
+          const cellText = String(cells[ci]).substring(0, maxChars);
+          ctx.fillText(cellText, rx, yPos + 15);
+          rx += COL_WIDTHS[ci];
+        }
+        yPos += TABLE_ROW_H;
+      }
+
+      // Convert page canvas to data URL at high quality
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.97);
+      pageDataUrls.push(dataUrl);
+      pageActualHeights.push(canvas.height); // store actual canvas pixel height
+    }
+
+    // Now assemble a PDF where each page is the rendered canvas JPEG
+    // We embed each JPEG as an XObject image in the PDF
+    const PAGE_W_PT = 595;
+    const PAGE_H_PT = 842;
+
+    const pdfObjects: string[] = [];
+    const binaryObjects: ArrayBuffer[] = [];
+    let objCount = 0;
+
+    // We track which objects are binary (JPEG streams)
+    const binaryObjIndices = new Set<number>();
+
+    function addTextObj(content: string): number {
+      objCount++;
+      pdfObjects.push(`${objCount} 0 obj\n${content}\nendobj`);
+      binaryObjects.push(new ArrayBuffer(0));
+      return objCount;
+    }
+
+    function addBinaryObj(header: string, jpegBytes: Uint8Array): number {
+      objCount++;
+      pdfObjects.push(`${objCount} 0 obj\n${header}\nstream\n`); // placeholder, binary appended later
+      binaryObjects.push(jpegBytes.buffer.slice(0) as ArrayBuffer);
+      binaryObjIndices.add(objCount - 1); // 0-based index
+      return objCount;
+    }
+
+    const pageContentIds: number[] = [];
+    const pageIds: number[] = [];
+    const imageXObjIds: number[] = [];
+
+    // Font (needed for page content streams even if no text)
+    const fontId = addTextObj(
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    );
+
+    for (let pi = 0; pi < pageDataUrls.length; pi++) {
+      const dataUrl = pageDataUrls[pi];
+      // Decode base64 to bytes
+      const base64 = dataUrl.split(",")[1];
+      const binaryStr = atob(base64);
+      const jpegBytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        jpegBytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      // Add JPEG XObject — use actual canvas pixel dimensions (scaled at 2x)
+      const actualH = pageActualHeights[pi] ?? PAGE_H_PX * SCALE;
+      const imgId = addBinaryObj(
+        `<< /Type /XObject /Subtype /Image /Width ${PAGE_W_PX * SCALE} /Height ${actualH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>`,
+        jpegBytes,
+      );
+      imageXObjIds.push(imgId);
+
+      // Page content stream: draw image filling the page
+      const stream = `q\n${PAGE_W_PT} 0 0 ${PAGE_H_PT} 0 0 cm\n/Im${pi + 1} Do\nQ\n`;
+      const streamBytes = new TextEncoder().encode(stream);
+      const contentId = addTextObj(
+        `<< /Length ${streamBytes.length} >>\nstream\n${stream}\nendstream`,
+      );
+      pageContentIds.push(contentId);
+
+      // Build XObject resource dict for this page
+      const xobjRef = `/Im${pi + 1} ${imgId} 0 R`;
+      const pageId = addTextObj(
+        `<< /Type /Page /MediaBox [0 0 ${PAGE_W_PT} ${PAGE_H_PT}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> /XObject << ${xobjRef} >> >> >>`,
+      );
+      pageIds.push(pageId);
+    }
+
+    if (pageIds.length === 0) {
+      // Fallback empty page
+      const contentId = addTextObj("<< /Length 0 >>\nstream\n\nendstream");
+      pageContentIds.push(contentId);
+      const pageId = addTextObj(
+        `<< /Type /Page /MediaBox [0 0 ${PAGE_W_PT} ${PAGE_H_PT}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> >> >>`,
+      );
+      pageIds.push(pageId);
+    }
+
+    const kidsRef = pageIds.map((id) => `${id} 0 R`).join(" ");
+    const pagesId = addTextObj(
+      `<< /Type /Pages /Kids [${kidsRef}] /Count ${pageIds.length} >>`,
+    );
+    for (let i = 0; i < pageIds.length; i++) {
+      const idx = pageIds[i] - 1;
+      const xobjRef =
+        i < imageXObjIds.length ? `/Im${i + 1} ${imageXObjIds[i]} 0 R` : "";
+      pdfObjects[idx] =
+        `${pageIds[i]} 0 obj\n<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_W_PT} ${PAGE_H_PT}] /Contents ${pageContentIds[i]} 0 R /Resources << /Font << /F1 ${fontId} 0 R >> /XObject << ${xobjRef} >> >> >>\nendobj`;
+    }
+    const catalogId = addTextObj(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+    // Assemble final PDF as binary
+    // Strategy: build text parts, insert binary JPEG streams at correct positions
+    const enc = new TextEncoder();
+    const parts: Uint8Array[] = [];
+
+    const headerStr = "%PDF-1.4\n%\xFF\xFF\xFF\xFF\n";
+    parts.push(enc.encode(headerStr));
+    let byteOffset = enc.encode(headerStr).length;
+
+    const offsets: number[] = new Array(objCount).fill(0);
+
+    for (let i = 0; i < pdfObjects.length; i++) {
+      offsets[i] = byteOffset;
+      const objStr = pdfObjects[i];
+      if (binaryObjIndices.has(i)) {
+        // Binary object: header up to "stream\n", then JPEG bytes, then "\nendstream\nendobj\n"
+        const headerPart = enc.encode(objStr); // ends with "stream\n"
+        parts.push(headerPart);
+        byteOffset += headerPart.length;
+        const jpegData = new Uint8Array(binaryObjects[i]);
+        parts.push(jpegData);
+        byteOffset += jpegData.length;
+        const trailer = enc.encode("\nendstream\nendobj\n");
+        parts.push(trailer);
+        byteOffset += trailer.length;
+      } else {
+        const objBytes = enc.encode(`${objStr}\n`);
+        parts.push(objBytes);
+        byteOffset += objBytes.length;
+      }
+    }
+
+    // xref table
+    const xrefOffset = byteOffset;
+    let xrefStr = "xref\n";
+    xrefStr += `0 ${objCount + 1}\n`;
+    xrefStr += "0000000000 65535 f \n";
+    for (const off of offsets) {
+      xrefStr += `${off.toString().padStart(10, "0")} 00000 n \n`;
+    }
+    xrefStr += "trailer\n";
+    xrefStr += `<< /Size ${objCount + 1} /Root ${catalogId} 0 R >>\n`;
+    xrefStr += "startxref\n";
+    xrefStr += `${xrefOffset}\n`;
+    xrefStr += "%%EOF\n";
+    parts.push(enc.encode(xrefStr));
+
+    // Merge all parts
+    const totalLen = parts.reduce((s, p) => s + p.length, 0);
+    const finalPdf = new Uint8Array(totalLen);
+    let pos = 0;
+    for (const p of parts) {
+      finalPdf.set(p, pos);
+      pos += p.length;
+    }
+
+    triggerDownload(
+      new Blob([finalPdf.buffer], { type: "application/pdf" }),
+      filename,
+    );
+  } else {
+    // ── JPEG path ─────────────────────────────────────────────────────────────
+    // Each design group is rendered as a section.
+    // Image occupies ~40% of the canvas width (which equals page width).
+    // Uses 2x scale for high-quality / retina output.
+    const JPEG_SCALE = 2;
+    const SECTION_PADDING = 20;
+    const ROW_H = 28;
+    const TABLE_HEADER_H = 28;
+    const BRAND_H = 70;
+    const GREEN_BAND_H = 40;
+    const META_BAND_H = 38;
+    const PAGE_W = 860; // logical width
+    // Image area height = ~40% of PAGE_W (square-ish, prominent)
+    const IMG_AREA_H = Math.floor(PAGE_W * 0.4); // ~344px (logical)
+
+    // Compute total canvas height (logical pixels)
+    let totalH = BRAND_H;
+    for (const [, groupOrders] of groups) {
+      totalH +=
+        GREEN_BAND_H +
+        META_BAND_H +
+        IMG_AREA_H +
+        10 +
+        TABLE_HEADER_H +
+        groupOrders.length * ROW_H +
+        SECTION_PADDING;
+    }
+    totalH += 20; // bottom padding
+
+    // Create canvas at 2x physical resolution for crisp output
+    const canvas = document.createElement("canvas");
+    canvas.width = PAGE_W * JPEG_SCALE;
+    canvas.height = totalH * JPEG_SCALE;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      alert("Canvas not supported.");
+      return;
+    }
+
+    // Scale all drawing to 2x
+    ctx.scale(JPEG_SCALE, JPEG_SCALE);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, PAGE_W, totalH);
+
+    // Brand header
+    ctx.fillStyle = "#1a1a2e";
+    ctx.fillRect(0, 0, PAGE_W, BRAND_H);
+    ctx.fillStyle = "#f97316";
+    ctx.font = "bold 26px Arial, sans-serif";
+    ctx.fillText("SHREE I JEWELLERY", SECTION_PADDING, 40);
+    ctx.fillStyle = "#e5e7eb";
+    ctx.font = "14px Arial, sans-serif";
+    ctx.fillText(`Karigar: ${karigarName}  |  ${today}`, SECTION_PADDING, 60);
+
+    let yPos = BRAND_H;
+
+    const TABLE_COLS = [
+      "Order No",
+      "Karigar",
+      "Size",
+      "Qty",
+      "Unit Wt",
+      "Total Wt",
+      "Type",
+    ];
+    const COL_WIDTHS = [230, 110, 70, 60, 80, 80, 70];
+    const TABLE_W = PAGE_W - SECTION_PADDING * 2;
+
+    for (const [design, groupOrders] of groups) {
+      const genericName = groupOrders[0]?.genericName ?? "";
+      const totalQty = groupOrders.reduce((s, o) => s + Number(o.quantity), 0);
+      const totalWt = groupOrders.reduce(
+        (s, o) => s + o.weight * Number(o.quantity),
+        0,
+      );
+
+      // Design group header (green band)
+      ctx.fillStyle = "#1a8c1a";
+      ctx.fillRect(0, yPos, PAGE_W, GREEN_BAND_H);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 17px Arial, sans-serif";
+      ctx.fillText(`Design: ${design}`, SECTION_PADDING, yPos + 26);
+      yPos += GREEN_BAND_H;
+
+      // Generic name + summary row
+      ctx.fillStyle = "#f3f4f6";
+      ctx.fillRect(0, yPos, PAGE_W, META_BAND_H);
+      ctx.fillStyle = "#111111";
+      ctx.font = "bold 14px Arial, sans-serif";
+      ctx.fillText(genericName, SECTION_PADDING, yPos + 16);
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "12px Arial, sans-serif";
+      ctx.fillText(
+        `${groupOrders.length} orders  |  Qty: ${totalQty}  |  Total Wt: ${totalWt.toFixed(2)}g`,
+        SECTION_PADDING,
+        yPos + 32,
+      );
+      yPos += META_BAND_H;
+
+      // Design image — large, centered, fills IMG_AREA_H
+      const imgMaxW = PAGE_W - SECTION_PADDING * 2;
+      const imgBoxX = SECTION_PADDING;
+      const imgBoxY = yPos;
+
+      const imgUrl = designImageUrls?.get(design);
+      const loadedImg = imgUrl ? await loadImage(imgUrl) : null;
+      if (loadedImg) {
+        const scale = Math.min(
+          imgMaxW / loadedImg.naturalWidth,
+          IMG_AREA_H / loadedImg.naturalHeight,
+        );
+        const drawW = loadedImg.naturalWidth * scale;
+        const drawH = loadedImg.naturalHeight * scale;
+        const drawX = imgBoxX + (imgMaxW - drawW) / 2;
+        const drawY = imgBoxY + (IMG_AREA_H - drawH) / 2;
+        ctx.fillStyle = "#f8f8f8";
+        ctx.fillRect(imgBoxX, imgBoxY, imgMaxW, IMG_AREA_H);
+        ctx.drawImage(loadedImg, drawX, drawY, drawW, drawH);
+      } else {
+        // Placeholder box
+        ctx.fillStyle = "#eeeeee";
+        ctx.fillRect(imgBoxX, imgBoxY, imgMaxW, IMG_AREA_H);
+        ctx.strokeStyle = "#cccccc";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(imgBoxX, imgBoxY, imgMaxW, IMG_AREA_H);
+        ctx.fillStyle = "#aaaaaa";
+        ctx.font = "15px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          `Design Image: ${design}`,
+          PAGE_W / 2,
+          imgBoxY + IMG_AREA_H / 2,
+        );
+        ctx.textAlign = "left";
+      }
+      yPos += IMG_AREA_H + 10;
+
+      // Table header row
+      ctx.fillStyle = "#374151";
+      ctx.fillRect(SECTION_PADDING, yPos, TABLE_W, TABLE_HEADER_H);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 12px Arial, sans-serif";
+      let hx = SECTION_PADDING + 8;
+      for (let h = 0; h < TABLE_COLS.length; h++) {
+        ctx.fillText(TABLE_COLS[h], hx, yPos + 18);
+        hx += COL_WIDTHS[h];
+      }
+      yPos += TABLE_HEADER_H;
+
+      // Order rows
+      for (let ri = 0; ri < groupOrders.length; ri++) {
+        const o = groupOrders[ri];
+        ctx.fillStyle = ri % 2 === 0 ? "#ffffff" : "#f3f4f6";
+        ctx.fillRect(SECTION_PADDING, yPos, TABLE_W, ROW_H);
+        // Bottom border
+        ctx.strokeStyle = "#e5e7eb";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(SECTION_PADDING, yPos + ROW_H);
+        ctx.lineTo(SECTION_PADDING + TABLE_W, yPos + ROW_H);
+        ctx.stroke();
+
+        ctx.fillStyle = "#111111";
+        ctx.font = "12px Arial, sans-serif";
+        const cells = [
+          o.orderNo,
+          o.karigarName ?? "—",
+          o.size ? String(o.size) : "—",
+          String(Number(o.quantity)),
+          `${o.weight}g`,
+          `${(o.weight * Number(o.quantity)).toFixed(1)}g`,
+          String(o.orderType),
+        ];
+        let rx = SECTION_PADDING + 8;
+        for (let ci = 0; ci < cells.length; ci++) {
+          const maxChars = Math.floor(COL_WIDTHS[ci] / 8);
+          ctx.fillText(String(cells[ci]).substring(0, maxChars), rx, yPos + 19);
+          rx += COL_WIDTHS[ci];
         }
         yPos += ROW_H;
       }
 
-      // Separator
+      // Section separator
       ctx.fillStyle = "#e5e7eb";
-      ctx.fillRect(0, yPos, PAGE_W, 1);
+      ctx.fillRect(0, yPos, PAGE_W, 2);
       yPos += SECTION_PADDING;
     }
 
@@ -810,7 +1018,7 @@ export async function exportKarigarByDesignGrouped(
         else alert("Failed to generate image.");
       },
       "image/jpeg",
-      0.92,
+      0.97, // high quality output
     );
   }
 }

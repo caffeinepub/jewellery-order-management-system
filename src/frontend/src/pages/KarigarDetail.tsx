@@ -106,7 +106,8 @@ export default function KarigarDetail() {
     }
   };
 
-  // Pre-fetch design image URLs for all unique design codes in this karigar's orders
+  // Pre-fetch design image URLs for all unique design codes in this karigar's orders.
+  // Uses getBytes() first for direct blob URLs; falls back to getDirectURL() if bytes empty.
   const fetchDesignImageUrls = async (
     orders: Order[],
   ): Promise<Map<string, string>> => {
@@ -116,11 +117,36 @@ export default function KarigarDetail() {
     await Promise.all(
       uniqueDesigns.map(async (design) => {
         try {
-          const blob = await actor.getDesignImage(design);
-          if (blob) {
-            const url = blob.getDirectURL();
-            if (url) urlMap.set(design, url);
+          const externalBlob = await actor.getDesignImage(design);
+          if (!externalBlob) return;
+
+          // Try getBytes() first — gives a local blob URL with no CORS issues
+          let url: string | null = null;
+          try {
+            const bytes = await externalBlob.getBytes();
+            if (bytes && bytes.length > 0) {
+              // Detect mime type from magic bytes
+              let mimeType = "image/jpeg";
+              if (bytes[0] === 0x89 && bytes[1] === 0x50)
+                mimeType = "image/png";
+              else if (bytes[0] === 0x47 && bytes[1] === 0x49)
+                mimeType = "image/gif";
+              else if (bytes[0] === 0x52 && bytes[1] === 0x49)
+                mimeType = "image/webp";
+              const blob = new Blob([bytes], { type: mimeType });
+              url = URL.createObjectURL(blob);
+            }
+          } catch {
+            // getBytes failed — fall through to getDirectURL
           }
+
+          // Fallback: use direct HTTP URL from the storage backend
+          if (!url) {
+            const directUrl = externalBlob.getDirectURL();
+            if (directUrl) url = directUrl;
+          }
+
+          if (url) urlMap.set(design, url);
         } catch {
           // skip failed image fetches
         }
