@@ -1,0 +1,39 @@
+import type { Time } from "@/backend";
+
+interface AgeingBadgeProps {
+  orderDate?: Time;
+  className?: string;
+}
+
+function getDaysAgo(orderDate?: Time): number | null {
+  if (!orderDate) return null;
+  const orderMs = Number(orderDate) / 1_000_000;
+  const nowMs = Date.now();
+  return Math.floor((nowMs - orderMs) / (1000 * 60 * 60 * 24));
+}
+
+export function AgeingBadge({ orderDate, className = "" }: AgeingBadgeProps) {
+  const days = getDaysAgo(orderDate);
+  if (days === null) return null;
+
+  let colorClass = "";
+  if (days <= 14) {
+    colorClass =
+      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300";
+  } else if (days <= 29) {
+    colorClass =
+      "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300";
+  } else {
+    colorClass = "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${colorClass} ${className}`}
+    >
+      {days}d
+    </span>
+  );
+}
+
+export { getDaysAgo };

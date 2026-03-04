@@ -1,58 +1,63 @@
-import { useState } from 'react';
-import { Link, useRouterState } from '@tanstack/react-router';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-} from '@/components/ui/sidebar';
+} from "@/components/ui/sidebar";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard,
-  Upload,
   AlertCircle,
+  Clock,
   Database,
+  FileCheck,
   Image,
+  LayoutDashboard,
   Printer,
   ScanLine,
   Trash2,
-} from 'lucide-react';
-import DataResetDialog from './DataResetDialog';
+  Upload,
+} from "lucide-react";
+import { useState } from "react";
+import DataResetDialog from "./DataResetDialog";
 
 const menuItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { title: 'Ingest Orders', icon: Upload, path: '/ingest-orders' },
-  { title: 'Unmapped Codes', icon: AlertCircle, path: '/unmapped-codes' },
-  { title: 'Master Designs', icon: Database, path: '/master-designs' },
-  { title: 'Design Images', icon: Image, path: '/design-images' },
-  { title: 'Tag Printing', icon: Printer, path: '/tag-printing' },
-  { title: 'Barcode Scanning', icon: ScanLine, path: '/barcode-scanning' },
+  { title: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { title: "Ingest Orders", icon: Upload, path: "/ingest-orders" },
+  { title: "Unmapped Codes", icon: AlertCircle, path: "/unmapped-codes" },
+  { title: "Master Designs", icon: Database, path: "/master-designs" },
+  { title: "Design Images", icon: Image, path: "/design-images" },
+  { title: "Tag Printing", icon: Printer, path: "/tag-printing" },
+  { title: "Barcode Scanning", icon: ScanLine, path: "/barcode-scanning" },
+  { title: "Reconciliation", icon: FileCheck, path: "/reconciliation" },
+  { title: "Ageing Stock", icon: Clock, path: "/ageing-stock" },
 ];
 
-export default function AppSidebar() {
+export function AppSidebar() {
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
   const [showDataResetDialog, setShowDataResetDialog] = useState(false);
 
   return (
     <>
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="offcanvas">
         <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gold text-gold-foreground">
               <LayoutDashboard className="h-5 w-5" />
             </div>
-            <div className="group-data-[collapsible=icon]:hidden">
+            <div>
               <h2 className="text-base font-semibold">Jewellery OMS</h2>
               <p className="text-xs text-muted-foreground">Order Management</p>
             </div>
           </div>
         </SidebarHeader>
+
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
@@ -62,7 +67,10 @@ export default function AppSidebar() {
               <SidebarMenu>
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton asChild isActive={currentPath === item.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={currentPath === item.path}
+                    >
                       <Link to={item.path}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
@@ -71,7 +79,9 @@ export default function AppSidebar() {
                   </SidebarMenuItem>
                 ))}
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => setShowDataResetDialog(true)}>
+                  <SidebarMenuButton
+                    onClick={() => setShowDataResetDialog(true)}
+                  >
                     <Trash2 className="h-4 w-4" />
                     <span>Data Reset</span>
                   </SidebarMenuButton>
@@ -80,12 +90,13 @@ export default function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+
         <SidebarFooter className="border-t border-sidebar-border p-4">
-          <p className="text-xs text-muted-foreground text-center group-data-[collapsible=icon]:hidden">
-            Built with love using{' '}
+          <p className="text-xs text-muted-foreground text-center">
+            Built with <span className="text-red-400">♥</span> using{" "}
             <a
               href={`https://caffeine.ai/?utm_source=Caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(
-                window.location.hostname
+                window.location.hostname,
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -94,7 +105,7 @@ export default function AppSidebar() {
               caffeine.ai
             </a>
           </p>
-          <p className="text-xs text-muted-foreground text-center mt-1 group-data-[collapsible=icon]:hidden">
+          <p className="text-xs text-muted-foreground text-center mt-1">
             © {new Date().getFullYear()}
           </p>
         </SidebarFooter>
@@ -107,3 +118,5 @@ export default function AppSidebar() {
     </>
   );
 }
+
+export default AppSidebar;

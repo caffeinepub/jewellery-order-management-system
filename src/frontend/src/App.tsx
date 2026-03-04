@@ -1,23 +1,35 @@
-import { RouterProvider, createRouter, createRoute, createRootRoute, Outlet } from '@tanstack/react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from 'next-themes';
-import { Toaster } from '@/components/ui/sonner';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import AppSidebar from '@/components/layout/AppSidebar';
-import Dashboard from '@/pages/Dashboard';
-import IngestOrders from '@/pages/IngestOrders';
-import UnmappedCodes from '@/pages/UnmappedCodes';
-import MasterDesigns from '@/pages/MasterDesigns';
-import DesignImages from '@/pages/DesignImages';
-import TagPrinting from '@/pages/TagPrinting';
-import BarcodeScanning from '@/pages/BarcodeScanning';
-import KarigarDetail from '@/pages/KarigarDetail';
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
+import AgeingStock from "@/pages/AgeingStock";
+import BarcodeScanning from "@/pages/BarcodeScanning";
+import Dashboard from "@/pages/Dashboard";
+import DesignImages from "@/pages/DesignImages";
+import IngestOrders from "@/pages/IngestOrders";
+import KarigarDetail from "@/pages/KarigarDetail";
+import MasterDesigns from "@/pages/MasterDesigns";
+import Reconciliation from "@/pages/Reconciliation";
+import TagPrinting from "@/pages/TagPrinting";
+import UnmappedCodes from "@/pages/UnmappedCodes";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  Outlet,
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,
-      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 30000,
     },
   },
 });
@@ -25,13 +37,14 @@ const queryClient = new QueryClient({
 function RootLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full overflow-x-hidden">
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset className="flex-1">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 lg:hidden">
-            <SidebarTrigger />
+        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {/* Mobile-only header with sidebar trigger */}
+          <header className="flex h-12 shrink-0 items-center gap-2 px-3 md:hidden border-b border-border">
+            <SidebarTrigger className="-ml-1" />
           </header>
-          <main className="flex-1">
+          <main className="flex-1 min-w-0 overflow-auto">
             <Outlet />
           </main>
         </SidebarInset>
@@ -44,55 +57,74 @@ const rootRoute = createRootRoute({
   component: RootLayout,
 });
 
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: Dashboard,
+});
+
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/',
+  path: "/dashboard",
   component: Dashboard,
 });
 
 const ingestOrdersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/ingest-orders',
+  path: "/ingest-orders",
   component: IngestOrders,
 });
 
 const unmappedCodesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/unmapped-codes',
+  path: "/unmapped-codes",
   component: UnmappedCodes,
 });
 
 const masterDesignsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/master-designs',
+  path: "/master-designs",
   component: MasterDesigns,
 });
 
 const designImagesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/design-images',
+  path: "/design-images",
   component: DesignImages,
 });
 
 const tagPrintingRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/tag-printing',
+  path: "/tag-printing",
   component: TagPrinting,
 });
 
 const barcodeScanningRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/barcode-scanning',
+  path: "/barcode-scanning",
   component: BarcodeScanning,
+});
+
+const reconciliationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reconciliation",
+  component: Reconciliation,
+});
+
+const ageingStockRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/ageing-stock",
+  component: AgeingStock,
 });
 
 const karigarDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/karigar/$name',
+  path: "/karigar/$name",
   component: KarigarDetail,
 });
 
 const routeTree = rootRoute.addChildren([
+  indexRoute,
   dashboardRoute,
   ingestOrdersRoute,
   unmappedCodesRoute,
@@ -100,24 +132,28 @@ const routeTree = rootRoute.addChildren([
   designImagesRoute,
   tagPrintingRoute,
   barcodeScanningRoute,
+  reconciliationRoute,
+  ageingStockRoute,
   karigarDetailRoute,
 ]);
 
 const router = createRouter({ routeTree });
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router;
   }
 }
 
-export default function App() {
+function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        <Toaster />
+        <Toaster richColors position="top-right" />
       </QueryClientProvider>
     </ThemeProvider>
   );
 }
+
+export default App;

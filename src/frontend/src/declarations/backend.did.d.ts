@@ -30,12 +30,33 @@ export interface MappingRecord {
   'genericName' : string,
   'designCode' : string,
 }
+export interface MasterDataRow {
+  'weight' : number,
+  'karigar' : string,
+  'orderDate' : [] | [Time],
+  'orderType' : OrderType,
+  'orderNo' : string,
+  'quantity' : bigint,
+  'designCode' : string,
+}
+export interface MasterPersistedResponse { 'persisted' : Array<Order> }
+export interface MasterReconciliationResult {
+  'missingInMasterCount' : bigint,
+  'newLinesCount' : bigint,
+  'alreadyExistingRows' : bigint,
+  'totalUploadedRows' : bigint,
+  'newLines' : Array<MasterDataRow>,
+  'missingInMaster' : Array<Order>,
+}
 export interface Order {
   'weight' : number,
   'status' : OrderStatus,
   'readyDate' : [] | [Time],
+  'originalOrderId' : [] | [string],
   'createdAt' : Time,
+  'movedBy' : [] | [string],
   'size' : number,
+  'orderDate' : [] | [Time],
   'orderType' : OrderType,
   'design' : string,
   'orderId' : string,
@@ -84,6 +105,12 @@ export interface _SERVICE {
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   'addKarigar' : ActorMethod<[string], undefined>,
   'assignOrdersToKarigar' : ActorMethod<[Array<MappingRecord>], undefined>,
+  'batchDeleteOrders' : ActorMethod<[Array<string>], undefined>,
+  'batchGetByStatus' : ActorMethod<[Array<string>, OrderStatus], Array<string>>,
+  'batchReturnOrdersToPending' : ActorMethod<
+    [Array<[string, bigint]>],
+    undefined
+  >,
   'batchSaveDesignMappings' : ActorMethod<
     [Array<[string, DesignMapping]>],
     undefined
@@ -96,6 +123,7 @@ export interface _SERVICE {
     [Array<[string, ExternalBlob]>],
     undefined
   >,
+  'clearAllDesignMappings' : ActorMethod<[], undefined>,
   'deleteOrder' : ActorMethod<[string], undefined>,
   'deleteReadyOrder' : ActorMethod<[string], undefined>,
   'getAllMasterDesignMappings' : ActorMethod<
@@ -103,11 +131,16 @@ export interface _SERVICE {
     Array<[string, DesignMapping]>
   >,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getDesignCountByKarigar' : ActorMethod<[string], [] | [bigint]>,
   'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
+  'getDesignImageMapping' : ActorMethod<[], Array<[string, ExternalBlob]>>,
   'getDesignMapping' : ActorMethod<[string], DesignMapping>,
+  'getFilteredOutKarigars' : ActorMethod<[], Array<string>>,
   'getKarigars' : ActorMethod<[], Array<Karigar>>,
   'getMasterDesignExcel' : ActorMethod<[], [] | [ExternalBlob]>,
   'getMasterDesignKarigars' : ActorMethod<[], Array<string>>,
+  'getMasterDesigns' : ActorMethod<[], Array<[string, string, string]>>,
+  'getOrder' : ActorMethod<[string], [] | [Order]>,
   'getOrders' : ActorMethod<
     [[] | [OrderStatus], [] | [OrderType], [] | [string]],
     Array<Order>
@@ -116,14 +149,38 @@ export interface _SERVICE {
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getReadyOrdersByDateRange' : ActorMethod<[Time, Time], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
+  'getUnreturnedOrders' : ActorMethod<[], Array<Order>>,
   'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
+  'markAllAsReady' : ActorMethod<[], undefined>,
+  'markOrdersAsPending' : ActorMethod<[Array<string>], undefined>,
   'markOrdersAsReady' : ActorMethod<[Array<string>], undefined>,
-  'markOrdersAsReturned' : ActorMethod<[Array<string>], undefined>,
-  'reassignDesign' : ActorMethod<[string, string], undefined>,
+  'persistMasterDataRows' : ActorMethod<
+    [Array<MasterDataRow>],
+    MasterPersistedResponse
+  >,
+  'reassignDesign' : ActorMethod<[string, string, string], undefined>,
+  'reconcileMasterFile' : ActorMethod<
+    [Array<MasterDataRow>],
+    MasterReconciliationResult
+  >,
+  'registerKarigar' : ActorMethod<[string], undefined>,
   'resetActiveOrders' : ActorMethod<[], undefined>,
+  'returnOrdersToPending' : ActorMethod<[string, bigint], undefined>,
   'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
+  'saveModifiedOrder' : ActorMethod<[bigint, bigint, Order], undefined>,
   'saveOrder' : ActorMethod<
-    [string, OrderType, string, string, number, number, bigint, string, string],
+    [
+      string,
+      OrderType,
+      string,
+      string,
+      number,
+      number,
+      bigint,
+      string,
+      string,
+      [] | [Time],
+    ],
     undefined
   >,
   'supplyAndReturnOrder' : ActorMethod<[string, bigint], undefined>,

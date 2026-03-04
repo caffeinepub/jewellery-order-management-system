@@ -1,135 +1,142 @@
-import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGetAllOrders } from '@/hooks/useQueries';
-import { Package, Weight, Hash, Users } from 'lucide-react';
-import { OrderType, OrderStatus } from '@/backend';
-
-type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CheckCircle, Package, RotateCcw, Stamp } from "lucide-react";
+import { useMemo } from "react";
+import { type Order, OrderStatus, OrderType } from "../../backend";
+import { useGetAllOrders } from "../../hooks/useQueries";
 
 interface SummaryCardsProps {
-  activeTab?: ActiveTab;
+  activeTab?: string;
 }
 
-export default function SummaryCards({ activeTab }: SummaryCardsProps) {
-  const { data: orders = [], isLoading } = useGetAllOrders();
+// Dynamic weight: always unit_weight × qty
+function dynamicWeight(order: Order): number {
+  return order.weight * Number(order.quantity);
+}
 
-  // Safely filter orders based on active tab using useMemo
-  const filteredOrders = useMemo(() => {
-    // Return empty array if orders is undefined or null
-    if (!orders || !Array.isArray(orders)) {
-      return [];
-    }
+// Count unique order numbers (not row count)
+function uniqueOrderCount(orders: Order[]): number {
+  return new Set(orders.map((o) => o.orderNo)).size;
+}
 
-    // Filter based on active tab
-    let result = orders;
-    
-    switch (activeTab) {
-      case "total":
-        // Total orders tab: Pending and ReturnFromHallmark orders
-        result = orders.filter(
-          (order) =>
-            order?.status === OrderStatus.Pending ||
-            order?.status === OrderStatus.ReturnFromHallmark
-        );
-        break;
+export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
+  const { data: allOrders = [], isLoading } = useGetAllOrders();
 
-      case "ready":
-        // Ready tab: orders with Ready status
-        result = orders.filter((order) => order?.status === OrderStatus.Ready);
-        
-        // Deduplicate orders by orderId - keep only the first occurrence
-        // This matches the deduplication logic in ReadyTab.tsx
-        const seenOrderIds = new Set<string>();
-        result = result.filter((order) => {
-          if (seenOrderIds.has(order.orderId)) {
-            return false;
-          }
-          seenOrderIds.add(order.orderId);
-          return true;
-        });
-        break;
+  const stats = useMemo(() => {
+    // Filter out zero-qty rows
+    const validOrders = allOrders.filter((o) => Number(o.quantity) > 0);
 
-      case "hallmark":
-        // Hallmark tab: Hallmark orders only
-        result = orders.filter(
-          (order) => order?.status === OrderStatus.Hallmark
-        );
-        break;
+    const pending = validOrders.filter((o) => o.status === OrderStatus.Pending);
+    const ready = validOrders.filter((o) => o.status === OrderStatus.Ready);
+    const hallmark = validOrders.filter(
+      (o) => o.status === OrderStatus.Hallmark,
+    );
+    const returnFromHallmark = validOrders.filter(
+      (o) => o.status === OrderStatus.ReturnFromHallmark,
+    );
 
-      case "customer":
-        // Customer orders tab: CO type orders with Pending status
-        result = orders.filter(
-          (order) =>
-            order?.orderType === OrderType.CO &&
-            order?.status === OrderStatus.Pending
-        );
-        break;
+    const calcStats = (orders: Order[]) => ({
+      // Unique order numbers only — splits do NOT increase count
+      count: uniqueOrderCount(orders),
+      qty: orders.reduce((s, o) => s + Number(o.quantity), 0),
+      // Dynamic weight: unit_weight × qty at render time
+      weight: orders.reduce((s, o) => s + dynamicWeight(o), 0),
+    });
 
-      case "karigars":
-        // Karigars tab: show same as total orders (Pending and ReturnFromHallmark)
-        result = orders.filter(
-          (order) =>
-            order?.status === OrderStatus.Pending ||
-            order?.status === OrderStatus.ReturnFromHallmark
-        );
-        break;
-
-      default:
-        result = orders;
-    }
-    
-    return result;
-  }, [orders, activeTab]);
-
-  // Calculate metrics with safe fallbacks using optional chaining
-  // Total weight = sum of (weight × quantity) for all rows
-  const totalOrders = filteredOrders?.length ?? 0;
-  const totalWeight = filteredOrders?.reduce((sum, order) => sum + ((order?.weight ?? 0) * Number(order?.quantity ?? 0)), 0) ?? 0;
-  const totalQuantity = filteredOrders?.reduce((sum, order) => sum + Number(order?.quantity ?? 0), 0) ?? 0;
-  const customerOrders = filteredOrders?.filter((order) => order?.orderType === OrderType.CO)?.length ?? 0;
+    return {
+      pending: calcStats(pending),
+      ready: calcStats(ready),
+      hallmark: calcStats(hallmark),
+      returnFromHallmark: calcStats(returnFromHallmark),
+    };
+  }, [allOrders]);
 
   const cards = [
     {
-      title: 'Total Orders',
-      value: totalOrders,
+      key: "total",
+      label: "Total Orders",
       icon: Package,
+      stats: stats.pending,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
     },
     {
-      title: 'Total Weight',
-      value: `${totalWeight.toFixed(2)}g`,
-      icon: Weight,
+      key: "ready",
+      label: "Ready",
+      icon: CheckCircle,
+      stats: stats.ready,
+      color: "text-green-500",
+      bg: "bg-green-500/10",
     },
     {
-      title: 'Total Quantity',
-      value: totalQuantity,
-      icon: Hash,
+      key: "hallmark",
+      label: "Hallmark",
+      icon: Stamp,
+      stats: stats.hallmark,
+      color: "text-purple-500",
+      bg: "bg-purple-500/10",
     },
     {
-      title: 'Customer Orders',
-      value: customerOrders,
-      icon: Users,
+      key: "return",
+      label: "Return",
+      icon: RotateCcw,
+      stats: stats.returnFromHallmark,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i} className="border-border">
+            <CardContent className="px-3 pb-3 pt-3">
+              <Skeleton className="h-4 w-16 mb-2" />
+              <Skeleton className="h-7 w-10 mb-1" />
+              <Skeleton className="h-3 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {cards.map((card) => (
-        <Card key={card.title} className="border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {card.title}
-            </CardTitle>
-            <card.icon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-8 w-20 animate-pulse rounded bg-muted" />
-            ) : (
-              <div className="text-2xl font-semibold">{card.value}</div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        const isActive = activeTab === card.key;
+        return (
+          <Card
+            key={card.key}
+            className={`border-border transition-all ${
+              isActive ? "ring-1 ring-primary" : ""
+            }`}
+          >
+            <CardContent className="px-3 pb-3 pt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`p-1.5 rounded-md ${card.bg}`}>
+                  <Icon className={`h-3.5 w-3.5 ${card.color}`} />
+                </div>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {card.label}
+                </span>
+              </div>
+              <div className="text-xl md:text-2xl font-bold text-foreground">
+                {card.stats.count}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5 space-x-2">
+                <span>{card.stats.qty} qty</span>
+                <span>·</span>
+                <span>{card.stats.weight.toFixed(1)}g</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
+
+export default SummaryCards;

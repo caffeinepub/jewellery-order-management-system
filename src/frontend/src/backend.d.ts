@@ -19,16 +19,16 @@ export interface MappingRecord {
     genericName: string;
     designCode: string;
 }
-export type Time = bigint;
-export interface DesignMapping {
-    createdAt: Time;
-    createdBy: string;
-    karigarName: string;
-    updatedAt: Time;
-    updatedBy?: string;
-    genericName: string;
+export interface MasterDataRow {
+    weight: number;
+    karigar: string;
+    orderDate?: Time;
+    orderType: OrderType;
+    orderNo: string;
+    quantity: bigint;
     designCode: string;
 }
+export type Time = bigint;
 export interface Karigar {
     name: string;
     createdAt: Time;
@@ -38,8 +38,11 @@ export interface Order {
     weight: number;
     status: OrderStatus;
     readyDate?: Time;
+    originalOrderId?: string;
     createdAt: Time;
+    movedBy?: string;
     size: number;
+    orderDate?: Time;
     orderType: OrderType;
     design: string;
     orderId: string;
@@ -50,6 +53,26 @@ export interface Order {
     quantity: bigint;
     remarks: string;
     product: string;
+}
+export interface DesignMapping {
+    createdAt: Time;
+    createdBy: string;
+    karigarName: string;
+    updatedAt: Time;
+    updatedBy?: string;
+    genericName: string;
+    designCode: string;
+}
+export interface MasterPersistedResponse {
+    persisted: Array<Order>;
+}
+export interface MasterReconciliationResult {
+    missingInMasterCount: bigint;
+    newLinesCount: bigint;
+    alreadyExistingRows: bigint;
+    totalUploadedRows: bigint;
+    newLines: Array<MasterDataRow>;
+    missingInMaster: Array<Order>;
 }
 export enum OrderStatus {
     Ready = "Ready",
@@ -65,30 +88,46 @@ export enum OrderType {
 export interface backendInterface {
     addKarigar(name: string): Promise<void>;
     assignOrdersToKarigar(mappings: Array<MappingRecord>): Promise<void>;
+    batchDeleteOrders(_orderIds: Array<string>): Promise<void>;
+    batchGetByStatus(ids: Array<string>, compareStatus: OrderStatus): Promise<Array<string>>;
+    batchReturnOrdersToPending(_orderRequests: Array<[string, bigint]>): Promise<void>;
     batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
     batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus): Promise<void>;
     batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
+    clearAllDesignMappings(): Promise<void>;
     deleteOrder(orderId: string): Promise<void>;
     deleteReadyOrder(orderId: string): Promise<void>;
     getAllMasterDesignMappings(): Promise<Array<[string, DesignMapping]>>;
     getAllOrders(): Promise<Array<Order>>;
+    getDesignCountByKarigar(_karigarName: string): Promise<bigint | null>;
     getDesignImage(designCode: string): Promise<ExternalBlob | null>;
+    getDesignImageMapping(): Promise<Array<[string, ExternalBlob]>>;
     getDesignMapping(designCode: string): Promise<DesignMapping>;
+    getFilteredOutKarigars(): Promise<Array<string>>;
     getKarigars(): Promise<Array<Karigar>>;
     getMasterDesignExcel(): Promise<ExternalBlob | null>;
     getMasterDesignKarigars(): Promise<Array<string>>;
+    getMasterDesigns(): Promise<Array<[string, string, string]>>;
+    getOrder(orderId: string): Promise<Order | null>;
     getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
     getOrdersWithMappings(): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
     getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
+    getUnreturnedOrders(): Promise<Array<Order>>;
     isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
+    markAllAsReady(): Promise<void>;
+    markOrdersAsPending(orderIds: Array<string>): Promise<void>;
     markOrdersAsReady(orderIds: Array<string>): Promise<void>;
-    markOrdersAsReturned(orderIds: Array<string>): Promise<void>;
-    reassignDesign(designCode: string, newKarigar: string): Promise<void>;
+    persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
+    reassignDesign(designCode: string, newKarigar: string, movedBy: string): Promise<void>;
+    reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
+    registerKarigar(name: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
+    returnOrdersToPending(_orderNo: string, _returnedQty: bigint): Promise<void>;
     saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
-    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string): Promise<void>;
+    saveModifiedOrder(_count: bigint, _startQty: bigint, order: Order): Promise<void>;
+    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
     supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
     updateDesignGroupStatus(designCodes: Array<string>): Promise<void>;

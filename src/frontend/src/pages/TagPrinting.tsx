@@ -1,11 +1,4 @@
-import { useState, useMemo } from "react";
-import { useGetReadyOrders, useGetReadyOrdersByDateRange, useUpdateDesignGroupStatus } from "@/hooks/useQueries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Copy, Calendar } from "lucide-react";
-import { toast } from "sonner";
+import type { Order } from "@/backend";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,23 +9,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  useGetReadyOrders,
+  useGetReadyOrdersByDateRange,
+  useUpdateDesignGroupStatus,
+} from "@/hooks/useQueries";
+import { Calendar, Copy } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 export default function TagPrinting() {
   const { data: readyOrders = [], isLoading } = useGetReadyOrders();
   const getReadyOrdersByDateRangeMutation = useGetReadyOrdersByDateRange();
   const updateDesignGroupStatusMutation = useUpdateDesignGroupStatus();
-  
+
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [filteredOrders, setFilteredOrders] = useState<typeof readyOrders>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isFiltering, setIsFiltering] = useState(false);
-  const [selectedDesignCodes, setSelectedDesignCodes] = useState<Set<string>>(new Set());
+  const [selectedDesignCodes, setSelectedDesignCodes] = useState<Set<string>>(
+    new Set(),
+  );
   const [showHallmarkDialog, setShowHallmarkDialog] = useState(false);
 
-  // Use filtered orders if date filter is active, otherwise use all ready orders
   const ordersToDisplay = isFiltering ? filteredOrders : readyOrders;
 
-  // Sort orders by readyDate before grouping
   const sortedOrders = useMemo(() => {
     return [...ordersToDisplay].sort((a, b) => {
       const dateA = a.readyDate ? Number(a.readyDate) : Number(a.createdAt);
@@ -41,11 +46,17 @@ export default function TagPrinting() {
     });
   }, [ordersToDisplay]);
 
-  // Group orders by design code
   const groupedByDesign = useMemo(() => {
-    const groups: Record<string, { orderNumbers: string[]; genericName: string | undefined; orderIds: string[] }> = {};
-    
-    sortedOrders.forEach((order) => {
+    const groups: Record<
+      string,
+      {
+        orderNumbers: string[];
+        genericName: string | undefined;
+        orderIds: string[];
+      }
+    > = {};
+
+    for (const order of sortedOrders) {
       if (!groups[order.design]) {
         groups[order.design] = {
           orderNumbers: [],
@@ -55,19 +66,17 @@ export default function TagPrinting() {
       }
       groups[order.design].orderNumbers.push(order.orderNo);
       groups[order.design].orderIds.push(order.orderId);
-    });
+    }
 
     return groups;
   }, [sortedOrders]);
 
   const handleCopyOrderNumbers = async (orderNumbers: string[]) => {
     try {
-      const text = orderNumbers.join(',');
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(orderNumbers.join(","));
       toast.success("Order numbers copied to clipboard");
-    } catch (error) {
+    } catch {
       toast.error("Failed to copy to clipboard");
-      console.error("Copy error:", error);
     }
   };
 
@@ -82,8 +91,8 @@ export default function TagPrinting() {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    const startTimestamp = BigInt(start.getTime() * 1000000); // Convert to nanoseconds
-    const endTimestamp = BigInt(end.getTime() * 1000000);
+    const startTimestamp = BigInt(start.getTime() * 1_000_000);
+    const endTimestamp = BigInt(end.getTime() * 1_000_000);
 
     try {
       const filtered = await getReadyOrdersByDateRangeMutation.mutateAsync({
@@ -93,9 +102,8 @@ export default function TagPrinting() {
       setFilteredOrders(filtered);
       setIsFiltering(true);
       toast.success(`Showing orders from ${startDate} to ${endDate}`);
-    } catch (error) {
-      toast.error("Failed to filter orders by date");
-      console.error("Date filter error:", error);
+    } catch {
+      // error handled by mutation onError
     }
   };
 
@@ -109,13 +117,13 @@ export default function TagPrinting() {
 
   const handleToggleDesignSelection = (designCode: string) => {
     setSelectedDesignCodes((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(designCode)) {
-        newSet.delete(designCode);
+      const next = new Set(prev);
+      if (next.has(designCode)) {
+        next.delete(designCode);
       } else {
-        newSet.add(designCode);
+        next.add(designCode);
       }
-      return newSet;
+      return next;
     });
   };
 
@@ -137,23 +145,26 @@ export default function TagPrinting() {
 
   const confirmMoveToHallmark = async () => {
     try {
-      // Collect all order IDs from selected design groups
       const orderIds: string[] = [];
-      selectedDesignCodes.forEach((designCode) => {
+      for (const designCode of selectedDesignCodes) {
         const group = groupedByDesign[designCode];
         if (group) {
           orderIds.push(...group.orderIds);
         }
-      });
+      }
 
       await updateDesignGroupStatusMutation.mutateAsync(orderIds);
-      toast.success(`${selectedDesignCodes.size} design group(s) moved to Hallmark`);
+      toast.success(
+        `${selectedDesignCodes.size} design group(s) moved to Hallmark`,
+      );
       setSelectedDesignCodes(new Set());
       setShowHallmarkDialog(false);
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to update design groups";
-      toast.error(errorMessage);
-      console.error("Error updating design groups:", error);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update design groups";
+      toast.error(message);
     }
   };
 
@@ -168,7 +179,8 @@ export default function TagPrinting() {
   }
 
   const designCodes = Object.keys(groupedByDesign).sort();
-  const allSelected = designCodes.length > 0 && selectedDesignCodes.size === designCodes.length;
+  const allSelected =
+    designCodes.length > 0 && selectedDesignCodes.size === designCodes.length;
 
   return (
     <div className="container mx-auto p-6">
@@ -190,8 +202,14 @@ export default function TagPrinting() {
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex items-center gap-2 flex-1">
-              <label className="text-sm font-medium whitespace-nowrap">From:</label>
+              <label
+                htmlFor="tag-start-date"
+                className="text-sm font-medium whitespace-nowrap"
+              >
+                From:
+              </label>
               <Input
+                id="tag-start-date"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -199,8 +217,14 @@ export default function TagPrinting() {
               />
             </div>
             <div className="flex items-center gap-2 flex-1">
-              <label className="text-sm font-medium whitespace-nowrap">To:</label>
+              <label
+                htmlFor="tag-end-date"
+                className="text-sm font-medium whitespace-nowrap"
+              >
+                To:
+              </label>
               <Input
+                id="tag-end-date"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -210,16 +234,19 @@ export default function TagPrinting() {
             <div className="flex gap-2">
               <Button
                 onClick={handleApplyDateFilter}
-                disabled={!startDate || !endDate || getReadyOrdersByDateRangeMutation.isPending}
+                disabled={
+                  !startDate ||
+                  !endDate ||
+                  getReadyOrdersByDateRangeMutation.isPending
+                }
                 className="bg-gold hover:bg-gold-hover"
               >
-                {getReadyOrdersByDateRangeMutation.isPending ? "Filtering..." : "Apply Filter"}
+                {getReadyOrdersByDateRangeMutation.isPending
+                  ? "Filtering..."
+                  : "Apply Filter"}
               </Button>
               {isFiltering && (
-                <Button
-                  onClick={handleClearDateFilter}
-                  variant="outline"
-                >
+                <Button onClick={handleClearDateFilter} variant="outline">
                   Clear Filter
                 </Button>
               )}
@@ -227,7 +254,8 @@ export default function TagPrinting() {
           </div>
           {isFiltering && (
             <p className="text-sm text-muted-foreground mt-2">
-              Showing {sortedOrders.length} order(s) from {startDate} to {endDate}
+              Showing {sortedOrders.length} order(s) from {startDate} to{" "}
+              {endDate}
             </p>
           )}
         </CardContent>
@@ -255,7 +283,9 @@ export default function TagPrinting() {
               className="bg-purple-600 hover:bg-purple-700"
               disabled={updateDesignGroupStatusMutation.isPending}
             >
-              {updateDesignGroupStatusMutation.isPending ? "Moving..." : "Move to Hallmark"}
+              {updateDesignGroupStatusMutation.isPending
+                ? "Moving..."
+                : "Move to Hallmark"}
             </Button>
           )}
         </div>
@@ -265,7 +295,9 @@ export default function TagPrinting() {
         <Card>
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">
-              {isFiltering ? "No orders found for the selected date range" : "No ready orders found"}
+              {isFiltering
+                ? "No orders found for the selected date range"
+                : "No ready orders found"}
             </p>
           </CardContent>
         </Card>
@@ -274,12 +306,14 @@ export default function TagPrinting() {
           {designCodes.map((designCode) => {
             const { orderNumbers, genericName } = groupedByDesign[designCode];
             const isSelected = selectedDesignCodes.has(designCode);
-            
+
             return (
               <Card
                 key={designCode}
                 className={`hover:shadow-lg transition-all cursor-pointer ${
-                  isSelected ? "ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-950/20" : ""
+                  isSelected
+                    ? "ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-950/20"
+                    : ""
                 }`}
                 onClick={() => handleToggleDesignSelection(designCode)}
               >
@@ -287,7 +321,9 @@ export default function TagPrinting() {
                   <div className="flex items-start gap-3">
                     <Checkbox
                       checked={isSelected}
-                      onCheckedChange={() => handleToggleDesignSelection(designCode)}
+                      onCheckedChange={() =>
+                        handleToggleDesignSelection(designCode)
+                      }
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Select design ${designCode}`}
                       className="mt-1"
@@ -302,7 +338,8 @@ export default function TagPrinting() {
                         </p>
                       )}
                       <p className="text-sm text-muted-foreground mt-1">
-                        {orderNumbers.length} order{orderNumbers.length !== 1 ? 's' : ''}
+                        {orderNumbers.length} order
+                        {orderNumbers.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
@@ -312,7 +349,7 @@ export default function TagPrinting() {
                     <p className="text-sm font-medium">Order Numbers:</p>
                     <div className="bg-muted rounded-md p-3 max-h-32 overflow-y-auto">
                       <p className="text-sm font-mono break-all">
-                        {orderNumbers.join(', ')}
+                        {orderNumbers.join(", ")}
                       </p>
                     </div>
                   </div>
@@ -334,17 +371,23 @@ export default function TagPrinting() {
         </div>
       )}
 
-      <AlertDialog open={showHallmarkDialog} onOpenChange={setShowHallmarkDialog}>
+      <AlertDialog
+        open={showHallmarkDialog}
+        onOpenChange={setShowHallmarkDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Move to Hallmark?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to move {selectedDesignCodes.size} design group(s) to Hallmark status? 
-              All orders in these design groups will be moved from the Ready tab to the Hallmark tab.
+              Are you sure you want to move {selectedDesignCodes.size} design
+              group(s) to Hallmark status? All orders in these design groups
+              will be moved from the Ready tab to the Hallmark tab.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={updateDesignGroupStatusMutation.isPending}>
+            <AlertDialogCancel
+              disabled={updateDesignGroupStatusMutation.isPending}
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -352,7 +395,9 @@ export default function TagPrinting() {
               disabled={updateDesignGroupStatusMutation.isPending}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {updateDesignGroupStatusMutation.isPending ? "Moving..." : "Confirm"}
+              {updateDesignGroupStatusMutation.isPending
+                ? "Moving..."
+                : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

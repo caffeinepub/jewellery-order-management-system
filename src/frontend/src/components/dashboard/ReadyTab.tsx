@@ -1,215 +1,582 @@
-import { useState, useMemo } from "react";
-import OrderTable from "./OrderTable";
-import { useGetAllOrders, useDeleteReadyOrder, useBatchUpdateOrderStatus } from "@/hooks/useQueries";
-import { OrderType, OrderStatus } from "@/backend";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Image as ImageIcon,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { type Order, OrderStatus } from "../../backend";
+import {
+  useMarkOrdersAsPending,
+  useReturnReadyOrderToPending,
+} from "../../hooks/useQueries";
+import { AgeingBadge } from "../../utils/ageingBadge";
+import {
+  exportAllToPDF,
+  exportOrdersToImage,
+  exportSelectedToPDF,
+} from "../../utils/exportUtils";
+import DesignImageModal from "./DesignImageModal";
 
-export default function ReadyTab() {
+interface ReadyTabProps {
+  orders: Order[];
+  isError?: boolean;
+}
+
+// Helper: compute dynamic weight
+function dynamicWeight(order: Order): number {
+  return order.weight * Number(order.quantity);
+}
+
+// Helper: count unique order numbers
+function uniqueOrderCount(orders: Order[]): number {
+  return new Set(orders.map((o) => o.orderNo)).size;
+}
+
+interface ReturnDialogState {
+  open: boolean;
+  order: Order | null;
+}
+
+export function ReadyTab({ orders, isError }: ReadyTabProps) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchText, setSearchText] = useState("");
-  const [selectedOrderType, setSelectedOrderType] = useState<OrderType | "ALL">("ALL");
-  const [selectedKarigar, setSelectedKarigar] = useState<string>("ALL");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
-  const { data: orders = [], isLoading } = useGetAllOrders();
-  const deleteReadyOrderMutation = useDeleteReadyOrder();
-  const batchUpdateStatusMutation = useBatchUpdateOrderStatus();
+  const [imageModalDesign, setImageModalDesign] = useState<string | null>(null);
+  const [returnDialog, setReturnDialog] = useState<ReturnDialogState>({
+    open: false,
+    order: null,
+  });
+  const [returnQty, setReturnQty] = useState<number>(0);
+  const [returnError, setReturnError] = useState<string | null>(null);
 
+  const markAsPending = useMarkOrdersAsPending();
+  const returnToPending = useReturnReadyOrderToPending();
+
+  // Filter: only Ready orders with qty > 0
+  const readyOrders = useMemo(
+    () =>
+      orders.filter(
+        (o) => o.status === OrderStatus.Ready && Number(o.quantity) > 0,
+      ),
+    [orders],
+  );
+
+  // Search filter
   const filteredOrders = useMemo(() => {
-    // Filter for Ready status orders only
-    let result = orders.filter((order) => order.status === OrderStatus.Ready);
+    if (!searchText.trim()) return readyOrders;
+    const q = searchText.toLowerCase();
+    return readyOrders.filter(
+      (o) =>
+        o.orderNo.toLowerCase().includes(q) ||
+        o.design.toLowerCase().includes(q) ||
+        (o.genericName ?? "").toLowerCase().includes(q) ||
+        (o.karigarName ?? "").toLowerCase().includes(q),
+    );
+  }, [readyOrders, searchText]);
 
-    // Deduplicate by orderId - keep only the first occurrence
-    const seenOrderIds = new Set<string>();
-    result = result.filter((order) => {
-      if (seenOrderIds.has(order.orderId)) {
-        return false;
-      }
-      seenOrderIds.add(order.orderId);
-      return true;
+  // Group by design code
+  const groups = useMemo(() => {
+    const map = new Map<string, Order[]>();
+    for (const o of filteredOrders) {
+      const key = o.design;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    }
+    return map;
+  }, [filteredOrders]);
+
+  const toggleGroup = (design: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(design)) next.delete(design);
+      else next.add(design);
+      return next;
     });
-
-    // Filter by order type
-    if (selectedOrderType !== "ALL") {
-      result = result.filter((order) => order.orderType === selectedOrderType);
-    }
-
-    // Filter by karigar
-    if (selectedKarigar !== "ALL") {
-      result = result.filter((order) => order.karigarName === selectedKarigar);
-    }
-
-    // Filter by date range
-    if (startDate) {
-      const start = new Date(startDate).getTime();
-      result = result.filter((order) => Number(order.createdAt) / 1000000 >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate).getTime() + 86400000; // Add 1 day to include end date
-      result = result.filter((order) => Number(order.createdAt) / 1000000 < end);
-    }
-
-    // Filter by search text (order number, design code, or generic name)
-    if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      result = result.filter(
-        (order) =>
-          order.orderNo.toLowerCase().includes(search) ||
-          order.design.toLowerCase().includes(search) ||
-          (order.genericName && order.genericName.toLowerCase().includes(search))
-      );
-    }
-
-    return result;
-  }, [orders, searchText, selectedOrderType, selectedKarigar, startDate, endDate]);
-
-  // Get unique karigars for filter dropdown
-  const uniqueKarigars = useMemo(() => {
-    const karigars = new Set<string>();
-    orders
-      .filter((order) => order.status === OrderStatus.Ready)
-      .forEach((order) => {
-        if (order.karigarName) {
-          karigars.add(order.karigarName);
-        }
-      });
-    return Array.from(karigars).sort();
-  }, [orders]);
-
-  const handleDelete = async (orderId: string) => {
-    setOrderToDelete(orderId);
   };
 
-  const confirmDelete = async () => {
-    if (!orderToDelete) return;
+  const toggleSelect = (orderId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const toggleSelectGroup = (design: string) => {
+    const groupOrders = groups.get(design) ?? [];
+    const allSelected = groupOrders.every((o) => selectedIds.has(o.orderId));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        for (const o of groupOrders) next.delete(o.orderId);
+      } else {
+        for (const o of groupOrders) next.add(o.orderId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredOrders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredOrders.map((o) => o.orderId)));
+    }
+  };
+
+  const handleMarkAsPending = async () => {
+    if (selectedIds.size === 0) return;
+    await markAsPending.mutateAsync(Array.from(selectedIds));
+    setSelectedIds(new Set());
+  };
+
+  // ── Return dialog ──
+  const openReturnDialog = (order: Order) => {
+    setReturnDialog({ open: true, order });
+    setReturnQty(Number(order.quantity));
+    setReturnError(null);
+  };
+
+  const closeReturnDialog = () => {
+    setReturnDialog({ open: false, order: null });
+    setReturnQty(0);
+    setReturnError(null);
+  };
+
+  const handleReturn = async () => {
+    if (!returnDialog.order) return;
+    setReturnError(null);
+
+    const readyQty = Number(returnDialog.order.quantity);
+
+    // Strict validation
+    if (returnQty <= 0) {
+      setReturnError("Return quantity must be greater than 0.");
+      return;
+    }
+    if (returnQty > readyQty) {
+      setReturnError(
+        `Return quantity (${returnQty}) exceeds ready quantity (${readyQty}).`,
+      );
+      return;
+    }
 
     try {
-      await deleteReadyOrderMutation.mutateAsync(orderToDelete);
-      toast.success("Order moved back to Pending status");
-      setOrderToDelete(null);
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to delete order";
-      toast.error(errorMessage);
-      console.error("Error deleting order:", error);
+      await returnToPending.mutateAsync({
+        orderId: returnDialog.order.orderId,
+        returnedQty: returnQty,
+      });
+      closeReturnDialog();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setReturnError(msg);
     }
   };
 
-  if (isLoading) {
-    return <div className="text-center py-8">Loading orders...</div>;
+  // ── Summary stats ──
+  const totalQty = filteredOrders.reduce((s, o) => s + Number(o.quantity), 0);
+  const totalWeight = filteredOrders.reduce((s, o) => s + dynamicWeight(o), 0);
+  const orderCount = uniqueOrderCount(filteredOrders);
+
+  const selectedOrders = filteredOrders.filter((o) =>
+    selectedIds.has(o.orderId),
+  );
+
+  if (isError) {
+    return (
+      <div className="p-4 text-destructive">
+        Failed to load orders. Please try again.
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by Order Number, Design Code, or Generic Name..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={selectedOrderType === "ALL" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType("ALL")}
-          >
-            All
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.CO ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.CO)}
-          >
-            CO
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.RB ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.RB)}
-          >
-            RB
-          </Button>
-          <Button
-            variant={selectedOrderType === OrderType.SO ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSelectedOrderType(OrderType.SO)}
-          >
-            SO
-          </Button>
-        </div>
-        <select
-          value={selectedKarigar}
-          onChange={(e) => setSelectedKarigar(e.target.value)}
-          className="px-3 py-2 border rounded-md bg-background text-sm"
-        >
-          <option value="ALL">All Karigars</option>
-          {uniqueKarigars.map((karigar) => (
-            <option key={karigar} value={karigar}>
-              {karigar}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">From:</label>
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-40"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">To:</label>
-          <Input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-40"
-          />
-        </div>
-      </div>
-      <OrderTable orders={filteredOrders} onDelete={handleDelete} />
-
-      <AlertDialog open={!!orderToDelete} onOpenChange={() => setOrderToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Move Order Back to Pending?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will change the order status from Ready back to Pending. The order will appear in the Total Orders tab.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteReadyOrderMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              disabled={deleteReadyOrderMutation.isPending}
-              className="bg-destructive hover:bg-destructive/90"
+    <div className="space-y-3">
+      {/* Search + actions */}
+      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+        <Input
+          placeholder="Search order, design, karigar…"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          className="h-8 text-sm max-w-xs"
+        />
+        <div className="flex gap-2 flex-wrap">
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleMarkAsPending}
+              disabled={markAsPending.isPending}
+              className="h-8 text-xs"
             >
-              {deleteReadyOrderMutation.isPending ? "Moving..." : "Confirm"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {markAsPending.isPending ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : null}
+              Mark as Pending ({selectedIds.size})
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              exportOrdersToImage(
+                filteredOrders,
+                "Ready Orders",
+                "ready-orders.jpg",
+              )
+            }
+            className="h-8 text-xs"
+          >
+            Export JPEG
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              exportAllToPDF(filteredOrders, "ready-orders-all.pdf")
+            }
+            className="h-8 text-xs"
+          >
+            Export PDF (All)
+          </Button>
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                exportSelectedToPDF(selectedOrders, "ready-orders-selected.pdf")
+              }
+              className="h-8 text-xs"
+            >
+              Export PDF (Selected)
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Summary row */}
+      <div className="flex gap-4 text-xs text-muted-foreground px-1">
+        <span>
+          <span className="font-semibold text-foreground">{orderCount}</span>{" "}
+          orders
+        </span>
+        <span>
+          <span className="font-semibold text-foreground">{totalQty}</span> qty
+        </span>
+        <span>
+          <span className="font-semibold text-foreground">
+            {totalWeight.toFixed(2)}g
+          </span>{" "}
+          weight
+        </span>
+        {selectedIds.size > 0 && (
+          <span className="text-primary">{selectedIds.size} selected</span>
+        )}
+      </div>
+
+      {/* Select all */}
+      {filteredOrders.length > 0 && (
+        <div className="flex items-center gap-2 px-1">
+          <Checkbox
+            checked={
+              selectedIds.size === filteredOrders.length &&
+              filteredOrders.length > 0
+            }
+            onCheckedChange={toggleSelectAll}
+            id="select-all-ready"
+          />
+          <label
+            htmlFor="select-all-ready"
+            className="text-xs text-muted-foreground cursor-pointer"
+          >
+            Select all
+          </label>
+        </div>
+      )}
+
+      {/* Groups */}
+      {filteredOrders.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 text-sm">
+          No ready orders found.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {Array.from(groups.entries()).map(([design, groupOrders]) => {
+            const isExpanded = expandedGroups.has(design);
+            const groupQty = groupOrders.reduce(
+              (s, o) => s + Number(o.quantity),
+              0,
+            );
+            const groupWeight = groupOrders.reduce(
+              (s, o) => s + dynamicWeight(o),
+              0,
+            );
+            const allSelected = groupOrders.every((o) =>
+              selectedIds.has(o.orderId),
+            );
+            const someSelected = groupOrders.some((o) =>
+              selectedIds.has(o.orderId),
+            );
+            const genericName = groupOrders[0]?.genericName ?? "";
+            const karigarName = groupOrders[0]?.karigarName ?? "";
+
+            return (
+              <div
+                key={design}
+                className="border border-border rounded-lg overflow-hidden"
+              >
+                {/* Group header */}
+                {/* biome-ignore lint/a11y/useKeyWithClickEvents: complex row with nested interactive elements */}
+                <div
+                  className="flex items-center gap-2 px-3 py-2 bg-card cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => toggleGroup(design)}
+                >
+                  <Checkbox
+                    checked={allSelected}
+                    data-state={
+                      someSelected && !allSelected ? "indeterminate" : undefined
+                    }
+                    onCheckedChange={() => toggleSelectGroup(design)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImageModalDesign(design);
+                    }}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </button>
+
+                  <span className="font-bold text-sm text-amber-500">
+                    {design}
+                  </span>
+                  {genericName && (
+                    <span className="text-xs text-muted-foreground">
+                      {genericName}
+                    </span>
+                  )}
+                  {karigarName && (
+                    <Badge variant="outline" className="text-xs h-5">
+                      {karigarName}
+                    </Badge>
+                  )}
+
+                  <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Qty: {groupQty}</span>
+                    <span>{groupWeight.toFixed(2)}g</span>
+                    <span className="text-muted-foreground">
+                      {groupOrders.length} row
+                      {groupOrders.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Group rows */}
+                {isExpanded && (
+                  <div className="divide-y divide-border">
+                    {groupOrders.map((order) => {
+                      const qty = Number(order.quantity);
+
+                      return (
+                        <div
+                          key={order.orderId}
+                          className="flex items-center gap-2 px-3 py-2 bg-background hover:bg-muted/30 transition-colors"
+                        >
+                          <Checkbox
+                            checked={selectedIds.has(order.orderId)}
+                            onCheckedChange={() => toggleSelect(order.orderId)}
+                          />
+
+                          <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">
+                                Order:{" "}
+                              </span>
+                              <span className="font-medium text-foreground">
+                                {order.orderNo}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">
+                                Qty:{" "}
+                              </span>
+                              <span className="font-medium text-foreground">
+                                {qty}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">
+                                Wt:{" "}
+                              </span>
+                              <span className="font-medium text-foreground">
+                                {order.weight.toFixed(2)}g
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">
+                                Size:{" "}
+                              </span>
+                              <span className="font-medium text-foreground">
+                                {order.size}
+                              </span>
+                            </div>
+                            {order.orderDate && (
+                              <div className="col-span-2 sm:col-span-1">
+                                <AgeingBadge orderDate={order.orderDate} />
+                              </div>
+                            )}
+                            {order.originalOrderId && (
+                              <div className="col-span-2 sm:col-span-2">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs h-4 border-amber-500/50 text-amber-500"
+                                >
+                                  Partial Supply
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Return button */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={() => openReturnDialog(order)}
+                            title="Return to Total Orders"
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Return
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Return Dialog */}
+      <Dialog open={returnDialog.open} onOpenChange={closeReturnDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Return to Total Orders</DialogTitle>
+          </DialogHeader>
+
+          {returnDialog.order && (
+            <div className="space-y-4">
+              <div className="text-sm space-y-1">
+                <div>
+                  <span className="text-muted-foreground">Order: </span>
+                  <span className="font-medium">
+                    {returnDialog.order.orderNo}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Design: </span>
+                  <span className="font-medium">
+                    {returnDialog.order.design}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Ready Qty: </span>
+                  <span className="font-medium">
+                    {Number(returnDialog.order.quantity)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Return Quantity</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={Number(returnDialog.order.quantity)}
+                  value={returnQty}
+                  onChange={(e) => {
+                    setReturnQty(Number.parseInt(e.target.value, 10) || 0);
+                    setReturnError(null);
+                  }}
+                  className="h-9"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Max: {Number(returnDialog.order.quantity)}
+                </p>
+              </div>
+
+              {returnError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    {returnError}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeReturnDialog}
+              disabled={returnToPending.isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleReturn} disabled={returnToPending.isPending}>
+              {returnToPending.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Returning…
+                </>
+              ) : (
+                "Confirm Return"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Design image modal */}
+      {imageModalDesign && (
+        <DesignImageModal
+          designCode={imageModalDesign}
+          open={!!imageModalDesign}
+          onClose={() => setImageModalDesign(null)}
+        />
+      )}
     </div>
   );
 }
+
+export default ReadyTab;

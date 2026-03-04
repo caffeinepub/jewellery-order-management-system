@@ -1,13 +1,19 @@
-import { useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FolderOpen, FileArchive, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useActor } from '@/hooks/useActor';
-import { ExternalBlob } from '@/backend';
-import { toast } from 'sonner';
+import { ExternalBlob } from "@/backend";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { useActor } from "@/hooks/useActor";
+import {
+  AlertCircle,
+  CheckCircle2,
+  FileArchive,
+  FolderOpen,
+  Upload,
+} from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface UploadResult {
   designCode: string;
@@ -20,12 +26,12 @@ export default function DesignImages() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
-  const [currentFile, setCurrentFile] = useState('');
+  const [currentFile, setCurrentFile] = useState("");
   const folderInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
 
   const extractFilenameAsDesignCode = (filename: string): string => {
-    return filename.replace(/\.[^/.]+$/, '');
+    return filename.replace(/\.[^/.]+$/, "");
   };
 
   const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +39,7 @@ export default function DesignImages() {
     if (!files || files.length === 0) return;
 
     await processImageFiles(Array.from(files));
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,50 +49,52 @@ export default function DesignImages() {
     setIsUploading(true);
     setUploadProgress(0);
     setUploadResults([]);
-    setCurrentFile('Extracting ZIP...');
+    setCurrentFile("Extracting ZIP...");
 
     try {
-      const JSZip: any = await import('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js' as any);
-      
+      const JSZip: any = await import(
+        "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" as any
+      );
+
       const zip = new JSZip.default();
       const zipContent = await zip.loadAsync(file);
-      
+
       const imageFiles: { name: string; data: Uint8Array }[] = [];
       const entries = Object.entries(zipContent.files) as any;
-      
+
       for (let i = 0; i < entries.length; i++) {
         const [filename, zipEntry] = entries[i];
         if (!zipEntry.dir && /\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) {
-          const data: ArrayBuffer = await zipEntry.async('arraybuffer');
+          const data: ArrayBuffer = await zipEntry.async("arraybuffer");
           // Create a new Uint8Array with ArrayBuffer type
           const uint8Data = new Uint8Array(data);
-          const name = filename.split('/').pop() || filename;
+          const name = filename.split("/").pop() || filename;
           imageFiles.push({ name, data: uint8Data });
         }
-        
+
         // Update extraction progress
         setUploadProgress(Math.floor((i / entries.length) * 20));
       }
 
       if (imageFiles.length === 0) {
-        toast.error('No image files found in ZIP');
+        toast.error("No image files found in ZIP");
         setIsUploading(false);
         return;
       }
 
       await processExtractedImages(imageFiles);
     } catch (error) {
-      console.error('ZIP extraction error:', error);
-      toast.error('Failed to extract ZIP file');
+      console.error("ZIP extraction error:", error);
+      toast.error("Failed to extract ZIP file");
       setIsUploading(false);
     }
 
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const processImageFiles = async (files: File[]) => {
     if (!actor) {
-      toast.error('Backend not initialized');
+      toast.error("Backend not initialized");
       return;
     }
 
@@ -94,12 +102,12 @@ export default function DesignImages() {
     setUploadProgress(0);
     setUploadResults([]);
 
-    const imageFiles = files.filter(file => 
-      /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
+    const imageFiles = files.filter((file) =>
+      /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name),
     );
 
     if (imageFiles.length === 0) {
-      toast.error('No image files found');
+      toast.error("No image files found");
       setIsUploading(false);
       return;
     }
@@ -109,8 +117,11 @@ export default function DesignImages() {
     const BATCH_SIZE = 5; // Process 5 images concurrently
 
     for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
-      const batch = imageFiles.slice(i, Math.min(i + BATCH_SIZE, imageFiles.length));
-      
+      const batch = imageFiles.slice(
+        i,
+        Math.min(i + BATCH_SIZE, imageFiles.length),
+      );
+
       const batchPromises = batch.map(async (file) => {
         const designCode = extractFilenameAsDesignCode(file.name);
         setCurrentFile(file.name);
@@ -119,9 +130,9 @@ export default function DesignImages() {
           const arrayBuffer = await file.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
           const blob = ExternalBlob.fromBytes(uint8Array);
-          
+
           await actor.uploadDesignImage(designCode, blob);
-          
+
           return {
             designCode,
             success: true,
@@ -131,21 +142,21 @@ export default function DesignImages() {
           return {
             designCode,
             success: false,
-            error: error instanceof Error ? error.message : 'Upload failed',
+            error: error instanceof Error ? error.message : "Upload failed",
           };
         }
       });
 
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-      
+
       const progress = Math.floor(((i + batch.length) / totalFiles) * 100);
       setUploadProgress(progress);
     }
 
     setUploadResults(results);
     setIsUploading(false);
-    setCurrentFile('');
+    setCurrentFile("");
 
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
@@ -157,9 +168,11 @@ export default function DesignImages() {
     }
   };
 
-  const processExtractedImages = async (imageFiles: { name: string; data: Uint8Array }[]) => {
+  const processExtractedImages = async (
+    imageFiles: { name: string; data: Uint8Array }[],
+  ) => {
     if (!actor) {
-      toast.error('Backend not initialized');
+      toast.error("Backend not initialized");
       setIsUploading(false);
       return;
     }
@@ -169,8 +182,11 @@ export default function DesignImages() {
     const BATCH_SIZE = 5;
 
     for (let i = 0; i < imageFiles.length; i += BATCH_SIZE) {
-      const batch = imageFiles.slice(i, Math.min(i + BATCH_SIZE, imageFiles.length));
-      
+      const batch = imageFiles.slice(
+        i,
+        Math.min(i + BATCH_SIZE, imageFiles.length),
+      );
+
       const batchPromises = batch.map(async ({ name, data }) => {
         const designCode = extractFilenameAsDesignCode(name);
         setCurrentFile(name);
@@ -180,10 +196,10 @@ export default function DesignImages() {
           const newArrayBuffer = new ArrayBuffer(data.length);
           const newUint8Array = new Uint8Array(newArrayBuffer);
           newUint8Array.set(data);
-          
+
           const blob = ExternalBlob.fromBytes(newUint8Array);
           await actor.uploadDesignImage(designCode, blob);
-          
+
           return {
             designCode,
             success: true,
@@ -193,21 +209,21 @@ export default function DesignImages() {
           return {
             designCode,
             success: false,
-            error: error instanceof Error ? error.message : 'Upload failed',
+            error: error instanceof Error ? error.message : "Upload failed",
           };
         }
       });
 
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-      
+
       const progress = 20 + Math.floor(((i + batch.length) / totalFiles) * 80);
       setUploadProgress(progress);
     }
 
     setUploadResults(results);
     setIsUploading(false);
-    setCurrentFile('');
+    setCurrentFile("");
 
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
@@ -310,13 +326,15 @@ export default function DesignImages() {
       {isUploading && (
         <Card className="mt-6 border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-medium">Upload Progress</CardTitle>
+            <CardTitle className="text-lg font-medium">
+              Upload Progress
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {currentFile || 'Processing...'}
+                  {currentFile || "Processing..."}
                 </span>
                 <span className="font-medium">{uploadProgress}%</span>
               </div>
@@ -329,14 +347,16 @@ export default function DesignImages() {
       {uploadResults.length > 0 && (
         <Card className="mt-6 border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-medium">Upload Results</CardTitle>
+            <CardTitle className="text-lg font-medium">
+              Upload Results
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
-              {uploadResults.map((result, idx) => (
+              {uploadResults.map((result) => (
                 <Alert
-                  key={idx}
-                  variant={result.success ? 'default' : 'destructive'}
+                  key={result.designCode}
+                  variant={result.success ? "default" : "destructive"}
                   className="py-3"
                 >
                   <div className="flex items-center gap-3">

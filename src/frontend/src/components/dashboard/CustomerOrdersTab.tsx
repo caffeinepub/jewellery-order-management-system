@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
-import OrderTable from "./OrderTable";
-import { useGetAllOrders } from "@/hooks/useQueries";
-import { OrderType, OrderStatus } from "@/backend";
+import { OrderStatus, OrderType } from "@/backend";
 import { Input } from "@/components/ui/input";
+import { useGetAllOrders } from "@/hooks/useQueries";
 import { Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import OrderTable from "./OrderTable";
 
 export default function CustomerOrdersTab() {
   const [searchText, setSearchText] = useState("");
@@ -12,7 +12,9 @@ export default function CustomerOrdersTab() {
   const filteredOrders = useMemo(() => {
     // Filter for CO type orders with Pending status only
     let result = orders.filter(
-      (order) => order.orderType === OrderType.CO && order.status === OrderStatus.Pending
+      (order) =>
+        order.orderType === OrderType.CO &&
+        order.status === OrderStatus.Pending,
     );
 
     // Filter by search text (order number, design code, or generic name)
@@ -22,7 +24,7 @@ export default function CustomerOrdersTab() {
         (order) =>
           order.orderNo.toLowerCase().includes(search) ||
           order.design.toLowerCase().includes(search) ||
-          (order.genericName && order.genericName.toLowerCase().includes(search))
+          order.genericName?.toLowerCase().includes(search),
       );
     }
 

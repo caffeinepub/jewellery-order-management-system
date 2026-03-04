@@ -7,25 +7,28 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { useResetActiveOrders } from '@/hooks/useQueries';
-import { toast } from 'sonner';
+} from "@/components/ui/alert-dialog";
+import { useResetActiveOrders } from "@/hooks/useQueries";
+import { toast } from "sonner";
 
 interface DataResetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export default function DataResetDialog({ open, onOpenChange }: DataResetDialogProps) {
+export default function DataResetDialog({
+  open,
+  onOpenChange,
+}: DataResetDialogProps) {
   const resetMutation = useResetActiveOrders();
 
   const handleConfirm = async () => {
     try {
       await resetMutation.mutateAsync();
-      toast.success('All active orders have been deleted successfully');
+      toast.success("All active orders have been deleted successfully");
       onOpenChange(false);
     } catch (error) {
-      toast.error('Failed to reset data');
+      toast.error("Failed to reset data");
       console.error(error);
     }
   };
@@ -37,8 +40,9 @@ export default function DataResetDialog({ open, onOpenChange }: DataResetDialogP
           <AlertDialogTitle>Reset Active Orders Data</AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p>
-              This action will permanently delete all orders with <strong>Pending</strong>,{' '}
-              <strong>Ready</strong>, or <strong>Return from Hallmark</strong> status.
+              This action will permanently delete all orders with{" "}
+              <strong>Pending</strong>, <strong>Ready</strong>, or{" "}
+              <strong>Return from Hallmark</strong> status.
             </p>
             <p className="font-medium">The following tabs will be affected:</p>
             <ul className="list-disc list-inside pl-2 space-y-1">
@@ -54,13 +58,17 @@ export default function DataResetDialog({ open, onOpenChange }: DataResetDialogP
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={resetMutation.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={resetMutation.isPending}>
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={resetMutation.isPending}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {resetMutation.isPending ? 'Deleting...' : 'Delete All Active Orders'}
+            {resetMutation.isPending
+              ? "Deleting..."
+              : "Delete All Active Orders"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

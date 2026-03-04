@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, X } from 'lucide-react';
-import { useGetDesignImage } from '@/hooks/useQueries';
+} from "@/components/ui/dialog";
+import { useGetDesignImage } from "@/hooks/useQueries";
+import { X, ZoomIn, ZoomOut } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface DesignImageModalProps {
   designCode: string;
@@ -24,8 +24,11 @@ export default function DesignImageModal({
   const [isPanning, setIsPanning] = useState(false);
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
-  
+
   const { data: designData, isLoading, error } = useGetDesignImage(designCode);
+
+  // Derive the image URL from the blob using getDirectURL()
+  const imageUrl = designData?.blob ? designData.blob.getDirectURL() : null;
 
   useEffect(() => {
     if (!open) {
@@ -34,33 +37,26 @@ export default function DesignImageModal({
     }
   }, [open]);
 
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.25, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 0.25, 0.5));
-  };
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5));
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom > 1) {
       setIsPanning(true);
-      setStartPan({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
+      setStartPan({
+        x: e.clientX - panPosition.x,
+        y: e.clientY - panPosition.y,
+      });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isPanning && zoom > 1) {
-      setPanPosition({
-        x: e.clientX - startPan.x,
-        y: e.clientY - startPan.y,
-      });
+      setPanPosition({ x: e.clientX - startPan.x, y: e.clientY - startPan.y });
     }
   };
 
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
+  const handleMouseUp = () => setIsPanning(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (zoom > 1 && e.touches.length === 1) {
@@ -81,9 +77,7 @@ export default function DesignImageModal({
     }
   };
 
-  const handleTouchEnd = () => {
-    setIsPanning(false);
-  };
+  const handleTouchEnd = () => setIsPanning(false);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -100,23 +94,29 @@ export default function DesignImageModal({
         <div className="space-y-4">
           {isLoading && (
             <div className="flex items-center justify-center py-12">
-              <div className="text-muted-foreground">Loading design image...</div>
+              <div className="text-muted-foreground">
+                Loading design image...
+              </div>
             </div>
           )}
 
           {error && (
             <div className="flex items-center justify-center py-12">
-              <div className="text-destructive">Failed to load design image</div>
+              <div className="text-destructive">
+                Failed to load design image
+              </div>
             </div>
           )}
 
           {!isLoading && !error && !designData && (
             <div className="flex items-center justify-center py-12 bg-muted rounded-lg">
-              <div className="text-muted-foreground">No image available for this design</div>
+              <div className="text-muted-foreground">
+                No image available for this design
+              </div>
             </div>
           )}
 
-          {designData && designData.imageUrl && (
+          {designData && imageUrl && (
             <>
               <div className="flex items-center justify-center gap-2 mb-4">
                 <Button variant="outline" size="sm" onClick={handleZoomOut}>
@@ -132,7 +132,10 @@ export default function DesignImageModal({
 
               <div
                 className="overflow-auto max-h-[50vh] border rounded-lg bg-muted/20 flex items-center justify-center p-4"
-                style={{ cursor: zoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+                style={{
+                  cursor:
+                    zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+                }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -142,21 +145,25 @@ export default function DesignImageModal({
                 onTouchEnd={handleTouchEnd}
               >
                 <img
-                  src={designData.imageUrl}
+                  src={imageUrl}
                   alt={`Design ${designCode}`}
                   style={{
                     transform: `scale(${zoom}) translate(${panPosition.x / zoom}px, ${panPosition.y / zoom}px)`,
-                    transition: isPanning ? 'none' : 'transform 0.2s ease-in-out',
-                    maxWidth: '100%',
-                    height: 'auto',
-                    userSelect: 'none',
+                    transition: isPanning
+                      ? "none"
+                      : "transform 0.2s ease-in-out",
+                    maxWidth: "100%",
+                    height: "auto",
+                    userSelect: "none",
                   }}
                   className="rounded-md"
                   draggable={false}
                 />
               </div>
               <p className="text-xs text-muted-foreground text-center">
-                {zoom > 1 ? 'Click and drag to pan' : 'Use zoom controls to magnify'}
+                {zoom > 1
+                  ? "Click and drag to pan"
+                  : "Use zoom controls to magnify"}
               </p>
             </>
           )}
@@ -167,15 +174,15 @@ export default function DesignImageModal({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Design Code:</span>
-                  <p className="font-medium">{designData.designCode}</p>
+                  <p className="font-medium">{designCode}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Generic Name:</span>
-                  <p className="font-medium">{designData.genericName || '-'}</p>
+                  <p className="font-medium">{designData.genericName || "-"}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Karigar Name:</span>
-                  <p className="font-medium">{designData.karigarName || '-'}</p>
+                  <p className="font-medium">{designData.karigarName || "-"}</p>
                 </div>
               </div>
             </div>

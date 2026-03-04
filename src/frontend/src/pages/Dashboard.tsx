@@ -1,59 +1,94 @@
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
+import HallmarkTab from "@/components/dashboard/HallmarkTab";
+import KarigarsTab from "@/components/dashboard/KarigarsTab";
+import ReadyTab from "@/components/dashboard/ReadyTab";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import TotalOrdersTab from "@/components/dashboard/TotalOrdersTab";
-import ReadyTab from "@/components/dashboard/ReadyTab";
-import HallmarkTab from "@/components/dashboard/HallmarkTab";
-import CustomerOrdersTab from "@/components/dashboard/CustomerOrdersTab";
-import KarigarsTab from "@/components/dashboard/KarigarsTab";
 import UnmappedSection from "@/components/dashboard/UnmappedSection";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useGetAllOrders } from "@/hooks/useQueries";
+import { useState } from "react";
 
-type ActiveTab = "total" | "ready" | "hallmark" | "customer" | "karigars";
+type TabKey = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("total");
+  const [activeTab, setActiveTab] = useState<TabKey>("total");
+  const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Manage your jewellery orders and production workflow
-        </p>
-      </div>
+    <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0">
+      <SummaryCards activeTab={activeTab} />
 
       <UnmappedSection />
 
-      <SummaryCards activeTab={activeTab} />
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => setActiveTab(val as TabKey)}
+        className="w-full"
+      >
+        <div className="overflow-x-auto">
+          <TabsList className="w-max min-w-full">
+            <TabsTrigger
+              value="total"
+              className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              Total Orders
+            </TabsTrigger>
+            <TabsTrigger
+              value="ready"
+              className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              Ready
+            </TabsTrigger>
+            <TabsTrigger
+              value="hallmark"
+              className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              Hallmark
+            </TabsTrigger>
+            <TabsTrigger
+              value="customer"
+              className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              Customer Orders
+            </TabsTrigger>
+            <TabsTrigger
+              value="karigars"
+              className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+            >
+              Karigars
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ActiveTab)} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="total">Total Orders</TabsTrigger>
-          <TabsTrigger value="ready">Ready</TabsTrigger>
-          <TabsTrigger value="hallmark">Hallmark</TabsTrigger>
-          <TabsTrigger value="customer">Customer Orders</TabsTrigger>
-          <TabsTrigger value="karigars">Karigars</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="total" className="space-y-4">
-          <TotalOrdersTab />
-        </TabsContent>
-
-        <TabsContent value="ready" className="space-y-4">
-          <ReadyTab />
-        </TabsContent>
-
-        <TabsContent value="hallmark" className="space-y-4">
-          <HallmarkTab />
-        </TabsContent>
-
-        <TabsContent value="customer" className="space-y-4">
-          <CustomerOrdersTab />
-        </TabsContent>
-
-        <TabsContent value="karigars" className="space-y-4">
-          <KarigarsTab />
-        </TabsContent>
+        {isLoading ? (
+          <div className="flex flex-col gap-3 mt-4">
+            {["s1", "s2", "s3", "s4", "s5"].map((sk) => (
+              <div
+                key={sk}
+                className="h-14 w-full rounded-lg bg-muted animate-pulse"
+              />
+            ))}
+          </div>
+        ) : (
+          <>
+            <TabsContent value="total" className="mt-3">
+              <TotalOrdersTab orders={allOrders} isError={isError} />
+            </TabsContent>
+            <TabsContent value="ready" className="mt-3">
+              <ReadyTab orders={allOrders} isError={isError} />
+            </TabsContent>
+            <TabsContent value="hallmark" className="mt-3">
+              <HallmarkTab orders={allOrders} isError={isError} />
+            </TabsContent>
+            <TabsContent value="customer" className="mt-3">
+              <CustomerOrdersTab />
+            </TabsContent>
+            <TabsContent value="karigars" className="mt-3">
+              <KarigarsTab />
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   );
