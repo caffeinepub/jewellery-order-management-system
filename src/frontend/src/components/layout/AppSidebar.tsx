@@ -45,7 +45,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="none">
+      <Sidebar collapsible="offcanvas">
         <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gold text-gold-foreground">

@@ -41,7 +41,7 @@ function RootLayout() {
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {/* Mobile-only header with sidebar trigger */}
-          <header className="flex h-12 shrink-0 items-center gap-2 px-3 md:hidden border-b border-border">
+          <header className="flex h-12 shrink-0 items-center gap-2 px-3 lg:hidden border-b border-border">
             <SidebarTrigger className="-ml-1" />
           </header>
           <main className="flex-1 min-w-0 overflow-auto">
