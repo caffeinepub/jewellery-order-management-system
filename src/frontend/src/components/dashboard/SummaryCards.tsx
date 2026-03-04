@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, Package, RotateCcw, Stamp } from "lucide-react";
+import { CheckCircle, Package, ShoppingBag, Stamp } from "lucide-react";
 import { useMemo } from "react";
 import { type Order, OrderStatus, OrderType } from "../../backend";
 import { useGetAllOrders } from "../../hooks/useQueries";
@@ -31,8 +31,9 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
     const hallmark = validOrders.filter(
       (o) => o.status === OrderStatus.Hallmark,
     );
-    const returnFromHallmark = validOrders.filter(
-      (o) => o.status === OrderStatus.ReturnFromHallmark,
+    // Customer Orders: same filter as CustomerOrdersTab (CO type + Pending status)
+    const customerOrders = validOrders.filter(
+      (o) => o.orderType === OrderType.CO && o.status === OrderStatus.Pending,
     );
 
     const calcStats = (orders: Order[]) => ({
@@ -47,7 +48,7 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
       pending: calcStats(pending),
       ready: calcStats(ready),
       hallmark: calcStats(hallmark),
-      returnFromHallmark: calcStats(returnFromHallmark),
+      customerOrders: calcStats(customerOrders),
     };
   }, [allOrders]);
 
@@ -77,10 +78,10 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
       bg: "bg-purple-500/10",
     },
     {
-      key: "return",
-      label: "Return",
-      icon: RotateCcw,
-      stats: stats.returnFromHallmark,
+      key: "customer",
+      label: "Customer Orders",
+      icon: ShoppingBag,
+      stats: stats.customerOrders,
       color: "text-amber-500",
       bg: "bg-amber-500/10",
     },

@@ -170,7 +170,7 @@ export default function TagPrinting() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="w-full p-6">
         <div className="flex items-center justify-center py-12">
           <div className="text-muted-foreground">Loading ready orders...</div>
         </div>
@@ -183,7 +183,7 @@ export default function TagPrinting() {
     designCodes.length > 0 && selectedDesignCodes.size === designCodes.length;
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="w-full p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-foreground">Tag Printing</h1>
         <p className="text-muted-foreground mt-2">

@@ -84,6 +84,12 @@
     border-color: oklch(var(--border));
   }
 
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
   body {
     background-color: oklch(var(--background));
     color: oklch(var(--foreground));

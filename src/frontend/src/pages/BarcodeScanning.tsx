@@ -237,7 +237,7 @@ export default function BarcodeScanning() {
     );
 
   return (
-    <div className="container px-4 sm:px-6 py-8">
+    <div className="w-full px-4 sm:px-6 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">
           Barcode Scanning

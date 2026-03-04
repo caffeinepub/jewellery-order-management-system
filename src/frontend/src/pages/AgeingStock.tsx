@@ -241,7 +241,7 @@ export default function AgeingStock() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-4 md:p-6 space-y-6">
+      <div className="w-full p-4 md:p-6 space-y-6">
         <div>
           <Skeleton className="h-8 w-48 mb-2" />
           <Skeleton className="h-4 w-72" />
@@ -262,7 +262,7 @@ export default function AgeingStock() {
 
   if (isError) {
     return (
-      <div className="container mx-auto p-4 md:p-6">
+      <div className="w-full p-4 md:p-6">
         <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950 dark:border-red-800 p-6 text-center">
           <p className="text-red-700 dark:text-red-300 font-medium">
             Failed to load orders. Please refresh the page.
@@ -273,7 +273,7 @@ export default function AgeingStock() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="w-full p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>

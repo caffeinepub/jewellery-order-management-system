@@ -16,7 +16,7 @@ export default function Dashboard() {
   const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
 
   return (
-    <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0 w-full overflow-x-hidden">
       <SummaryCards activeTab={activeTab} />
 
       <UnmappedSection />

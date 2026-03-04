@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
 function RootLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex min-h-screen w-full overflow-x-hidden">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {/* Mobile-only header with sidebar trigger */}

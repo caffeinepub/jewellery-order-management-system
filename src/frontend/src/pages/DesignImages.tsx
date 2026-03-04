@@ -236,7 +236,7 @@ export default function DesignImages() {
   };
 
   return (
-    <div className="container px-4 sm:px-6 py-8">
+    <div className="w-full px-4 sm:px-6 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">Design Images</h1>
         <p className="text-muted-foreground mt-1">

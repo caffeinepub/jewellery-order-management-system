@@ -145,7 +145,7 @@ export default function IngestOrders() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 p-4">
+    <div className="w-full max-w-2xl mx-auto space-y-6 p-4">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Ingest Orders</h1>
         <p className="text-muted-foreground text-sm mt-1">
