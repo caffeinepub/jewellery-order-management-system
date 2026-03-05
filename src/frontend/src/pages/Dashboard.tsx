@@ -8,18 +8,35 @@ import UnmappedSection from "@/components/dashboard/UnmappedSection";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetAllOrders } from "@/hooks/useQueries";
 import { useState } from "react";
+import { AppRole } from "../backend";
+import { useAuth } from "../context/AuthContext";
 
 type TabKey = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<TabKey>("total");
+  const { currentUser } = useAuth();
+  const isStaff = currentUser?.role === AppRole.Staff;
+  const isKarigar = currentUser?.role === AppRole.Karigar;
+
+  // Karigar users only ever see the Karigars tab
+  const defaultTab: TabKey = isKarigar ? "karigars" : "total";
+  const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
   const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
+
+  // Karigar: render only the Karigars tab view
+  if (isKarigar) {
+    return (
+      <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0 w-full overflow-x-hidden">
+        <KarigarsTab />
+      </div>
+    );
+  }
 
   return (
     <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0 w-full overflow-x-hidden">
-      <SummaryCards activeTab={activeTab} />
-
-      <UnmappedSection />
+      {/* Summary cards and unmapped section: Admin only, not Staff or Karigar */}
+      {!isStaff && <SummaryCards activeTab={activeTab} />}
+      {!isStaff && <UnmappedSection />}
 
       <Tabs
         value={activeTab}
@@ -52,12 +69,15 @@ export default function Dashboard() {
             >
               Customer Orders
             </TabsTrigger>
-            <TabsTrigger
-              value="karigars"
-              className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
-            >
-              Karigars
-            </TabsTrigger>
+            {/* Karigars tab: Admin only, hidden for Staff */}
+            {!isStaff && (
+              <TabsTrigger
+                value="karigars"
+                className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+              >
+                Karigars
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -84,9 +104,11 @@ export default function Dashboard() {
             <TabsContent value="customer" className="mt-3">
               <CustomerOrdersTab />
             </TabsContent>
-            <TabsContent value="karigars" className="mt-3">
-              <KarigarsTab />
-            </TabsContent>
+            {!isStaff && (
+              <TabsContent value="karigars" className="mt-3">
+                <KarigarsTab />
+              </TabsContent>
+            )}
           </>
         )}
       </Tabs>

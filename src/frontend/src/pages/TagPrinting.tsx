@@ -358,7 +358,7 @@ export default function TagPrinting() {
                       e.stopPropagation();
                       handleCopyOrderNumbers(orderNumbers);
                     }}
-                    className="w-full bg-gold hover:bg-gold-hover"
+                    className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold border-2 border-orange-400 shadow-md"
                     size="sm"
                   >
                     <Copy className="mr-2 h-4 w-4" />

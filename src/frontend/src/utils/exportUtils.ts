@@ -481,8 +481,8 @@ export async function exportKarigarByDesignGrouped(
     // Images in raw PDF require XObject embedding — instead we render each
     // page to a canvas first and embed as JPEG XObject.
 
-    // Use 2x scale for high-quality rendering (retina/print quality)
-    const SCALE = 2;
+    // Use 3x scale for high-quality rendering (retina/print quality, no compression)
+    const SCALE = 3;
     const PAGE_W_PX = 794; // A4 @ 96dpi ≈ 794x1123 (logical pixels)
     const PAGE_H_PX = 1123;
     const MARGIN = 40;
@@ -662,8 +662,8 @@ export async function exportKarigarByDesignGrouped(
         yPos += TABLE_ROW_H;
       }
 
-      // Convert page canvas to data URL at high quality
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.97);
+      // Convert page canvas to data URL at maximum quality (no compression)
+      const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
       pageDataUrls.push(dataUrl);
       pageActualHeights.push(canvas.height); // store actual canvas pixel height
     }

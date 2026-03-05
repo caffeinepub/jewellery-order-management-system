@@ -7,12 +7,15 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronRight, User } from "lucide-react";
 import { useMemo } from "react";
+import { AppRole } from "../../backend";
+import { useAuth } from "../../context/AuthContext";
 
 export default function KarigarsTab() {
   const { data: orders = [], isLoading } = useGetAllOrders();
   // Use the full DesignMapping data (not just the 3-tuple) for accurate karigar resolution
   const { data: rawMappings = [] } = useGetAllDesignMappings();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   // Build a normalized Map<designCode, DesignMapping> for O(1) lookups
   const designMappingsMap = useMemo(
@@ -27,9 +30,19 @@ export default function KarigarsTab() {
         order.status === OrderStatus.Pending && Number(order.quantity) > 0,
     );
 
-    const groups: Record<string, typeof pendingOrders> = {};
+    // If current user is Karigar role, filter to their orders only
+    const filteredOrders =
+      currentUser?.role === AppRole.Karigar && currentUser.karigarName
+        ? pendingOrders.filter(
+            (order) =>
+              resolveKarigar(order.design, designMappingsMap) ===
+              currentUser.karigarName,
+          )
+        : pendingOrders;
 
-    for (const order of pendingOrders) {
+    const groups: Record<string, typeof filteredOrders> = {};
+
+    for (const order of filteredOrders) {
       // SINGLE SOURCE OF TRUTH: always resolve karigar from master design mappings
       // Never use order.karigarName for grouping
       const karigar = resolveKarigar(order.design, designMappingsMap);
@@ -60,7 +73,7 @@ export default function KarigarsTab() {
         if (b.name === "Unassigned") return -1;
         return a.name.localeCompare(b.name);
       });
-  }, [orders, designMappingsMap]);
+  }, [orders, designMappingsMap, currentUser]);
 
   const handleKarigarClick = (karigarName: string) => {
     navigate({ to: `/karigar/${encodeURIComponent(karigarName)}` });

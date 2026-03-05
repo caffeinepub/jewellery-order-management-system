@@ -6,8 +6,10 @@ import { ChevronDown, ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { Image as ImageIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { type Order, OrderStatus, OrderType } from "../../backend";
+import { useAuth } from "../../context/AuthContext";
 import {
   useDeleteOrder,
+  useGenericNameResolver,
   useKarigarResolver,
   useMarkOrdersAsReady,
 } from "../../hooks/useQueries";
@@ -30,6 +32,29 @@ function uniqueOrderCount(orders: Order[]): number {
   return new Set(orders.map((o) => o.orderNo)).size;
 }
 
+// Last Action badge component
+function LastActionBadge({ lastAction }: { lastAction?: string }) {
+  if (!lastAction)
+    return <span className="text-muted-foreground text-xs">—</span>;
+  const parts = lastAction.split(" • ");
+  const status = parts[0] ?? "";
+  const color =
+    status === "Ready"
+      ? "bg-green-500/15 text-green-400 border-green-500/30"
+      : status === "Pending"
+        ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+        : status === "Returned"
+          ? "bg-red-500/15 text-red-400 border-red-500/30"
+          : "bg-blue-500/15 text-blue-400 border-blue-500/30";
+  return (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${color} whitespace-nowrap`}
+    >
+      {lastAction}
+    </span>
+  );
+}
+
 export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -43,9 +68,11 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
 
   const markAsReady = useMarkOrdersAsReady();
   const deleteOrder = useDeleteOrder();
+  const { currentUser } = useAuth();
 
-  // Single source of truth: resolve karigar dynamically from master design mappings
+  // Single source of truth: resolve karigar and generic name dynamically from master design mappings
   const resolveKarigar = useKarigarResolver();
+  const resolveGenericName = useGenericNameResolver();
 
   // Filter: only Pending orders with qty > 0
   const pendingOrders = useMemo(
@@ -143,7 +170,10 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
 
   const handleMarkAsReady = async () => {
     if (selectedIds.size === 0) return;
-    await markAsReady.mutateAsync(Array.from(selectedIds));
+    await markAsReady.mutateAsync({
+      orderIds: Array.from(selectedIds),
+      updatedBy: currentUser?.name ?? "system",
+    });
     setSelectedIds(new Set());
   };
 
@@ -301,10 +331,9 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
             const someSelected = groupOrders.some((o) =>
               selectedIds.has(o.orderId),
             );
-            // Resolve karigar dynamically from master design — single source of truth
+            // Single source of truth: resolve karigar AND generic name dynamically from master design mappings
             const resolvedKarigar = resolveKarigar(design);
-            // Generic name still comes from order record (not karigar-related)
-            const genericName = groupOrders[0]?.genericName ?? "";
+            const genericName = resolveGenericName(design);
 
             return (
               <div
@@ -448,6 +477,19 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
                                 <AgeingBadge orderDate={order.orderDate} />
                               </div>
                             )}
+                            {/* Updated By */}
+                            <div>
+                              <span className="text-muted-foreground">
+                                By:{" "}
+                              </span>
+                              <span className="font-medium text-foreground">
+                                {order.updatedBy ?? "—"}
+                              </span>
+                            </div>
+                            {/* Last Action */}
+                            <div className="col-span-2 sm:col-span-2">
+                              <LastActionBadge lastAction={order.lastAction} />
+                            </div>
                             {order.remarks && (
                               <div className="col-span-2 sm:col-span-4 text-muted-foreground italic">
                                 {order.remarks}

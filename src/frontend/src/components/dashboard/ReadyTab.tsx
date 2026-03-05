@@ -21,7 +21,11 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { type Order, OrderStatus } from "../../backend";
+import { useAuth } from "../../context/AuthContext";
 import {
+  useBatchUpdateOrderStatus,
+  useGenericNameResolver,
+  useKarigarResolver,
   useMarkOrdersAsPending,
   useReturnReadyOrderToPending,
 } from "../../hooks/useQueries";
@@ -36,6 +40,29 @@ import DesignImageModal from "./DesignImageModal";
 interface ReadyTabProps {
   orders: Order[];
   isError?: boolean;
+}
+
+// Last Action badge component
+function LastActionBadge({ lastAction }: { lastAction?: string }) {
+  if (!lastAction)
+    return <span className="text-muted-foreground text-xs">—</span>;
+  const parts = lastAction.split(" • ");
+  const status = parts[0] ?? "";
+  const color =
+    status === "Ready"
+      ? "bg-green-500/15 text-green-400 border-green-500/30"
+      : status === "Pending"
+        ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+        : status === "Returned"
+          ? "bg-red-500/15 text-red-400 border-red-500/30"
+          : "bg-blue-500/15 text-blue-400 border-blue-500/30";
+  return (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${color} whitespace-nowrap`}
+    >
+      {lastAction}
+    </span>
+  );
 }
 
 // Helper: compute dynamic weight
@@ -67,6 +94,11 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
 
   const markAsPending = useMarkOrdersAsPending();
   const returnToPending = useReturnReadyOrderToPending();
+  const moveToHallmark = useBatchUpdateOrderStatus();
+  const { currentUser } = useAuth();
+  // Single source of truth: resolve karigar and generic name dynamically from master design mappings
+  const resolveKarigar = useKarigarResolver();
+  const resolveGenericName = useGenericNameResolver();
 
   // Filter: only Ready orders with qty > 0
   const readyOrders = useMemo(
@@ -143,7 +175,20 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
 
   const handleMarkAsPending = async () => {
     if (selectedIds.size === 0) return;
-    await markAsPending.mutateAsync(Array.from(selectedIds));
+    await markAsPending.mutateAsync({
+      orderIds: Array.from(selectedIds),
+      updatedBy: currentUser?.name ?? "system",
+    });
+    setSelectedIds(new Set());
+  };
+
+  const handleMoveToHallmark = async () => {
+    if (selectedIds.size === 0) return;
+    await moveToHallmark.mutateAsync({
+      orderIds: Array.from(selectedIds),
+      newStatus: OrderStatus.Hallmark,
+      updatedBy: currentUser?.name ?? "system",
+    });
     setSelectedIds(new Set());
   };
 
@@ -182,6 +227,7 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
       await returnToPending.mutateAsync({
         orderId: returnDialog.order.orderId,
         returnedQty: returnQty,
+        updatedBy: currentUser?.name ?? "system",
       });
       closeReturnDialog();
     } catch (err: unknown) {
@@ -219,17 +265,30 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
         />
         <div className="flex gap-2 flex-wrap">
           {selectedIds.size > 0 && (
-            <Button
-              size="sm"
-              onClick={handleMarkAsPending}
-              disabled={markAsPending.isPending}
-              className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold border-0"
-            >
-              {markAsPending.isPending ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              ) : null}
-              Mark as Pending ({selectedIds.size})
-            </Button>
+            <>
+              <Button
+                size="sm"
+                onClick={handleMarkAsPending}
+                disabled={markAsPending.isPending}
+                className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold border-0"
+              >
+                {markAsPending.isPending ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : null}
+                Mark as Pending ({selectedIds.size})
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleMoveToHallmark}
+                disabled={moveToHallmark.isPending}
+                className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold border-0"
+              >
+                {moveToHallmark.isPending ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : null}
+                Move to Hallmark ({selectedIds.size})
+              </Button>
+            </>
           )}
           <Button
             size="sm"
@@ -333,8 +392,9 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
             const someSelected = groupOrders.some((o) =>
               selectedIds.has(o.orderId),
             );
-            const genericName = groupOrders[0]?.genericName ?? "";
-            const karigarName = groupOrders[0]?.karigarName ?? "";
+            // Single source of truth: resolve from master design mappings, not stored order fields
+            const genericName = resolveGenericName(design);
+            const karigarName = resolveKarigar(design);
 
             return (
               <div
@@ -381,7 +441,7 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
                       {genericName}
                     </span>
                   )}
-                  {karigarName && (
+                  {karigarName && karigarName !== "Unassigned" && (
                     <Badge variant="outline" className="text-xs h-5">
                       {karigarName}
                     </Badge>
@@ -466,6 +526,19 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
                                 </Badge>
                               </div>
                             )}
+                            {/* Updated By */}
+                            <div>
+                              <span className="text-muted-foreground">
+                                By:{" "}
+                              </span>
+                              <span className="font-medium text-foreground">
+                                {order.updatedBy ?? "—"}
+                              </span>
+                            </div>
+                            {/* Last Action */}
+                            <div className="col-span-2 sm:col-span-2">
+                              <LastActionBadge lastAction={order.lastAction} />
+                            </div>
                           </div>
 
                           {/* Return button */}

@@ -21,6 +21,7 @@ export const _CaffeineStorageRefillResult = IDL.Record({
 });
 export const MappingRecord = IDL.Record({
   'karigarName' : IDL.Text,
+  'excelGenericName' : IDL.Text,
   'genericName' : IDL.Text,
   'designCode' : IDL.Text,
 });
@@ -30,21 +31,30 @@ export const OrderStatus = IDL.Variant({
   'ReturnFromHallmark' : IDL.Null,
   'Pending' : IDL.Null,
 });
-export const Time = IDL.Int;
-export const DesignMapping = IDL.Record({
-  'createdAt' : Time,
-  'createdBy' : IDL.Text,
-  'karigarName' : IDL.Text,
-  'updatedAt' : Time,
-  'updatedBy' : IDL.Opt(IDL.Text),
-  'genericName' : IDL.Text,
-  'designCode' : IDL.Text,
-});
-export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const OrderType = IDL.Variant({
   'CO' : IDL.Null,
   'RB' : IDL.Null,
   'SO' : IDL.Null,
+});
+export const Time = IDL.Int;
+export const AppRole = IDL.Variant({
+  'Staff' : IDL.Null,
+  'Admin' : IDL.Null,
+  'Karigar' : IDL.Null,
+});
+export const MasterDesignMapping = IDL.Record({
+  'karigar' : IDL.Text,
+  'excelGenericName' : IDL.Text,
+  'genericName' : IDL.Text,
+  'designCode' : IDL.Text,
+});
+export const OrderStatusLog = IDL.Record({
+  'id' : IDL.Text,
+  'oldStatus' : OrderStatus,
+  'orderId' : IDL.Text,
+  'updatedAt' : Time,
+  'updatedBy' : IDL.Text,
+  'newStatus' : OrderStatus,
 });
 export const Order = IDL.Record({
   'weight' : IDL.Float64,
@@ -61,35 +71,55 @@ export const Order = IDL.Record({
   'orderNo' : IDL.Text,
   'karigarName' : IDL.Opt(IDL.Text),
   'updatedAt' : Time,
+  'updatedBy' : IDL.Opt(IDL.Text),
   'genericName' : IDL.Opt(IDL.Text),
   'quantity' : IDL.Nat,
+  'lastAction' : IDL.Opt(IDL.Text),
   'remarks' : IDL.Text,
   'product' : IDL.Text,
+});
+export const DesignMapping = IDL.Record({
+  'createdAt' : Time,
+  'createdBy' : IDL.Text,
+  'karigarName' : IDL.Text,
+  'updatedAt' : Time,
+  'updatedBy' : IDL.Opt(IDL.Text),
+  'genericName' : IDL.Text,
+  'designCode' : IDL.Text,
 });
 export const Karigar = IDL.Record({
   'name' : IDL.Text,
   'createdAt' : Time,
   'createdBy' : IDL.Text,
 });
+export const ExternalBlob = IDL.Vec(IDL.Nat8);
+export const AppStatus = IDL.Variant({
+  'Inactive' : IDL.Null,
+  'Active' : IDL.Null,
+});
+export const AppUser = IDL.Record({
+  'id' : IDL.Text,
+  'status' : AppStatus,
+  'name' : IDL.Text,
+  'createdAt' : Time,
+  'role' : AppRole,
+  'karigarName' : IDL.Opt(IDL.Text),
+  'loginId' : IDL.Text,
+  'passwordHash' : IDL.Text,
+});
 export const MasterDataRow = IDL.Record({
-  'weight' : IDL.Float64,
   'karigar' : IDL.Text,
-  'orderDate' : IDL.Opt(Time),
-  'orderType' : OrderType,
-  'orderNo' : IDL.Text,
-  'quantity' : IDL.Nat,
+  'genericName' : IDL.Text,
   'designCode' : IDL.Text,
 });
-export const MasterPersistedResponse = IDL.Record({
-  'persisted' : IDL.Vec(Order),
-});
 export const MasterReconciliationResult = IDL.Record({
-  'missingInMasterCount' : IDL.Nat,
-  'newLinesCount' : IDL.Nat,
-  'alreadyExistingRows' : IDL.Nat,
-  'totalUploadedRows' : IDL.Nat,
-  'newLines' : IDL.Vec(MasterDataRow),
-  'missingInMaster' : IDL.Vec(Order),
+  'missingInExcel' : IDL.Vec(MasterDataRow),
+  'matchedRows' : IDL.Vec(MasterDataRow),
+  'missingInSystem' : IDL.Vec(MasterDataRow),
+});
+export const MasterPersistedResponse = IDL.Record({
+  'reconciliationResult' : MasterReconciliationResult,
+  'persistedRows' : IDL.Vec(MasterDataRow),
 });
 
 export const idlService = IDL.Service({
@@ -119,104 +149,18 @@ export const idlService = IDL.Service({
       [],
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-  'addKarigar' : IDL.Func([IDL.Text], [], []),
-  'assignOrdersToKarigar' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
-  'batchDeleteOrders' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-  'batchGetByStatus' : IDL.Func(
-      [IDL.Vec(IDL.Text), OrderStatus],
-      [IDL.Vec(IDL.Text)],
-      [],
-    ),
-  'batchReturnOrdersToPending' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-      [],
-      [],
-    ),
   'batchSaveDesignMappings' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
+      [IDL.Vec(MappingRecord), IDL.Text],
       [],
       [],
     ),
-  'batchUpdateOrderStatus' : IDL.Func([IDL.Vec(IDL.Text), OrderStatus], [], []),
-  'batchUploadDesignImages' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
+  'batchUpdateOrderStatus' : IDL.Func(
+      [IDL.Vec(IDL.Text), OrderStatus, IDL.Text],
       [],
       [],
     ),
   'clearAllDesignMappings' : IDL.Func([], [], []),
-  'deleteOrder' : IDL.Func([IDL.Text], [], []),
-  'deleteReadyOrder' : IDL.Func([IDL.Text], [], []),
-  'getAllMasterDesignMappings' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
-      ['query'],
-    ),
-  'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'getDesignCountByKarigar' : IDL.Func(
-      [IDL.Text],
-      [IDL.Opt(IDL.Nat)],
-      ['query'],
-    ),
-  'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
-  'getDesignImageMapping' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
-      ['query'],
-    ),
-  'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
-  'getFilteredOutKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
-  'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
-  'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
-  'getMasterDesignKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
-  'getMasterDesigns' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text, IDL.Text))],
-      ['query'],
-    ),
-  'getOrder' : IDL.Func([IDL.Text], [IDL.Opt(Order)], ['query']),
-  'getOrders' : IDL.Func(
-      [IDL.Opt(OrderStatus), IDL.Opt(OrderType), IDL.Opt(IDL.Text)],
-      [IDL.Vec(Order)],
-      ['query'],
-    ),
-  'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'getReadyOrdersByDateRange' : IDL.Func(
-      [Time, Time],
-      [IDL.Vec(Order)],
-      ['query'],
-    ),
-  'getUniqueKarigarsFromDesignMappings' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Text)],
-      ['query'],
-    ),
-  'getUnreturnedOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-  'isExistingDesignCodes' : IDL.Func(
-      [IDL.Vec(IDL.Text)],
-      [IDL.Vec(IDL.Bool)],
-      ['query'],
-    ),
-  'markAllAsReady' : IDL.Func([], [], []),
-  'markOrdersAsPending' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-  'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-  'persistMasterDataRows' : IDL.Func(
-      [IDL.Vec(MasterDataRow)],
-      [MasterPersistedResponse],
-      [],
-    ),
-  'reassignDesign' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-  'reconcileMasterFile' : IDL.Func(
-      [IDL.Vec(MasterDataRow)],
-      [MasterReconciliationResult],
-      [],
-    ),
-  'registerKarigar' : IDL.Func([IDL.Text], [], []),
-  'resetActiveOrders' : IDL.Func([], [], []),
-  'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-  'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-  'saveModifiedOrder' : IDL.Func([IDL.Nat, IDL.Nat, Order], [], []),
-  'saveOrder' : IDL.Func(
+  'createOrder' : IDL.Func(
       [
         IDL.Text,
         OrderType,
@@ -226,19 +170,121 @@ export const idlService = IDL.Service({
         IDL.Float64,
         IDL.Nat,
         IDL.Text,
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Text),
+      ],
+      [IDL.Text],
+      [],
+    ),
+  'createOrderWithDate' : IDL.Func(
+      [
         IDL.Text,
+        OrderType,
+        IDL.Text,
+        IDL.Text,
+        IDL.Float64,
+        IDL.Float64,
+        IDL.Nat,
+        IDL.Text,
+        IDL.Opt(IDL.Text),
+        IDL.Opt(IDL.Text),
         IDL.Opt(Time),
       ],
+      [IDL.Text],
+      [],
+    ),
+  'createUser' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, AppRole, IDL.Opt(IDL.Text)],
+      [IDL.Text],
+      [],
+    ),
+  'deleteOrder' : IDL.Func([IDL.Text], [], []),
+  'getAllMasterDesignMappings' : IDL.Func(
+      [],
+      [IDL.Vec(MasterDesignMapping)],
+      ['query'],
+    ),
+  'getAllOrderStatusLogs' : IDL.Func([], [IDL.Vec(OrderStatusLog)], ['query']),
+  'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getDesignCountByKarigar' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+      ['query'],
+    ),
+  'getDesignImageMapping' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
+      ['query'],
+    ),
+  'getDesignMapping' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(DesignMapping)],
+      ['query'],
+    ),
+  'getFilteredOutKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
+  'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
+  'getMasterDesigns' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'getOrder' : IDL.Func([IDL.Text], [IDL.Opt(Order)], ['query']),
+  'getOrderStatusLog' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(OrderStatusLog)],
+      ['query'],
+    ),
+  'getOrdersByStatus' : IDL.Func([OrderStatus], [IDL.Vec(Order)], ['query']),
+  'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getUniqueKarigarsFromDesignMappings' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Text)],
+      ['query'],
+    ),
+  'getUser' : IDL.Func([IDL.Text], [IDL.Opt(AppUser)], ['query']),
+  'getUserByLoginId' : IDL.Func([IDL.Text], [IDL.Opt(AppUser)], ['query']),
+  'initDefaultAdmin' : IDL.Func([], [], []),
+  'isExistingDesignCodes' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'listUsers' : IDL.Func([], [IDL.Vec(AppUser)], ['query']),
+  'logOrderStatusChange' : IDL.Func(
+      [IDL.Text, OrderStatus, OrderStatus, IDL.Text],
       [],
       [],
     ),
-  'supplyAndReturnOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-  'supplyOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-  'updateDesignGroupStatus' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-  'updateDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-  'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
+  'login' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [
+        IDL.Opt(
+          IDL.Record({
+            'id' : IDL.Text,
+            'name' : IDL.Text,
+            'role' : AppRole,
+            'karigarName' : IDL.Opt(IDL.Text),
+          })
+        ),
+      ],
+      ['query'],
+    ),
+  'markOrdersAsPending' : IDL.Func([IDL.Vec(IDL.Text), IDL.Text], [], []),
+  'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text), IDL.Text], [], []),
+  'persistMasterDataRows' : IDL.Func(
+      [IDL.Vec(MasterDataRow)],
+      [MasterPersistedResponse],
+      [],
+    ),
+  'reconcileMasterFile' : IDL.Func([], [MasterReconciliationResult], ['query']),
+  'registerKarigar' : IDL.Func([IDL.Text], [], []),
+  'resetActiveOrders' : IDL.Func([], [], []),
+  'resetDefaultAdmin' : IDL.Func([], [], []),
+  'resetUserPassword' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'saveDesignMapping' : IDL.Func([DesignMapping], [], []),
+  'supplyAndReturnOrder' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [], []),
+  'supplyOrder' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [], []),
+  'updateMasterDesignKarigars' : IDL.Func([IDL.Text, IDL.Nat], [], []),
+  'updateOrderQuantity' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [], []),
+  'updateUser' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, AppRole, IDL.Opt(IDL.Text), AppStatus],
+      [],
+      [],
+    ),
   'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
-  'uploadDesignMapping' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
   'uploadMasterDesignExcel' : IDL.Func([ExternalBlob], [], []),
 });
 
@@ -258,6 +304,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const MappingRecord = IDL.Record({
     'karigarName' : IDL.Text,
+    'excelGenericName' : IDL.Text,
     'genericName' : IDL.Text,
     'designCode' : IDL.Text,
   });
@@ -267,21 +314,30 @@ export const idlFactory = ({ IDL }) => {
     'ReturnFromHallmark' : IDL.Null,
     'Pending' : IDL.Null,
   });
-  const Time = IDL.Int;
-  const DesignMapping = IDL.Record({
-    'createdAt' : Time,
-    'createdBy' : IDL.Text,
-    'karigarName' : IDL.Text,
-    'updatedAt' : Time,
-    'updatedBy' : IDL.Opt(IDL.Text),
-    'genericName' : IDL.Text,
-    'designCode' : IDL.Text,
-  });
-  const ExternalBlob = IDL.Vec(IDL.Nat8);
   const OrderType = IDL.Variant({
     'CO' : IDL.Null,
     'RB' : IDL.Null,
     'SO' : IDL.Null,
+  });
+  const Time = IDL.Int;
+  const AppRole = IDL.Variant({
+    'Staff' : IDL.Null,
+    'Admin' : IDL.Null,
+    'Karigar' : IDL.Null,
+  });
+  const MasterDesignMapping = IDL.Record({
+    'karigar' : IDL.Text,
+    'excelGenericName' : IDL.Text,
+    'genericName' : IDL.Text,
+    'designCode' : IDL.Text,
+  });
+  const OrderStatusLog = IDL.Record({
+    'id' : IDL.Text,
+    'oldStatus' : OrderStatus,
+    'orderId' : IDL.Text,
+    'updatedAt' : Time,
+    'updatedBy' : IDL.Text,
+    'newStatus' : OrderStatus,
   });
   const Order = IDL.Record({
     'weight' : IDL.Float64,
@@ -298,33 +354,52 @@ export const idlFactory = ({ IDL }) => {
     'orderNo' : IDL.Text,
     'karigarName' : IDL.Opt(IDL.Text),
     'updatedAt' : Time,
+    'updatedBy' : IDL.Opt(IDL.Text),
     'genericName' : IDL.Opt(IDL.Text),
     'quantity' : IDL.Nat,
+    'lastAction' : IDL.Opt(IDL.Text),
     'remarks' : IDL.Text,
     'product' : IDL.Text,
+  });
+  const DesignMapping = IDL.Record({
+    'createdAt' : Time,
+    'createdBy' : IDL.Text,
+    'karigarName' : IDL.Text,
+    'updatedAt' : Time,
+    'updatedBy' : IDL.Opt(IDL.Text),
+    'genericName' : IDL.Text,
+    'designCode' : IDL.Text,
   });
   const Karigar = IDL.Record({
     'name' : IDL.Text,
     'createdAt' : Time,
     'createdBy' : IDL.Text,
   });
+  const ExternalBlob = IDL.Vec(IDL.Nat8);
+  const AppStatus = IDL.Variant({ 'Inactive' : IDL.Null, 'Active' : IDL.Null });
+  const AppUser = IDL.Record({
+    'id' : IDL.Text,
+    'status' : AppStatus,
+    'name' : IDL.Text,
+    'createdAt' : Time,
+    'role' : AppRole,
+    'karigarName' : IDL.Opt(IDL.Text),
+    'loginId' : IDL.Text,
+    'passwordHash' : IDL.Text,
+  });
   const MasterDataRow = IDL.Record({
-    'weight' : IDL.Float64,
     'karigar' : IDL.Text,
-    'orderDate' : IDL.Opt(Time),
-    'orderType' : OrderType,
-    'orderNo' : IDL.Text,
-    'quantity' : IDL.Nat,
+    'genericName' : IDL.Text,
     'designCode' : IDL.Text,
   });
-  const MasterPersistedResponse = IDL.Record({ 'persisted' : IDL.Vec(Order) });
   const MasterReconciliationResult = IDL.Record({
-    'missingInMasterCount' : IDL.Nat,
-    'newLinesCount' : IDL.Nat,
-    'alreadyExistingRows' : IDL.Nat,
-    'totalUploadedRows' : IDL.Nat,
-    'newLines' : IDL.Vec(MasterDataRow),
-    'missingInMaster' : IDL.Vec(Order),
+    'missingInExcel' : IDL.Vec(MasterDataRow),
+    'matchedRows' : IDL.Vec(MasterDataRow),
+    'missingInSystem' : IDL.Vec(MasterDataRow),
+  });
+  const MasterPersistedResponse = IDL.Record({
+    'reconciliationResult' : MasterReconciliationResult,
+    'persistedRows' : IDL.Vec(MasterDataRow),
   });
   
   return IDL.Service({
@@ -354,108 +429,18 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-    'addKarigar' : IDL.Func([IDL.Text], [], []),
-    'assignOrdersToKarigar' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
-    'batchDeleteOrders' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-    'batchGetByStatus' : IDL.Func(
-        [IDL.Vec(IDL.Text), OrderStatus],
-        [IDL.Vec(IDL.Text)],
-        [],
-      ),
-    'batchReturnOrdersToPending' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
-        [],
-        [],
-      ),
     'batchSaveDesignMappings' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
+        [IDL.Vec(MappingRecord), IDL.Text],
         [],
         [],
       ),
     'batchUpdateOrderStatus' : IDL.Func(
-        [IDL.Vec(IDL.Text), OrderStatus],
-        [],
-        [],
-      ),
-    'batchUploadDesignImages' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
+        [IDL.Vec(IDL.Text), OrderStatus, IDL.Text],
         [],
         [],
       ),
     'clearAllDesignMappings' : IDL.Func([], [], []),
-    'deleteOrder' : IDL.Func([IDL.Text], [], []),
-    'deleteReadyOrder' : IDL.Func([IDL.Text], [], []),
-    'getAllMasterDesignMappings' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
-        ['query'],
-      ),
-    'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'getDesignCountByKarigar' : IDL.Func(
-        [IDL.Text],
-        [IDL.Opt(IDL.Nat)],
-        ['query'],
-      ),
-    'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
-    'getDesignImageMapping' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(IDL.Text, ExternalBlob))],
-        ['query'],
-      ),
-    'getDesignMapping' : IDL.Func([IDL.Text], [DesignMapping], ['query']),
-    'getFilteredOutKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
-    'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
-    'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
-    'getMasterDesignKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
-    'getMasterDesigns' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text, IDL.Text))],
-        ['query'],
-      ),
-    'getOrder' : IDL.Func([IDL.Text], [IDL.Opt(Order)], ['query']),
-    'getOrders' : IDL.Func(
-        [IDL.Opt(OrderStatus), IDL.Opt(OrderType), IDL.Opt(IDL.Text)],
-        [IDL.Vec(Order)],
-        ['query'],
-      ),
-    'getOrdersWithMappings' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'getReadyOrdersByDateRange' : IDL.Func(
-        [Time, Time],
-        [IDL.Vec(Order)],
-        ['query'],
-      ),
-    'getUniqueKarigarsFromDesignMappings' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Text)],
-        ['query'],
-      ),
-    'getUnreturnedOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
-    'isExistingDesignCodes' : IDL.Func(
-        [IDL.Vec(IDL.Text)],
-        [IDL.Vec(IDL.Bool)],
-        ['query'],
-      ),
-    'markAllAsReady' : IDL.Func([], [], []),
-    'markOrdersAsPending' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-    'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-    'persistMasterDataRows' : IDL.Func(
-        [IDL.Vec(MasterDataRow)],
-        [MasterPersistedResponse],
-        [],
-      ),
-    'reassignDesign' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-    'reconcileMasterFile' : IDL.Func(
-        [IDL.Vec(MasterDataRow)],
-        [MasterReconciliationResult],
-        [],
-      ),
-    'registerKarigar' : IDL.Func([IDL.Text], [], []),
-    'resetActiveOrders' : IDL.Func([], [], []),
-    'returnOrdersToPending' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-    'saveDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-    'saveModifiedOrder' : IDL.Func([IDL.Nat, IDL.Nat, Order], [], []),
-    'saveOrder' : IDL.Func(
+    'createOrder' : IDL.Func(
         [
           IDL.Text,
           OrderType,
@@ -465,19 +450,129 @@ export const idlFactory = ({ IDL }) => {
           IDL.Float64,
           IDL.Nat,
           IDL.Text,
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+        ],
+        [IDL.Text],
+        [],
+      ),
+    'createOrderWithDate' : IDL.Func(
+        [
           IDL.Text,
+          OrderType,
+          IDL.Text,
+          IDL.Text,
+          IDL.Float64,
+          IDL.Float64,
+          IDL.Nat,
+          IDL.Text,
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
           IDL.Opt(Time),
         ],
+        [IDL.Text],
+        [],
+      ),
+    'createUser' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, AppRole, IDL.Opt(IDL.Text)],
+        [IDL.Text],
+        [],
+      ),
+    'deleteOrder' : IDL.Func([IDL.Text], [], []),
+    'getAllMasterDesignMappings' : IDL.Func(
+        [],
+        [IDL.Vec(MasterDesignMapping)],
+        ['query'],
+      ),
+    'getAllOrderStatusLogs' : IDL.Func(
+        [],
+        [IDL.Vec(OrderStatusLog)],
+        ['query'],
+      ),
+    'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getDesignCountByKarigar' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
+        ['query'],
+      ),
+    'getDesignImageMapping' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
+        ['query'],
+      ),
+    'getDesignMapping' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(DesignMapping)],
+        ['query'],
+      ),
+    'getFilteredOutKarigars' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'getKarigars' : IDL.Func([], [IDL.Vec(Karigar)], ['query']),
+    'getMasterDesignExcel' : IDL.Func([], [IDL.Opt(ExternalBlob)], ['query']),
+    'getMasterDesigns' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'getOrder' : IDL.Func([IDL.Text], [IDL.Opt(Order)], ['query']),
+    'getOrderStatusLog' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(OrderStatusLog)],
+        ['query'],
+      ),
+    'getOrdersByStatus' : IDL.Func([OrderStatus], [IDL.Vec(Order)], ['query']),
+    'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getUniqueKarigarsFromDesignMappings' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
+      ),
+    'getUser' : IDL.Func([IDL.Text], [IDL.Opt(AppUser)], ['query']),
+    'getUserByLoginId' : IDL.Func([IDL.Text], [IDL.Opt(AppUser)], ['query']),
+    'initDefaultAdmin' : IDL.Func([], [], []),
+    'isExistingDesignCodes' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'listUsers' : IDL.Func([], [IDL.Vec(AppUser)], ['query']),
+    'logOrderStatusChange' : IDL.Func(
+        [IDL.Text, OrderStatus, OrderStatus, IDL.Text],
         [],
         [],
       ),
-    'supplyAndReturnOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-    'supplyOrder' : IDL.Func([IDL.Text, IDL.Nat], [], []),
-    'updateDesignGroupStatus' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
-    'updateDesignMapping' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
-    'updateMasterDesignKarigars' : IDL.Func([IDL.Vec(IDL.Text)], [], []),
+    'login' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'id' : IDL.Text,
+              'name' : IDL.Text,
+              'role' : AppRole,
+              'karigarName' : IDL.Opt(IDL.Text),
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'markOrdersAsPending' : IDL.Func([IDL.Vec(IDL.Text), IDL.Text], [], []),
+    'markOrdersAsReady' : IDL.Func([IDL.Vec(IDL.Text), IDL.Text], [], []),
+    'persistMasterDataRows' : IDL.Func(
+        [IDL.Vec(MasterDataRow)],
+        [MasterPersistedResponse],
+        [],
+      ),
+    'reconcileMasterFile' : IDL.Func(
+        [],
+        [MasterReconciliationResult],
+        ['query'],
+      ),
+    'registerKarigar' : IDL.Func([IDL.Text], [], []),
+    'resetActiveOrders' : IDL.Func([], [], []),
+    'resetDefaultAdmin' : IDL.Func([], [], []),
+    'resetUserPassword' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'saveDesignMapping' : IDL.Func([DesignMapping], [], []),
+    'supplyAndReturnOrder' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [], []),
+    'supplyOrder' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [], []),
+    'updateMasterDesignKarigars' : IDL.Func([IDL.Text, IDL.Nat], [], []),
+    'updateOrderQuantity' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [], []),
+    'updateUser' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, AppRole, IDL.Opt(IDL.Text), AppStatus],
+        [],
+        [],
+      ),
     'uploadDesignImage' : IDL.Func([IDL.Text, ExternalBlob], [], []),
-    'uploadDesignMapping' : IDL.Func([IDL.Vec(MappingRecord)], [], []),
     'uploadMasterDesignExcel' : IDL.Func([ExternalBlob], [], []),
   });
 };

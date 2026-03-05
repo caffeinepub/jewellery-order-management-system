@@ -1,10 +1,10 @@
 import { type Order, OrderStatus, OrderType } from "@/backend";
 import SuppliedQtyDialog from "@/components/dashboard/SuppliedQtyDialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useActor } from "@/hooks/useActor";
 import {
+  useGenericNameResolver,
   useGetAllDesignMappings,
   useGetAllOrders,
   useMarkOrdersAsReady,
@@ -37,6 +37,8 @@ export default function KarigarDetail() {
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
 
   const decodedName = decodeURIComponent(name);
+  // Resolve generic name dynamically from master design mappings
+  const resolveGenericName = useGenericNameResolver();
 
   // Build design mappings map for dynamic karigar resolution
   const designMappingsMap = useMemo(
@@ -92,7 +94,7 @@ export default function KarigarDetail() {
 
     if (nonRbOrders.length > 0) {
       markAsReadyMutation.mutate(
-        nonRbOrders.map((o) => o.orderId),
+        { orderIds: nonRbOrders.map((o) => o.orderId), updatedBy: "system" },
         {
           onSuccess: () => {
             setSelectedIds((prev) => {
@@ -117,7 +119,11 @@ export default function KarigarDetail() {
     await Promise.all(
       uniqueDesigns.map(async (design) => {
         try {
-          const externalBlob = await actor.getDesignImage(design);
+          const a = actor as any;
+          const externalBlob =
+            typeof a.getDesignImage === "function"
+              ? await a.getDesignImage(design)
+              : null;
           if (!externalBlob) return;
 
           // Try getBytes() first — gives a local blob URL with no CORS issues
@@ -292,7 +298,7 @@ export default function KarigarDetail() {
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-hidden">
-          {/* Table header */}
+          {/* Table header — karigar view: Generic Name, Weight, Qty only */}
           <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 border-b border-border">
             <Checkbox
               checked={
@@ -302,22 +308,13 @@ export default function KarigarDetail() {
               onCheckedChange={toggleAll}
             />
             <span className="text-sm font-medium text-muted-foreground flex-1">
-              Order No
-            </span>
-            <span className="text-sm font-medium text-muted-foreground w-32">
-              Design
-            </span>
-            <span className="text-sm font-medium text-muted-foreground w-32">
               Generic Name
             </span>
-            <span className="text-sm font-medium text-muted-foreground w-20">
+            <span className="text-sm font-medium text-muted-foreground w-24">
               Weight
             </span>
             <span className="text-sm font-medium text-muted-foreground w-16">
               Qty
-            </span>
-            <span className="text-sm font-medium text-muted-foreground w-16">
-              Type
             </span>
           </div>
 
@@ -335,25 +332,16 @@ export default function KarigarDetail() {
                   onCheckedChange={() => toggleOne(order.orderId)}
                   onClick={(e) => e.stopPropagation()}
                 />
-                <span className="flex-1 text-sm font-medium">
-                  {order.orderNo}
+                {/* Generic name resolved dynamically from master design mappings */}
+                <span className="flex-1 text-sm text-foreground">
+                  {resolveGenericName(order.design) || order.design}
                 </span>
-                <span className="w-32 text-sm text-orange-500 font-bold">
-                  {order.design}
-                </span>
-                <span className="w-32 text-sm text-muted-foreground">
-                  {order.genericName ?? "—"}
-                </span>
-                <span className="w-20 text-sm">
+                <span className="w-24 text-sm">
                   {(order.weight * Number(order.quantity)).toFixed(2)}g
                 </span>
-                <span className="w-16 text-sm">{Number(order.quantity)}</span>
-                <Badge
-                  variant="outline"
-                  className="w-16 text-xs justify-center"
-                >
-                  {order.orderType}
-                </Badge>
+                <span className="w-16 text-sm font-medium">
+                  {Number(order.quantity)}
+                </span>
               </div>
             ))}
           </div>

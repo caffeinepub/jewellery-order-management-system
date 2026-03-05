@@ -114,7 +114,7 @@ export default function OrderTable({
           order.orderType === OrderType.SO || order.orderType === OrderType.CO,
       );
       const orderIds = soCoOrders.map((order) => order.orderId);
-      await actor.markOrdersAsReady(orderIds);
+      await actor.markOrdersAsReady(orderIds, "system");
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await queryClient.invalidateQueries({ queryKey: ["ordersWithMappings"] });
       await queryClient.invalidateQueries({ queryKey: ["unmappedOrders"] });
@@ -206,7 +206,7 @@ export default function OrderTable({
         </div>
       )}
 
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

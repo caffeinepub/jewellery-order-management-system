@@ -11,10 +11,12 @@ import Dashboard from "@/pages/Dashboard";
 import DesignImages from "@/pages/DesignImages";
 import IngestOrders from "@/pages/IngestOrders";
 import KarigarDetail from "@/pages/KarigarDetail";
+import LoginPage from "@/pages/LoginPage";
 import MasterDesigns from "@/pages/MasterDesigns";
 import Reconciliation from "@/pages/Reconciliation";
 import TagPrinting from "@/pages/TagPrinting";
 import UnmappedCodes from "@/pages/UnmappedCodes";
+import UserManagement from "@/pages/UserManagement";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -22,8 +24,12 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  useNavigate,
 } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
+import { useEffect } from "react";
+import { AppRole } from "./backend";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,13 +40,47 @@ const queryClient = new QueryClient({
   },
 });
 
+// ── Auth Guard ─────────────────────────────────────────────────────────────────
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { currentUser, isInitializing } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isInitializing && !currentUser) {
+      navigate({ to: "/login" });
+    }
+  }, [currentUser, isInitializing, navigate]);
+
+  if (isInitializing) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#0a0a0a" }}
+      >
+        <div className="text-gray-400 text-sm">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!currentUser) return null;
+
+  return <>{children}</>;
+}
+
 function RootLayout() {
+  const { currentUser } = useAuth();
+
+  // If no user, render outlet directly (for /login)
+  if (!currentUser) {
+    return <Outlet />;
+  }
+
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full overflow-x-hidden">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          {/* Mobile-only header with sidebar trigger */}
+          {/* Mobile-only header with sidebar trigger (hidden on desktop ≥1024px) */}
           <header className="flex h-12 shrink-0 items-center gap-2 px-3 lg:hidden border-b border-border">
             <SidebarTrigger className="-ml-1" />
           </header>
@@ -53,77 +93,179 @@ function RootLayout() {
   );
 }
 
+// ── Protected Dashboard (redirects karigar-only users) ─────────────────────────
+function ProtectedDashboard() {
+  return (
+    <AuthGuard>
+      <Dashboard />
+    </AuthGuard>
+  );
+}
+
+// ── Admin-only wrapper ─────────────────────────────────────────────────────────
+function AdminRoute({
+  component: Component,
+}: { component: React.ComponentType }) {
+  const { currentUser, isInitializing } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (
+      !isInitializing &&
+      (!currentUser || currentUser.role !== AppRole.Admin)
+    ) {
+      navigate({ to: "/" });
+    }
+  }, [currentUser, isInitializing, navigate]);
+
+  if (!currentUser || currentUser.role !== AppRole.Admin) return null;
+  return <Component />;
+}
+
+// ── Staff/Admin-only wrapper ───────────────────────────────────────────────────
+function StaffAdminRoute({
+  component: Component,
+}: { component: React.ComponentType }) {
+  const { currentUser, isInitializing } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (
+      !isInitializing &&
+      (!currentUser || currentUser.role === AppRole.Karigar)
+    ) {
+      navigate({ to: "/" });
+    }
+  }, [currentUser, isInitializing, navigate]);
+
+  if (!currentUser || currentUser.role === AppRole.Karigar) return null;
+  return <Component />;
+}
+
 const rootRoute = createRootRoute({
   component: RootLayout,
+});
+
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/login",
+  component: LoginPage,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: Dashboard,
+  component: ProtectedDashboard,
 });
 
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
-  component: Dashboard,
+  component: ProtectedDashboard,
 });
 
 const ingestOrdersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ingest-orders",
-  component: IngestOrders,
+  component: () => (
+    <AuthGuard>
+      <StaffAdminRoute component={IngestOrders} />
+    </AuthGuard>
+  ),
 });
 
 const unmappedCodesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/unmapped-codes",
-  component: UnmappedCodes,
+  component: () => (
+    <AuthGuard>
+      <StaffAdminRoute component={UnmappedCodes} />
+    </AuthGuard>
+  ),
 });
 
 const masterDesignsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/master-designs",
-  component: MasterDesigns,
+  component: () => (
+    <AuthGuard>
+      <AdminRoute component={MasterDesigns} />
+    </AuthGuard>
+  ),
 });
 
 const designImagesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/design-images",
-  component: DesignImages,
+  component: () => (
+    <AuthGuard>
+      <AdminRoute component={DesignImages} />
+    </AuthGuard>
+  ),
 });
 
 const tagPrintingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tag-printing",
-  component: TagPrinting,
+  component: () => (
+    <AuthGuard>
+      <StaffAdminRoute component={TagPrinting} />
+    </AuthGuard>
+  ),
 });
 
 const barcodeScanningRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/barcode-scanning",
-  component: BarcodeScanning,
+  component: () => (
+    <AuthGuard>
+      <StaffAdminRoute component={BarcodeScanning} />
+    </AuthGuard>
+  ),
 });
 
 const reconciliationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reconciliation",
-  component: Reconciliation,
+  component: () => (
+    <AuthGuard>
+      <StaffAdminRoute component={Reconciliation} />
+    </AuthGuard>
+  ),
 });
 
 const ageingStockRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ageing-stock",
-  component: AgeingStock,
+  component: () => (
+    <AuthGuard>
+      <StaffAdminRoute component={AgeingStock} />
+    </AuthGuard>
+  ),
 });
 
 const karigarDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/karigar/$name",
-  component: KarigarDetail,
+  component: () => (
+    <AuthGuard>
+      <KarigarDetail />
+    </AuthGuard>
+  ),
+});
+
+const userManagementRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/user-management",
+  component: () => (
+    <AuthGuard>
+      <AdminRoute component={UserManagement} />
+    </AuthGuard>
+  ),
 });
 
 const routeTree = rootRoute.addChildren([
+  loginRoute,
   indexRoute,
   dashboardRoute,
   ingestOrdersRoute,
@@ -135,6 +277,7 @@ const routeTree = rootRoute.addChildren([
   reconciliationRoute,
   ageingStockRoute,
   karigarDetailRoute,
+  userManagementRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -149,8 +292,10 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-        <Toaster richColors position="top-right" />
+        <AuthProvider>
+          <RouterProvider router={router} />
+          <Toaster richColors position="top-right" />
+        </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

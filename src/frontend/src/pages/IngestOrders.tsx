@@ -86,11 +86,6 @@ export default function IngestOrders() {
             throw new Error("Missing design code");
           }
 
-          const uniqueSuffix = `${Date.now()}-${i}-${Math.random()
-            .toString(36)
-            .slice(2, 7)}`;
-          const orderId = `${order.orderNo.trim()}-${order.design.trim()}-${uniqueSuffix}`;
-
           const orderType =
             order.orderType === OrderType.RB
               ? OrderType.RB
@@ -98,20 +93,19 @@ export default function IngestOrders() {
                 ? OrderType.SO
                 : OrderType.CO;
 
-          // orderDate is already bigint | null from parseOrdersExcel
-          const orderDateNano: bigint | null = order.orderDate ?? null;
-
-          await actor.saveOrder(
+          // Use createOrderWithDate to persist the order date from Excel
+          await actor.createOrderWithDate(
             order.orderNo.trim(),
             orderType,
             (order.product ?? "").trim(),
             order.design.trim(),
             order.weight ?? 0,
             order.size ?? 0,
-            BigInt(order.quantity), // quantity is number from parseOrdersExcel, convert to bigint
+            BigInt(order.quantity),
             (order.remarks ?? "").trim(),
-            orderId,
-            orderDateNano,
+            null, // genericName — resolved dynamically from master design mappings
+            null, // karigarName — resolved dynamically from master design mappings
+            order.orderDate ?? null,
           );
 
           success++;

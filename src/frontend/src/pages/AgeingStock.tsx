@@ -20,10 +20,6 @@ import { toast } from "sonner";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function nanoToMs(nano: bigint): number {
-  return Number(nano / BigInt(1_000_000));
-}
-
 function daysAgo(epochMs: number): number {
   const diff = Date.now() - epochMs;
   if (diff < 0) return 0;
@@ -72,11 +68,38 @@ interface DesignGroup {
 
 function safeOrderDateMs(order: Order): number | null {
   try {
-    const od = order.orderDate;
+    // Cast to unknown to handle runtime data that may differ from declared type
+    // (e.g. orders uploaded via Excel may have string or number orderDate)
+    const od = order.orderDate as unknown;
     if (od == null) return null;
-    const ms = nanoToMs(od);
-    if (Number.isNaN(ms) || ms < 946684800000 || ms > 4102444800000)
-      return null;
+
+    let ms: number | null = null;
+
+    if (typeof od === "bigint") {
+      // Nanosecond timestamp from backend
+      ms = Number(od / BigInt(1_000_000));
+    } else if (typeof od === "number") {
+      // Already milliseconds
+      ms = od > 1e12 ? od : od * 1000; // handle seconds vs ms
+    } else if (typeof od === "string" && od.trim().length > 0) {
+      const s = od.trim();
+      // DD/MM/YYYY
+      const ddmmyyyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (ddmmyyyy) {
+        const [, d, m, y] = ddmmyyyy;
+        ms = new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+      } else {
+        // ISO / YYYY-MM-DD / any format Date can parse
+        const parsed = new Date(s);
+        if (!Number.isNaN(parsed.getTime())) {
+          ms = parsed.getTime();
+        }
+      }
+    }
+
+    if (ms === null || Number.isNaN(ms)) return null;
+    // Sanity: year 2000–2100
+    if (ms < 946684800000 || ms > 4102444800000) return null;
     return ms;
   } catch {
     return null;
@@ -203,7 +226,10 @@ export default function AgeingStock() {
 
     if (nonRbOrders.length > 0) {
       try {
-        await markReadyMutation.mutateAsync(nonRbOrders.map((o) => o.orderId));
+        await markReadyMutation.mutateAsync({
+          orderIds: nonRbOrders.map((o) => o.orderId),
+          updatedBy: "system",
+        });
         toast.success(
           `${nonRbOrders.length} order${nonRbOrders.length > 1 ? "s" : ""} marked as Ready`,
         );

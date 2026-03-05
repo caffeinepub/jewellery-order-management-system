@@ -10,6 +10,21 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export type AppRole = { 'Staff' : null } |
+  { 'Admin' : null } |
+  { 'Karigar' : null };
+export type AppStatus = { 'Inactive' : null } |
+  { 'Active' : null };
+export interface AppUser {
+  'id' : string,
+  'status' : AppStatus,
+  'name' : string,
+  'createdAt' : Time,
+  'role' : AppRole,
+  'karigarName' : [] | [string],
+  'loginId' : string,
+  'passwordHash' : string,
+}
 export interface DesignMapping {
   'createdAt' : Time,
   'createdBy' : string,
@@ -27,26 +42,29 @@ export interface Karigar {
 }
 export interface MappingRecord {
   'karigarName' : string,
+  'excelGenericName' : string,
   'genericName' : string,
   'designCode' : string,
 }
 export interface MasterDataRow {
-  'weight' : number,
   'karigar' : string,
-  'orderDate' : [] | [Time],
-  'orderType' : OrderType,
-  'orderNo' : string,
-  'quantity' : bigint,
+  'genericName' : string,
   'designCode' : string,
 }
-export interface MasterPersistedResponse { 'persisted' : Array<Order> }
+export interface MasterDesignMapping {
+  'karigar' : string,
+  'excelGenericName' : string,
+  'genericName' : string,
+  'designCode' : string,
+}
+export interface MasterPersistedResponse {
+  'reconciliationResult' : MasterReconciliationResult,
+  'persistedRows' : Array<MasterDataRow>,
+}
 export interface MasterReconciliationResult {
-  'missingInMasterCount' : bigint,
-  'newLinesCount' : bigint,
-  'alreadyExistingRows' : bigint,
-  'totalUploadedRows' : bigint,
-  'newLines' : Array<MasterDataRow>,
-  'missingInMaster' : Array<Order>,
+  'missingInExcel' : Array<MasterDataRow>,
+  'matchedRows' : Array<MasterDataRow>,
+  'missingInSystem' : Array<MasterDataRow>,
 }
 export interface Order {
   'weight' : number,
@@ -63,8 +81,10 @@ export interface Order {
   'orderNo' : string,
   'karigarName' : [] | [string],
   'updatedAt' : Time,
+  'updatedBy' : [] | [string],
   'genericName' : [] | [string],
   'quantity' : bigint,
+  'lastAction' : [] | [string],
   'remarks' : string,
   'product' : string,
 }
@@ -72,6 +92,14 @@ export type OrderStatus = { 'Ready' : null } |
   { 'Hallmark' : null } |
   { 'ReturnFromHallmark' : null } |
   { 'Pending' : null };
+export interface OrderStatusLog {
+  'id' : string,
+  'oldStatus' : OrderStatus,
+  'orderId' : string,
+  'updatedAt' : Time,
+  'updatedBy' : string,
+  'newStatus' : OrderStatus,
+}
 export type OrderType = { 'CO' : null } |
   { 'RB' : null } |
   { 'SO' : null };
@@ -103,72 +131,16 @@ export interface _SERVICE {
     _CaffeineStorageRefillResult
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
-  'addKarigar' : ActorMethod<[string], undefined>,
-  'assignOrdersToKarigar' : ActorMethod<[Array<MappingRecord>], undefined>,
-  'batchDeleteOrders' : ActorMethod<[Array<string>], undefined>,
-  'batchGetByStatus' : ActorMethod<[Array<string>, OrderStatus], Array<string>>,
-  'batchReturnOrdersToPending' : ActorMethod<
-    [Array<[string, bigint]>],
-    undefined
-  >,
   'batchSaveDesignMappings' : ActorMethod<
-    [Array<[string, DesignMapping]>],
+    [Array<MappingRecord>, string],
     undefined
   >,
   'batchUpdateOrderStatus' : ActorMethod<
-    [Array<string>, OrderStatus],
-    undefined
-  >,
-  'batchUploadDesignImages' : ActorMethod<
-    [Array<[string, ExternalBlob]>],
+    [Array<string>, OrderStatus, string],
     undefined
   >,
   'clearAllDesignMappings' : ActorMethod<[], undefined>,
-  'deleteOrder' : ActorMethod<[string], undefined>,
-  'deleteReadyOrder' : ActorMethod<[string], undefined>,
-  'getAllMasterDesignMappings' : ActorMethod<
-    [],
-    Array<[string, DesignMapping]>
-  >,
-  'getAllOrders' : ActorMethod<[], Array<Order>>,
-  'getDesignCountByKarigar' : ActorMethod<[string], [] | [bigint]>,
-  'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
-  'getDesignImageMapping' : ActorMethod<[], Array<[string, ExternalBlob]>>,
-  'getDesignMapping' : ActorMethod<[string], DesignMapping>,
-  'getFilteredOutKarigars' : ActorMethod<[], Array<string>>,
-  'getKarigars' : ActorMethod<[], Array<Karigar>>,
-  'getMasterDesignExcel' : ActorMethod<[], [] | [ExternalBlob]>,
-  'getMasterDesignKarigars' : ActorMethod<[], Array<string>>,
-  'getMasterDesigns' : ActorMethod<[], Array<[string, string, string]>>,
-  'getOrder' : ActorMethod<[string], [] | [Order]>,
-  'getOrders' : ActorMethod<
-    [[] | [OrderStatus], [] | [OrderType], [] | [string]],
-    Array<Order>
-  >,
-  'getOrdersWithMappings' : ActorMethod<[], Array<Order>>,
-  'getReadyOrders' : ActorMethod<[], Array<Order>>,
-  'getReadyOrdersByDateRange' : ActorMethod<[Time, Time], Array<Order>>,
-  'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
-  'getUnreturnedOrders' : ActorMethod<[], Array<Order>>,
-  'isExistingDesignCodes' : ActorMethod<[Array<string>], Array<boolean>>,
-  'markAllAsReady' : ActorMethod<[], undefined>,
-  'markOrdersAsPending' : ActorMethod<[Array<string>], undefined>,
-  'markOrdersAsReady' : ActorMethod<[Array<string>], undefined>,
-  'persistMasterDataRows' : ActorMethod<
-    [Array<MasterDataRow>],
-    MasterPersistedResponse
-  >,
-  'reassignDesign' : ActorMethod<[string, string, string], undefined>,
-  'reconcileMasterFile' : ActorMethod<
-    [Array<MasterDataRow>],
-    MasterReconciliationResult
-  >,
-  'registerKarigar' : ActorMethod<[string], undefined>,
-  'resetActiveOrders' : ActorMethod<[], undefined>,
-  'returnOrdersToPending' : ActorMethod<[string, bigint], undefined>,
-  'saveDesignMapping' : ActorMethod<[string, string, string], undefined>,
-  'saveModifiedOrder' : ActorMethod<[bigint, bigint, Order], undefined>,
-  'saveOrder' : ActorMethod<
+  'createOrder' : ActorMethod<
     [
       string,
       OrderType,
@@ -178,18 +150,88 @@ export interface _SERVICE {
       number,
       bigint,
       string,
+      [] | [string],
+      [] | [string],
+    ],
+    string
+  >,
+  'createOrderWithDate' : ActorMethod<
+    [
       string,
+      OrderType,
+      string,
+      string,
+      number,
+      number,
+      bigint,
+      string,
+      [] | [string],
+      [] | [string],
       [] | [Time],
     ],
+    string
+  >,
+  'createUser' : ActorMethod<
+    [string, string, string, AppRole, [] | [string]],
+    string
+  >,
+  'deleteOrder' : ActorMethod<[string], undefined>,
+  'getAllMasterDesignMappings' : ActorMethod<[], Array<MasterDesignMapping>>,
+  'getAllOrderStatusLogs' : ActorMethod<[], Array<OrderStatusLog>>,
+  'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getDesignCountByKarigar' : ActorMethod<[], Array<[string, bigint]>>,
+  'getDesignImageMapping' : ActorMethod<[], Array<[string, DesignMapping]>>,
+  'getDesignMapping' : ActorMethod<[string], [] | [DesignMapping]>,
+  'getFilteredOutKarigars' : ActorMethod<[], Array<string>>,
+  'getKarigars' : ActorMethod<[], Array<Karigar>>,
+  'getMasterDesignExcel' : ActorMethod<[], [] | [ExternalBlob]>,
+  'getMasterDesigns' : ActorMethod<[], Array<string>>,
+  'getOrder' : ActorMethod<[string], [] | [Order]>,
+  'getOrderStatusLog' : ActorMethod<[string], Array<OrderStatusLog>>,
+  'getOrdersByStatus' : ActorMethod<[OrderStatus], Array<Order>>,
+  'getReadyOrders' : ActorMethod<[], Array<Order>>,
+  'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
+  'getUser' : ActorMethod<[string], [] | [AppUser]>,
+  'getUserByLoginId' : ActorMethod<[string], [] | [AppUser]>,
+  'initDefaultAdmin' : ActorMethod<[], undefined>,
+  'isExistingDesignCodes' : ActorMethod<[string], boolean>,
+  'listUsers' : ActorMethod<[], Array<AppUser>>,
+  'logOrderStatusChange' : ActorMethod<
+    [string, OrderStatus, OrderStatus, string],
     undefined
   >,
-  'supplyAndReturnOrder' : ActorMethod<[string, bigint], undefined>,
-  'supplyOrder' : ActorMethod<[string, bigint], undefined>,
-  'updateDesignGroupStatus' : ActorMethod<[Array<string>], undefined>,
-  'updateDesignMapping' : ActorMethod<[string, string, string], undefined>,
-  'updateMasterDesignKarigars' : ActorMethod<[Array<string>], undefined>,
+  'login' : ActorMethod<
+    [string, string],
+    [] | [
+      {
+        'id' : string,
+        'name' : string,
+        'role' : AppRole,
+        'karigarName' : [] | [string],
+      }
+    ]
+  >,
+  'markOrdersAsPending' : ActorMethod<[Array<string>, string], undefined>,
+  'markOrdersAsReady' : ActorMethod<[Array<string>, string], undefined>,
+  'persistMasterDataRows' : ActorMethod<
+    [Array<MasterDataRow>],
+    MasterPersistedResponse
+  >,
+  'reconcileMasterFile' : ActorMethod<[], MasterReconciliationResult>,
+  'registerKarigar' : ActorMethod<[string], undefined>,
+  'resetActiveOrders' : ActorMethod<[], undefined>,
+  'resetDefaultAdmin' : ActorMethod<[], undefined>,
+  'resetUserPassword' : ActorMethod<[string, string], undefined>,
+  'saveDesignMapping' : ActorMethod<[DesignMapping], undefined>,
+  'supplyAndReturnOrder' : ActorMethod<[string, bigint, string], undefined>,
+  'supplyOrder' : ActorMethod<[string, bigint, string], undefined>,
+  'updateMasterDesignKarigars' : ActorMethod<[string, bigint], undefined>,
+  'updateOrderQuantity' : ActorMethod<[string, bigint, string], undefined>,
+  'updateUser' : ActorMethod<
+    [string, string, string, AppRole, [] | [string], AppStatus],
+    undefined
+  >,
   'uploadDesignImage' : ActorMethod<[string, ExternalBlob], undefined>,
-  'uploadDesignMapping' : ActorMethod<[Array<MappingRecord>], undefined>,
   'uploadMasterDesignExcel' : ActorMethod<[ExternalBlob], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

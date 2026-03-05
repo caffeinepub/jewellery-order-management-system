@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { Order } from "../../backend";
+import { useAuth } from "../../context/AuthContext";
 import { useBatchSupplyRBOrders } from "../../hooks/useQueries";
 
 interface SupplyEntry {
@@ -37,6 +38,7 @@ export default function SuppliedQtyDialog({
   const [success, setSuccess] = useState(false);
 
   const batchSupply = useBatchSupplyRBOrders();
+  const { currentUser } = useAuth();
 
   // Reset entries when orders change
   const resetEntries = () => {
@@ -92,12 +94,13 @@ export default function SuppliedQtyDialog({
     }
 
     try {
-      await batchSupply.mutateAsync(
-        entries.map((e) => ({
+      await batchSupply.mutateAsync({
+        supplies: entries.map((e) => ({
           orderId: e.order.orderId,
           suppliedQty: e.suppliedQty,
         })),
-      );
+        updatedBy: currentUser?.name ?? "system",
+      });
       setSuccess(true);
       setTimeout(() => {
         onOpenChange(false);

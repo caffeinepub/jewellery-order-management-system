@@ -89,7 +89,7 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
         {[0, 1, 2, 3].map((i) => (
           <Card key={i} className="border-border">
             <CardContent className="px-3 pb-3 pt-3">
@@ -104,7 +104,7 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
       {cards.map((card) => {
         const Icon = card.icon;
         const isActive = activeTab === card.key;

@@ -64,7 +64,7 @@ export function EditDesignModal({
     try {
       if (addingNew && newKarigarName.trim()) {
         try {
-          await actor.addKarigar(newKarigarName.trim());
+          await actor.registerKarigar(newKarigarName.trim());
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           if (!msg.toLowerCase().includes("already exists")) {
@@ -73,7 +73,16 @@ export function EditDesignModal({
         }
       }
 
-      await actor.reassignDesign(designCode, karigarToUse, "user");
+      // Use saveDesignMapping to update karigar for this design code
+      const now = BigInt(Date.now()) * BigInt(1_000_000);
+      await actor.saveDesignMapping({
+        designCode,
+        genericName,
+        karigarName: karigarToUse,
+        createdAt: now,
+        createdBy: "system",
+        updatedAt: now,
+      });
 
       // Invalidate all relevant caches so KarigarsTab and TotalOrdersTab update
       await queryClient.invalidateQueries({ queryKey: ["allOrders"] });

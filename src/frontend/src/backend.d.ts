@@ -16,19 +16,24 @@ export class ExternalBlob {
 }
 export interface MappingRecord {
     karigarName: string;
+    excelGenericName: string;
     genericName: string;
     designCode: string;
 }
 export interface MasterDataRow {
-    weight: number;
     karigar: string;
-    orderDate?: Time;
-    orderType: OrderType;
-    orderNo: string;
-    quantity: bigint;
+    genericName: string;
     designCode: string;
 }
 export type Time = bigint;
+export interface OrderStatusLog {
+    id: string;
+    oldStatus: OrderStatus;
+    orderId: string;
+    updatedAt: Time;
+    updatedBy: string;
+    newStatus: OrderStatus;
+}
 export interface Karigar {
     name: string;
     createdAt: Time;
@@ -49,10 +54,28 @@ export interface Order {
     orderNo: string;
     karigarName?: string;
     updatedAt: Time;
+    updatedBy?: string;
     genericName?: string;
     quantity: bigint;
+    lastAction?: string;
     remarks: string;
     product: string;
+}
+export interface AppUser {
+    id: string;
+    status: AppStatus;
+    name: string;
+    createdAt: Time;
+    role: AppRole;
+    karigarName?: string;
+    loginId: string;
+    passwordHash: string;
+}
+export interface MasterDesignMapping {
+    karigar: string;
+    excelGenericName: string;
+    genericName: string;
+    designCode: string;
 }
 export interface DesignMapping {
     createdAt: Time;
@@ -64,15 +87,22 @@ export interface DesignMapping {
     designCode: string;
 }
 export interface MasterPersistedResponse {
-    persisted: Array<Order>;
+    reconciliationResult: MasterReconciliationResult;
+    persistedRows: Array<MasterDataRow>;
 }
 export interface MasterReconciliationResult {
-    missingInMasterCount: bigint;
-    newLinesCount: bigint;
-    alreadyExistingRows: bigint;
-    totalUploadedRows: bigint;
-    newLines: Array<MasterDataRow>;
-    missingInMaster: Array<Order>;
+    missingInExcel: Array<MasterDataRow>;
+    matchedRows: Array<MasterDataRow>;
+    missingInSystem: Array<MasterDataRow>;
+}
+export enum AppRole {
+    Staff = "Staff",
+    Admin = "Admin",
+    Karigar = "Karigar"
+}
+export enum AppStatus {
+    Inactive = "Inactive",
+    Active = "Active"
 }
 export enum OrderStatus {
     Ready = "Ready",
@@ -86,54 +116,54 @@ export enum OrderType {
     SO = "SO"
 }
 export interface backendInterface {
-    addKarigar(name: string): Promise<void>;
-    assignOrdersToKarigar(mappings: Array<MappingRecord>): Promise<void>;
-    batchDeleteOrders(_orderIds: Array<string>): Promise<void>;
-    batchGetByStatus(ids: Array<string>, compareStatus: OrderStatus): Promise<Array<string>>;
-    batchReturnOrdersToPending(_orderRequests: Array<[string, bigint]>): Promise<void>;
-    batchSaveDesignMappings(mappings: Array<[string, DesignMapping]>): Promise<void>;
-    batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus): Promise<void>;
-    batchUploadDesignImages(images: Array<[string, ExternalBlob]>): Promise<void>;
+    batchSaveDesignMappings(mappings: Array<MappingRecord>, createdBy: string): Promise<void>;
+    batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus, updatedBy: string): Promise<void>;
     clearAllDesignMappings(): Promise<void>;
+    createOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, genericName: string | null, karigarName: string | null): Promise<string>;
+    createOrderWithDate(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, genericName: string | null, karigarName: string | null, orderDate: Time | null): Promise<string>;
+    createUser(name: string, loginId: string, passwordHash: string, role: AppRole, karigarName: string | null): Promise<string>;
     deleteOrder(orderId: string): Promise<void>;
-    deleteReadyOrder(orderId: string): Promise<void>;
-    getAllMasterDesignMappings(): Promise<Array<[string, DesignMapping]>>;
+    getAllMasterDesignMappings(): Promise<Array<MasterDesignMapping>>;
+    getAllOrderStatusLogs(): Promise<Array<OrderStatusLog>>;
     getAllOrders(): Promise<Array<Order>>;
-    getDesignCountByKarigar(_karigarName: string): Promise<bigint | null>;
-    getDesignImage(designCode: string): Promise<ExternalBlob | null>;
-    getDesignImageMapping(): Promise<Array<[string, ExternalBlob]>>;
-    getDesignMapping(designCode: string): Promise<DesignMapping>;
+    getDesignCountByKarigar(): Promise<Array<[string, bigint]>>;
+    getDesignImageMapping(): Promise<Array<[string, DesignMapping]>>;
+    getDesignMapping(designCode: string): Promise<DesignMapping | null>;
     getFilteredOutKarigars(): Promise<Array<string>>;
     getKarigars(): Promise<Array<Karigar>>;
     getMasterDesignExcel(): Promise<ExternalBlob | null>;
-    getMasterDesignKarigars(): Promise<Array<string>>;
-    getMasterDesigns(): Promise<Array<[string, string, string]>>;
+    getMasterDesigns(): Promise<Array<string>>;
     getOrder(orderId: string): Promise<Order | null>;
-    getOrders(_statusFilter: OrderStatus | null, _typeFilter: OrderType | null, _searchText: string | null): Promise<Array<Order>>;
-    getOrdersWithMappings(): Promise<Array<Order>>;
+    getOrderStatusLog(orderId: string): Promise<Array<OrderStatusLog>>;
+    getOrdersByStatus(status: OrderStatus): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
-    getReadyOrdersByDateRange(startDate: Time, endDate: Time): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
-    getUnreturnedOrders(): Promise<Array<Order>>;
-    isExistingDesignCodes(designCodes: Array<string>): Promise<Array<boolean>>;
-    markAllAsReady(): Promise<void>;
-    markOrdersAsPending(orderIds: Array<string>): Promise<void>;
-    markOrdersAsReady(orderIds: Array<string>): Promise<void>;
-    persistMasterDataRows(masterRows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
-    reassignDesign(designCode: string, newKarigar: string, movedBy: string): Promise<void>;
-    reconcileMasterFile(masterDataRows: Array<MasterDataRow>): Promise<MasterReconciliationResult>;
+    getUser(id: string): Promise<AppUser | null>;
+    getUserByLoginId(loginId: string): Promise<AppUser | null>;
+    initDefaultAdmin(): Promise<void>;
+    isExistingDesignCodes(designCode: string): Promise<boolean>;
+    listUsers(): Promise<Array<AppUser>>;
+    logOrderStatusChange(orderId: string, oldStatus: OrderStatus, newStatus: OrderStatus, updatedBy: string): Promise<void>;
+    login(loginId: string, hashedPassword: string): Promise<{
+        id: string;
+        name: string;
+        role: AppRole;
+        karigarName?: string;
+    } | null>;
+    markOrdersAsPending(orderIds: Array<string>, updatedBy: string): Promise<void>;
+    markOrdersAsReady(orderIds: Array<string>, updatedBy: string): Promise<void>;
+    persistMasterDataRows(rows: Array<MasterDataRow>): Promise<MasterPersistedResponse>;
+    reconcileMasterFile(): Promise<MasterReconciliationResult>;
     registerKarigar(name: string): Promise<void>;
     resetActiveOrders(): Promise<void>;
-    returnOrdersToPending(_orderNo: string, _returnedQty: bigint): Promise<void>;
-    saveDesignMapping(designCode: string, genericName: string, karigarName: string): Promise<void>;
-    saveModifiedOrder(_count: bigint, _startQty: bigint, order: Order): Promise<void>;
-    saveOrder(orderNo: string, orderType: OrderType, product: string, design: string, weight: number, size: number, quantity: bigint, remarks: string, orderId: string, orderDate: Time | null): Promise<void>;
-    supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
-    supplyOrder(orderId: string, suppliedQuantity: bigint): Promise<void>;
-    updateDesignGroupStatus(designCodes: Array<string>): Promise<void>;
-    updateDesignMapping(designCode: string, newGenericName: string, newKarigarName: string): Promise<void>;
-    updateMasterDesignKarigars(karigars: Array<string>): Promise<void>;
-    uploadDesignImage(designCode: string, blob: ExternalBlob): Promise<void>;
-    uploadDesignMapping(mappingData: Array<MappingRecord>): Promise<void>;
-    uploadMasterDesignExcel(blob: ExternalBlob): Promise<void>;
+    resetDefaultAdmin(): Promise<void>;
+    resetUserPassword(id: string, newPasswordHash: string): Promise<void>;
+    saveDesignMapping(designMapping: DesignMapping): Promise<void>;
+    supplyAndReturnOrder(orderId: string, suppliedQuantity: bigint, updatedBy: string): Promise<void>;
+    supplyOrder(orderId: string, suppliedQuantity: bigint, updatedBy: string): Promise<void>;
+    updateMasterDesignKarigars(designCode: string, count: bigint): Promise<void>;
+    updateOrderQuantity(orderId: string, newQuantity: bigint, updatedBy: string): Promise<void>;
+    updateUser(id: string, name: string, loginId: string, role: AppRole, karigarName: string | null, status: AppStatus): Promise<void>;
+    uploadDesignImage(designCode: string, image: ExternalBlob): Promise<void>;
+    uploadMasterDesignExcel(excelFile: ExternalBlob): Promise<void>;
 }

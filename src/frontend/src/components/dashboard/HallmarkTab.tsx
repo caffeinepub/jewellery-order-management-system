@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { useBatchUpdateOrderStatus, useGetAllOrders } from "@/hooks/useQueries";
+import {
+  useBatchUpdateOrderStatus,
+  useGenericNameResolver,
+  useGetAllOrders,
+  useKarigarResolver,
+} from "@/hooks/useQueries";
 import { AgeingBadge } from "@/utils/ageingBadge";
 import {
   exportAllToPDF,
@@ -19,16 +24,44 @@ import {
   Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 
 interface HallmarkTabProps {
   orders?: Order[];
   isError?: boolean;
 }
 
+// Last Action badge component
+function LastActionBadge({ lastAction }: { lastAction?: string }) {
+  if (!lastAction)
+    return <span className="text-muted-foreground text-xs">—</span>;
+  const parts = lastAction.split(" • ");
+  const status = parts[0] ?? "";
+  const color =
+    status === "Ready"
+      ? "bg-green-500/15 text-green-400 border-green-500/30"
+      : status === "Pending"
+        ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+        : status === "Returned"
+          ? "bg-red-500/15 text-red-400 border-red-500/30"
+          : "bg-blue-500/15 text-blue-400 border-blue-500/30";
+  return (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${color} whitespace-nowrap`}
+    >
+      {lastAction}
+    </span>
+  );
+}
+
 export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
   const { data: fetchedOrders = [], isLoading } = useGetAllOrders();
   const allOrders = propOrders ?? fetchedOrders;
   const batchUpdateMutation = useBatchUpdateOrderStatus();
+  const { currentUser } = useAuth();
+  // Single source of truth: resolve karigar and generic name dynamically from master design mappings
+  const resolveKarigar = useKarigarResolver();
+  const resolveGenericName = useGenericNameResolver();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -118,6 +151,7 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
       {
         orderIds: Array.from(selectedIds),
         newStatus: OrderStatus.Pending,
+        updatedBy: currentUser?.name ?? "system",
       },
       { onSuccess: () => setSelectedIds(new Set()) },
     );
@@ -289,15 +323,17 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
                   >
                     {design}
                   </span>
-                  <span className="text-sm text-muted-foreground">
-                    {orders[0]?.genericName ?? ""}
-                  </span>
+                  {resolveGenericName(design) && (
+                    <span className="text-sm text-muted-foreground">
+                      {resolveGenericName(design)}
+                    </span>
+                  )}
                   <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{orders.length} orders</span>
                     <span>{totalWeight.toFixed(2)}g</span>
                     <span>Qty: {totalQty}</span>
                     <Badge variant="secondary" className="text-xs">
-                      {orders[0]?.karigarName ?? "—"}
+                      {resolveKarigar(design)}
                     </Badge>
                   </div>
                 </div>
@@ -339,6 +375,17 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
                             {order.orderType}
                           </Badge>
                           <AgeingBadge orderDate={order.orderDate} />
+                          {/* Updated By */}
+                          <span className="text-muted-foreground text-xs">
+                            By:{" "}
+                            <span className="text-foreground">
+                              {order.updatedBy ?? "—"}
+                            </span>
+                          </span>
+                          {/* Last Action */}
+                          <div className="col-span-2 md:col-span-2">
+                            <LastActionBadge lastAction={order.lastAction} />
+                          </div>
                         </div>
                       </div>
                     ))}

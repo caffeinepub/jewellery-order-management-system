@@ -1,7 +1,7 @@
 import {
-  type DesignMapping,
   ExternalBlob,
   type MappingRecord,
+  type MasterDesignMapping,
 } from "@/backend";
 import { EditDesignModal } from "@/components/masterdesigns/EditDesignModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -107,16 +107,21 @@ export default function MasterDesigns() {
 
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (!row || row.length < 3) continue;
+        if (!row || row.length < 1) continue;
 
         const designCode = normalizeDesignCode(String(row[0] || "").trim());
+        if (!designCode) continue; // only skip rows with no design code
+
         const genericName = String(row[1] || "").trim();
         const karigarName = String(row[2] || "").trim();
 
-        if (!designCode || !genericName || !karigarName) continue;
-
-        mappings.push({ designCode, genericName, karigarName });
-        uniqueKarigars.add(karigarName);
+        mappings.push({
+          designCode,
+          genericName,
+          karigarName,
+          excelGenericName: genericName,
+        });
+        if (karigarName) uniqueKarigars.add(karigarName);
       }
 
       setUploadProgress(40);
@@ -281,17 +286,17 @@ export default function MasterDesigns() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {masterDesignMappings.map(
-                    ([designCode, mapping]: [string, DesignMapping]) => (
-                      <TableRow key={designCode}>
+                  {(masterDesignMappings as MasterDesignMapping[]).map(
+                    (mapping) => (
+                      <TableRow key={mapping.designCode}>
                         <TableCell className="font-mono font-medium">
-                          {designCode}
+                          {mapping.designCode}
                         </TableCell>
                         <TableCell>{mapping.genericName}</TableCell>
-                        <TableCell>{mapping.karigarName}</TableCell>
+                        <TableCell>{mapping.karigar}</TableCell>
                         <TableCell className="text-right">
                           {orderCountByDesign[
-                            normalizeDesignCode(designCode)
+                            normalizeDesignCode(mapping.designCode)
                           ] || 0}
                         </TableCell>
                         <TableCell>
@@ -300,9 +305,9 @@ export default function MasterDesigns() {
                             size="sm"
                             onClick={() =>
                               handleEditMapping(
-                                designCode,
+                                mapping.designCode,
                                 mapping.genericName,
-                                mapping.karigarName,
+                                mapping.karigar,
                               )
                             }
                           >
