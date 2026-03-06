@@ -78,6 +78,7 @@ export const Order = IDL.Record({
   'remarks' : IDL.Text,
   'product' : IDL.Text,
 });
+export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const DesignMapping = IDL.Record({
   'createdAt' : Time,
   'createdBy' : IDL.Text,
@@ -92,7 +93,6 @@ export const Karigar = IDL.Record({
   'createdAt' : Time,
   'createdBy' : IDL.Text,
 });
-export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const AppStatus = IDL.Variant({
   'Inactive' : IDL.Null,
   'Active' : IDL.Null,
@@ -211,6 +211,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
       ['query'],
     ),
+  'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
   'getDesignImageMapping' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],
@@ -361,6 +362,7 @@ export const idlFactory = ({ IDL }) => {
     'remarks' : IDL.Text,
     'product' : IDL.Text,
   });
+  const ExternalBlob = IDL.Vec(IDL.Nat8);
   const DesignMapping = IDL.Record({
     'createdAt' : Time,
     'createdBy' : IDL.Text,
@@ -375,7 +377,6 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Time,
     'createdBy' : IDL.Text,
   });
-  const ExternalBlob = IDL.Vec(IDL.Nat8);
   const AppStatus = IDL.Variant({ 'Inactive' : IDL.Null, 'Active' : IDL.Null });
   const AppUser = IDL.Record({
     'id' : IDL.Text,
@@ -495,6 +496,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
         ['query'],
       ),
+    'getDesignImage' : IDL.Func([IDL.Text], [IDL.Opt(ExternalBlob)], ['query']),
     'getDesignImageMapping' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Text, DesignMapping))],

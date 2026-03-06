@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/AuthContext";
 import {
   useGetReadyOrders,
   useGetReadyOrdersByDateRange,
@@ -26,6 +27,7 @@ export default function TagPrinting() {
   const { data: readyOrders = [], isLoading } = useGetReadyOrders();
   const getReadyOrdersByDateRangeMutation = useGetReadyOrdersByDateRange();
   const updateDesignGroupStatusMutation = useUpdateDesignGroupStatus();
+  const { currentUser } = useAuth();
 
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -153,7 +155,10 @@ export default function TagPrinting() {
         }
       }
 
-      await updateDesignGroupStatusMutation.mutateAsync(orderIds);
+      await updateDesignGroupStatusMutation.mutateAsync({
+        orderIds,
+        updatedBy: currentUser?.name ?? "system",
+      });
       toast.success(
         `${selectedDesignCodes.size} design group(s) moved to Hallmark`,
       );

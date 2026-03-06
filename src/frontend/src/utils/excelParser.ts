@@ -60,7 +60,23 @@ function parseExcelDateSerial(XLSX: any, raw: unknown): bigint | null {
     }
   }
   if (typeof raw === "string") {
-    const ms = Date.parse(raw);
+    const s = raw.trim();
+    // Try DD/MM/YYYY or DD-MM-YYYY (Indian date format)
+    const ddmmyyyy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (ddmmyyyy) {
+      const [, d, m, y] = ddmmyyyy;
+      const ms = Date.UTC(Number(y), Number(m) - 1, Number(d));
+      if (!Number.isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
+    }
+    // Try YYYY-MM-DD (ISO)
+    const yyyymmdd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (yyyymmdd) {
+      const [, y, m, d] = yyyymmdd;
+      const ms = Date.UTC(Number(y), Number(m) - 1, Number(d));
+      if (!Number.isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
+    }
+    // Fallback: try Date.parse (handles MM/DD/YYYY and ISO strings)
+    const ms = Date.parse(s);
     if (!Number.isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
   }
   return null;

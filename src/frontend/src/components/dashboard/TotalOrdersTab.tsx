@@ -93,16 +93,24 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
       const q = searchText.toLowerCase();
       result = result.filter((o) => {
         const resolvedKarigar = resolveKarigar(o.design);
+        const resolvedGenericName = resolveGenericName(o.design);
         return (
           o.orderNo.toLowerCase().includes(q) ||
           o.design.toLowerCase().includes(q) ||
           (o.genericName ?? "").toLowerCase().includes(q) ||
+          resolvedGenericName.toLowerCase().includes(q) ||
           resolvedKarigar.toLowerCase().includes(q)
         );
       });
     }
     return result;
-  }, [pendingOrders, typeFilter, searchText, resolveKarigar]);
+  }, [
+    pendingOrders,
+    typeFilter,
+    searchText,
+    resolveKarigar,
+    resolveGenericName,
+  ]);
 
   // Group by design code, sorted oldest-due-first within each group
   const groups = useMemo(() => {

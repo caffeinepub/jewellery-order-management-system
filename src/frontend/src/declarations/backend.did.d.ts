@@ -180,6 +180,7 @@ export interface _SERVICE {
   'getAllOrderStatusLogs' : ActorMethod<[], Array<OrderStatusLog>>,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
   'getDesignCountByKarigar' : ActorMethod<[], Array<[string, bigint]>>,
+  'getDesignImage' : ActorMethod<[string], [] | [ExternalBlob]>,
   'getDesignImageMapping' : ActorMethod<[], Array<[string, DesignMapping]>>,
   'getDesignMapping' : ActorMethod<[string], [] | [DesignMapping]>,
   'getFilteredOutKarigars' : ActorMethod<[], Array<string>>,

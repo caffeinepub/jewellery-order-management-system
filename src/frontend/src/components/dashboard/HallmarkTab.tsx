@@ -17,14 +17,21 @@ import {
   exportSelectedToPDF,
 } from "@/utils/exportUtils";
 import {
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   FileDown,
   Loader2,
   Search,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+
+// Today's ISO date string helper
+function todayStr(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 interface HallmarkTabProps {
   orders?: Order[];
@@ -70,38 +77,65 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
   const [karigarFilter, setKarigarFilter] = useState("");
   const [orderTypeFilter, setOrderTypeFilter] = useState("");
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
+  // Date filter — default to today so Hallmark tab shows only today's moved orders
+  const [hallmarkFromDate, setHallmarkFromDate] = useState<string>(todayStr());
+  const [hallmarkToDate, setHallmarkToDate] = useState<string>(todayStr());
 
   const hallmarkOrders = useMemo(
     () => allOrders.filter((o) => o.status === OrderStatus.Hallmark),
     [allOrders],
   );
 
+  // Date-filtered hallmark orders (based on updatedAt timestamp)
+  const dateFiltered = useMemo(() => {
+    if (!hallmarkFromDate && !hallmarkToDate) return hallmarkOrders;
+    return hallmarkOrders.filter((o) => {
+      const ms = Number(o.updatedAt) / 1_000_000;
+      const d = new Date(ms);
+      const dateStr = d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+      const afterFrom = !hallmarkFromDate || dateStr >= hallmarkFromDate;
+      const beforeTo = !hallmarkToDate || dateStr <= hallmarkToDate;
+      return afterFrom && beforeTo;
+    });
+  }, [hallmarkOrders, hallmarkFromDate, hallmarkToDate]);
+
+  // Karigar options resolved dynamically from master design mappings
   const karigars = useMemo(() => {
     const set = new Set(
-      hallmarkOrders.map((o) => o.karigarName ?? "").filter(Boolean),
+      dateFiltered.map((o) => resolveKarigar(o.design)).filter(Boolean),
     );
     return Array.from(set).sort();
-  }, [hallmarkOrders]);
+  }, [dateFiltered, resolveKarigar]);
 
   const orderTypes = useMemo(() => {
-    const set = new Set(hallmarkOrders.map((o) => o.orderType));
+    const set = new Set(dateFiltered.map((o) => o.orderType));
     return Array.from(set).sort();
-  }, [hallmarkOrders]);
+  }, [dateFiltered]);
 
   const filtered = useMemo(() => {
-    return hallmarkOrders.filter((o) => {
+    return dateFiltered.filter((o) => {
       const q = searchQuery.toLowerCase();
       const matchSearch =
         !q ||
         o.orderNo.toLowerCase().includes(q) ||
         o.design.toLowerCase().includes(q) ||
         (o.genericName ?? "").toLowerCase().includes(q) ||
-        (o.karigarName ?? "").toLowerCase().includes(q);
-      const matchKarigar = !karigarFilter || o.karigarName === karigarFilter;
+        resolveGenericName(o.design).toLowerCase().includes(q) ||
+        resolveKarigar(o.design).toLowerCase().includes(q);
+      // Karigar filter uses resolved karigar name
+      const matchKarigar =
+        !karigarFilter || resolveKarigar(o.design) === karigarFilter;
       const matchType = !orderTypeFilter || o.orderType === orderTypeFilter;
       return matchSearch && matchKarigar && matchType;
     });
-  }, [hallmarkOrders, searchQuery, karigarFilter, orderTypeFilter]);
+  }, [
+    dateFiltered,
+    searchQuery,
+    karigarFilter,
+    orderTypeFilter,
+    resolveGenericName,
+    resolveKarigar,
+  ]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Order[]>();
@@ -193,13 +227,66 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
 
   return (
     <div className="space-y-4">
+      {/* Date Filter Row */}
+      <div className="flex flex-wrap gap-2 items-center bg-muted/30 rounded-lg px-3 py-2">
+        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="text-xs font-medium text-muted-foreground">Date:</span>
+        <div className="flex items-center gap-1">
+          <label
+            htmlFor="hallmark-from-date"
+            className="text-xs text-muted-foreground"
+          >
+            From
+          </label>
+          <Input
+            id="hallmark-from-date"
+            type="date"
+            value={hallmarkFromDate}
+            onChange={(e) => setHallmarkFromDate(e.target.value)}
+            className="h-7 text-xs w-36"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label
+            htmlFor="hallmark-to-date"
+            className="text-xs text-muted-foreground"
+          >
+            To
+          </label>
+          <Input
+            id="hallmark-to-date"
+            type="date"
+            value={hallmarkToDate}
+            onChange={(e) => setHallmarkToDate(e.target.value)}
+            className="h-7 text-xs w-36"
+          />
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => {
+            setHallmarkFromDate("");
+            setHallmarkToDate("");
+          }}
+        >
+          <X className="h-3 w-3 mr-1" />
+          Show All
+        </Button>
+        {(hallmarkFromDate || hallmarkToDate) && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            {dateFiltered.length} orders in range
+          </span>
+        )}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Search orders..."
+            placeholder="Search orders, generic name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />

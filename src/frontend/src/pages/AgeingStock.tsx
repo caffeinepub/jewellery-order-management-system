@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetAllOrders, useMarkOrdersAsReady } from "@/hooks/useQueries";
 import {
-  CalendarX,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -22,7 +21,6 @@ import { toast } from "sonner";
 
 function daysAgo(epochMs: number): number {
   const diff = Date.now() - epochMs;
-  if (diff < 0) return 0;
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -76,23 +74,31 @@ function safeOrderDateMs(order: Order): number | null {
     let ms: number | null = null;
 
     if (typeof od === "bigint") {
-      // Nanosecond timestamp from backend
+      // Nanosecond timestamp from backend — divide as BigInt first to preserve precision
+      if (od === BigInt(0)) return null;
       ms = Number(od / BigInt(1_000_000));
     } else if (typeof od === "number") {
       // Already milliseconds
       ms = od > 1e12 ? od : od * 1000; // handle seconds vs ms
     } else if (typeof od === "string" && od.trim().length > 0) {
       const s = od.trim();
-      // DD/MM/YYYY
-      const ddmmyyyy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      // DD/MM/YYYY or DD-MM-YYYY (Indian date format — most common in this app)
+      const ddmmyyyy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
       if (ddmmyyyy) {
         const [, d, m, y] = ddmmyyyy;
-        ms = new Date(Number(y), Number(m) - 1, Number(d)).getTime();
+        ms = Date.UTC(Number(y), Number(m) - 1, Number(d));
       } else {
-        // ISO / YYYY-MM-DD / any format Date can parse
-        const parsed = new Date(s);
-        if (!Number.isNaN(parsed.getTime())) {
-          ms = parsed.getTime();
+        // YYYY-MM-DD (ISO)
+        const yyyymmdd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (yyyymmdd) {
+          const [, y, m, d] = yyyymmdd;
+          ms = Date.UTC(Number(y), Number(m) - 1, Number(d));
+        } else {
+          // Fallback: any format Date can parse
+          const parsed = new Date(s);
+          if (!Number.isNaN(parsed.getTime())) {
+            ms = parsed.getTime();
+          }
         }
       }
     }
@@ -258,7 +264,6 @@ export default function AgeingStock() {
   const allPendingOrders = groups.flatMap((g) => g.orders);
   const totalPending = allPendingOrders.length;
   const ordersWithDate = allPendingOrders.filter((o) => o.ageDays !== null);
-  const ordersWithoutDate = allPendingOrders.filter((o) => o.ageDays === null);
   const freshCount = ordersWithDate.filter((o) => o.ageBand === "green").length;
   const ageingCount = ordersWithDate.filter(
     (o) => o.ageBand === "yellow",
@@ -389,18 +394,6 @@ export default function AgeingStock() {
           </CardContent>
         </Card>
       </div>
-
-      {ordersWithoutDate.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          <CalendarX className="h-4 w-4 flex-shrink-0" />
-          <span>
-            <strong>{ordersWithoutDate.length}</strong> order
-            {ordersWithoutDate.length > 1 ? "s" : ""} have no order date and are
-            excluded from age-band counts. Upload orders with an{" "}
-            <em>Order Date</em> column to enable ageing tracking.
-          </span>
-        </div>
-      )}
 
       {totalPending > 0 && (
         <div className="flex items-center gap-3 text-sm">

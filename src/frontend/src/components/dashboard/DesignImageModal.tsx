@@ -27,8 +27,39 @@ export default function DesignImageModal({
 
   const { data: designData, isLoading, error } = useGetDesignImage(designCode);
 
-  // Derive the image URL from the blob using getDirectURL()
-  const imageUrl = designData?.blob ? designData.blob.getDirectURL() : null;
+  // Fetch image bytes first for full-quality blob URL, fallback to getDirectURL()
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!designData?.blob) {
+      setImageUrl(null);
+      return;
+    }
+    let objectUrl: string | null = null;
+    (async () => {
+      try {
+        const bytes = await designData.blob.getBytes();
+        if (bytes && bytes.length > 0) {
+          let mimeType = "image/jpeg";
+          if (bytes[0] === 0x89 && bytes[1] === 0x50) mimeType = "image/png";
+          else if (bytes[0] === 0x47 && bytes[1] === 0x49)
+            mimeType = "image/gif";
+          else if (bytes[0] === 0x52 && bytes[1] === 0x49)
+            mimeType = "image/webp";
+          const blob = new Blob([bytes], { type: mimeType });
+          objectUrl = URL.createObjectURL(blob);
+          setImageUrl(objectUrl);
+          return;
+        }
+      } catch {
+        /* fall through to getDirectURL */
+      }
+      setImageUrl(designData.blob.getDirectURL());
+    })();
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [designData?.blob]);
 
   useEffect(() => {
     if (!open) {

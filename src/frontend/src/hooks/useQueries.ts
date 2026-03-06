@@ -917,14 +917,20 @@ export function useUpdateDesignGroupStatus() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
   return useMutation({
-    // Accepts orderIds — moves them all to Hallmark status
-    mutationFn: async (orderIds: string[]) => {
+    // Accepts orderIds and optional updatedBy — moves them all to Hallmark status
+    mutationFn: async ({
+      orderIds,
+      updatedBy = "system",
+    }: {
+      orderIds: string[];
+      updatedBy?: string;
+    }) => {
       if (!actor) throw new Error("Actor not initialized");
       // Use batchUpdateOrderStatus with Hallmark — this is the correct backend call
       await actor.batchUpdateOrderStatus(
         orderIds,
         OrderStatus.Hallmark,
-        "system",
+        updatedBy,
       );
       // Log each status change for audit trail
       await Promise.allSettled(
@@ -933,7 +939,7 @@ export function useUpdateDesignGroupStatus() {
             orderId,
             OrderStatus.Ready,
             OrderStatus.Hallmark,
-            "system",
+            updatedBy,
           ),
         ),
       );

@@ -127,6 +127,7 @@ export interface backendInterface {
     getAllOrderStatusLogs(): Promise<Array<OrderStatusLog>>;
     getAllOrders(): Promise<Array<Order>>;
     getDesignCountByKarigar(): Promise<Array<[string, bigint]>>;
+    getDesignImage(designCode: string): Promise<ExternalBlob | null>;
     getDesignImageMapping(): Promise<Array<[string, DesignMapping]>>;
     getDesignMapping(designCode: string): Promise<DesignMapping | null>;
     getFilteredOutKarigars(): Promise<Array<string>>;

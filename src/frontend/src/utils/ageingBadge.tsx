@@ -7,7 +7,8 @@ interface AgeingBadgeProps {
 
 function getDaysAgo(orderDate?: Time): number | null {
   if (!orderDate) return null;
-  const orderMs = Number(orderDate) / 1_000_000;
+  // Must divide as BigInt first to avoid float64 precision loss on nanosecond timestamps
+  const orderMs = Number(BigInt(orderDate) / BigInt(1_000_000));
   const nowMs = Date.now();
   return Math.floor((nowMs - orderMs) / (1000 * 60 * 60 * 24));
 }

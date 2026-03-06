@@ -7,13 +7,10 @@ import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import Float "mo:core/Float";
 import Iter "mo:core/Iter";
-import TimeUtil "mo:core/Time";
 import Int "mo:core/Int";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
-import Migration "migration";
 
-(with migration = Migration.run)
 actor {
   type OrderType = {
     #CO;
@@ -565,6 +562,7 @@ actor {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
       case (?originalOrder) {
+        // Simple arithmetic for quantity difference
         if (suppliedQuantity > originalOrder.quantity) {
           Runtime.trap("Supplied quantity cannot be greater than original order quantity");
         };
@@ -721,6 +719,26 @@ actor {
 
   public shared ({ caller }) func uploadDesignImage(designCode : Text, image : Storage.ExternalBlob) : async () {
     designImages.add(designCode, image);
+  };
+
+  // GET DESIGN IMAGE — returns the stored blob for a given design code
+  public query ({ caller }) func getDesignImage(designCode : Text) : async ?Storage.ExternalBlob {
+    // Try exact match first
+    switch (designImages.get(designCode)) {
+      case (?blob) { ?blob };
+      case (null) {
+        // Find a matching key in a case-insensitive manner
+        let found = designImages.entries().find(
+          func((k, _v)) {
+            Text.equal(k, designCode) or Text.equal(k.toLower(), designCode.toLower());
+          }
+        );
+        switch (found) {
+          case (?(_, blob)) { ?blob };
+          case (null) { null };
+        };
+      };
+    };
   };
 
   public shared ({ caller }) func clearAllDesignMappings() : async () {

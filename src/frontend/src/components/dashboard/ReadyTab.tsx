@@ -109,7 +109,7 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
     [orders],
   );
 
-  // Search filter
+  // Search filter — includes resolved generic name for accurate search
   const filteredOrders = useMemo(() => {
     if (!searchText.trim()) return readyOrders;
     const q = searchText.toLowerCase();
@@ -118,9 +118,10 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
         o.orderNo.toLowerCase().includes(q) ||
         o.design.toLowerCase().includes(q) ||
         (o.genericName ?? "").toLowerCase().includes(q) ||
+        resolveGenericName(o.design).toLowerCase().includes(q) ||
         (o.karigarName ?? "").toLowerCase().includes(q),
     );
-  }, [readyOrders, searchText]);
+  }, [readyOrders, searchText, resolveGenericName]);
 
   // Group by design code
   const groups = useMemo(() => {
