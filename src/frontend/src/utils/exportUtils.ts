@@ -2,9 +2,37 @@ import type { Order } from "@/backend";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
+/**
+ * Resolver function type: maps a design code to a karigar name.
+ * If not provided, falls back to order.karigarName or "—".
+ */
+export type KarigarResolver = (designCode: string) => string;
+
+/** Resolve karigar name: prefer dynamic resolver, fall back to stored field */
+function resolveKarigarForExport(
+  order: Order,
+  karigarResolver?: KarigarResolver,
+): string {
+  if (karigarResolver) {
+    const resolved = karigarResolver(order.design);
+    if (resolved && resolved !== "Unassigned") return resolved;
+  }
+  return order.karigarName ?? "—";
+}
+
 function formatDate(ts: bigint | undefined | null): string {
   if (!ts) return "—";
-  const ms = Number(ts) / 1_000_000;
+  // Handle Motoko Option<Time> array format
+  let raw: unknown = ts;
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return "—";
+    raw = raw[0];
+  }
+  if (!raw) return "—";
+  const ms =
+    typeof raw === "bigint"
+      ? Number(raw / BigInt(1_000_000))
+      : Number(raw) / 1_000_000;
   return new Date(ms).toLocaleDateString("en-IN");
 }
 
@@ -23,7 +51,11 @@ function triggerDownload(blob: Blob, filename: string) {
 
 // ─── Excel export ────────────────────────────────────────────────────────────
 
-export async function exportToExcel(orders: Order[], filename = "orders.xlsx") {
+export async function exportToExcel(
+  orders: Order[],
+  filename = "orders.xlsx",
+  karigarResolver?: KarigarResolver,
+) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const XLSX: any = await import(
@@ -34,7 +66,7 @@ export async function exportToExcel(orders: Order[], filename = "orders.xlsx") {
       "Order Type": o.orderType,
       Design: o.design,
       "Generic Name": o.genericName ?? "",
-      Karigar: o.karigarName ?? "",
+      Karigar: resolveKarigarForExport(o, karigarResolver),
       Weight: o.weight,
       Qty: Number(o.quantity),
       Status: o.status,
@@ -65,7 +97,7 @@ export async function exportToExcel(orders: Order[], filename = "orders.xlsx") {
         o.orderType,
         o.design,
         o.genericName ?? "",
-        o.karigarName ?? "",
+        resolveKarigarForExport(o, karigarResolver),
         o.weight,
         Number(o.quantity),
         o.status,
@@ -83,7 +115,11 @@ export async function exportToExcel(orders: Order[], filename = "orders.xlsx") {
 
 // ─── PDF export (pure client-side, no external lib needed) ──────────────────
 
-function buildPDFBytes(orders: Order[], tabName = ""): ArrayBuffer {
+function buildPDFBytes(
+  orders: Order[],
+  tabName = "",
+  karigarResolver?: KarigarResolver,
+): ArrayBuffer {
   // Build a minimal valid PDF with proper table layout. A4: 595 x 842 pt.
   const PAGE_W = 595;
   const PAGE_H = 842;
@@ -175,7 +211,7 @@ function buildPDFBytes(orders: Order[], tabName = ""): ArrayBuffer {
       stream += `q\n${rowBg} rg\n${MARGIN} ${y - ROW_H} m\n${MARGIN + TABLE_W} ${y - ROW_H} l\n${MARGIN + TABLE_W} ${y} l\n${MARGIN} ${y} l\nf\nQ\n`;
       const cells = [
         escapePdf(String(o.orderNo).substring(0, 22)),
-        escapePdf(String(o.karigarName ?? "—").substring(0, 14)),
+        escapePdf(resolveKarigarForExport(o, karigarResolver).substring(0, 14)),
         escapePdf(o.size ? String(o.size) : "—"),
         escapePdf(String(Number(o.quantity))),
         escapePdf(`${o.weight}g`),
@@ -255,12 +291,13 @@ export function exportAllToPDF(
   orders: Order[],
   filename = "orders-all.pdf",
   tabName = "",
+  karigarResolver?: KarigarResolver,
 ) {
   if (!orders.length) {
     alert("No orders to export.");
     return;
   }
-  const buf = buildPDFBytes(orders, tabName);
+  const buf = buildPDFBytes(orders, tabName, karigarResolver);
   triggerDownload(new Blob([buf], { type: "application/pdf" }), filename);
 }
 
@@ -268,18 +305,23 @@ export function exportSelectedToPDF(
   orders: Order[],
   filename = "orders-selected.pdf",
   tabName = "",
+  karigarResolver?: KarigarResolver,
 ) {
   if (!orders.length) {
     alert("No orders selected for export.");
     return;
   }
-  const buf = buildPDFBytes(orders, tabName);
+  const buf = buildPDFBytes(orders, tabName, karigarResolver);
   triggerDownload(new Blob([buf], { type: "application/pdf" }), filename);
 }
 
-// Legacy alias — kept so OrderTable and KarigarDetail still compile
-export function exportToPDF(orders: Order[], filename = "orders.pdf") {
-  exportAllToPDF(orders, filename);
+// Legacy alias — kept for backwards compat; now supports karigar resolver
+export function exportToPDF(
+  orders: Order[],
+  filename = "orders.pdf",
+  karigarResolver?: KarigarResolver,
+) {
+  exportAllToPDF(orders, filename, "", karigarResolver);
 }
 
 // ─── JPEG / Image export ─────────────────────────────────────────────────────
@@ -288,6 +330,7 @@ export async function exportOrdersToImage(
   orders: Order[],
   tabName: string,
   filename = "export.jpg",
+  karigarResolver?: KarigarResolver,
 ): Promise<void> {
   if (!orders.length) {
     alert("No orders to export.");
@@ -366,7 +409,7 @@ export async function exportOrdersToImage(
       order.orderNo,
       order.design,
       order.genericName ?? "—",
-      order.karigarName ?? "—",
+      resolveKarigarForExport(order, karigarResolver),
       `${order.weight}g`,
       order.size ? String(order.size) : "—",
       String(Number(order.quantity)),
@@ -409,12 +452,18 @@ export async function exportOrdersToImage(
   );
 }
 
-// Legacy alias used by OrderTable
+// Legacy alias used by OrderTable; now supports karigar resolver
 export async function exportToJPEG(
   orders: Order[],
   _actor?: unknown,
+  karigarResolver?: KarigarResolver,
 ): Promise<void> {
-  await exportOrdersToImage(orders, "Orders Export", "orders.jpg");
+  await exportOrdersToImage(
+    orders,
+    "Orders Export",
+    "orders.jpg",
+    karigarResolver,
+  );
 }
 
 // ─── Karigar grouped export (by Design Code) ─────────────────────────────────
@@ -458,6 +507,7 @@ export async function exportKarigarByDesignGrouped(
   filename: string,
   format: "pdf" | "jpeg",
   designImageUrls?: Map<string, string>,
+  karigarResolver?: KarigarResolver,
 ): Promise<void> {
   if (!orders.length) {
     alert("No orders to export.");
@@ -644,7 +694,7 @@ export async function exportKarigarByDesignGrouped(
         ctx.font = "11px Arial, sans-serif";
         const cells = [
           o.orderNo,
-          o.karigarName ?? "—",
+          resolveKarigarForExport(o, karigarResolver),
           o.size ? String(o.size) : "—",
           String(Number(o.quantity)),
           `${o.weight}g`,
@@ -990,7 +1040,7 @@ export async function exportKarigarByDesignGrouped(
         ctx.font = "12px Arial, sans-serif";
         const cells = [
           o.orderNo,
-          o.karigarName ?? "—",
+          resolveKarigarForExport(o, karigarResolver),
           o.size ? String(o.size) : "—",
           String(Number(o.quantity)),
           `${o.weight}g`,

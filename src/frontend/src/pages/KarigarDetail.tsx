@@ -221,6 +221,10 @@ export default function KarigarDetail() {
     return urlMap;
   };
 
+  // Karigar resolver for exports — resolves dynamically from master design mappings
+  const karigarResolverFn = (designCode: string) =>
+    resolveKarigar(designCode, designMappingsMap);
+
   const handleExportJpeg = async () => {
     setIsExportingJpeg(true);
     try {
@@ -231,6 +235,7 @@ export default function KarigarDetail() {
         `${decodedName}-orders.jpg`,
         "jpeg",
         imageUrls,
+        karigarResolverFn,
       );
     } finally {
       setIsExportingJpeg(false);
@@ -245,6 +250,7 @@ export default function KarigarDetail() {
       `${decodedName}-orders-all.pdf`,
       "pdf",
       imageUrls,
+      karigarResolverFn,
     );
   };
 
@@ -256,11 +262,16 @@ export default function KarigarDetail() {
       `${decodedName}-orders-selected.pdf`,
       "pdf",
       imageUrls,
+      karigarResolverFn,
     );
   };
 
   const handleExportExcel = async () => {
-    await exportToExcel(karigarOrders, `${decodedName}-orders.xlsx`);
+    await exportToExcel(
+      karigarOrders,
+      `${decodedName}-orders.xlsx`,
+      karigarResolverFn,
+    );
   };
 
   // Dynamic weight: unit_weight × qty

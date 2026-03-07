@@ -295,7 +295,12 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
             size="sm"
             variant="outline"
             onClick={() =>
-              exportOrdersToImage(filteredOrders, "Ready", "ready-orders.jpg")
+              exportOrdersToImage(
+                filteredOrders,
+                "Ready",
+                "ready-orders.jpg",
+                resolveKarigar,
+              )
             }
             className="h-8 text-xs"
           >
@@ -305,7 +310,12 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
             size="sm"
             variant="outline"
             onClick={() =>
-              exportAllToPDF(filteredOrders, "ready-orders-all.pdf", "Ready")
+              exportAllToPDF(
+                filteredOrders,
+                "ready-orders-all.pdf",
+                "Ready",
+                resolveKarigar,
+              )
             }
             className="h-8 text-xs"
           >
@@ -320,6 +330,7 @@ export function ReadyTab({ orders, isError }: ReadyTabProps) {
                   selectedOrders,
                   "ready-orders-selected.pdf",
                   "Ready",
+                  resolveKarigar,
                 )
               }
               className="h-8 text-xs"

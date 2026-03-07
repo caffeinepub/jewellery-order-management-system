@@ -7,6 +7,8 @@ import { useGetAllOrders } from "../../hooks/useQueries";
 
 interface SummaryCardsProps {
   activeTab?: string;
+  hallmarkFromDate?: string;
+  hallmarkToDate?: string;
 }
 
 // Dynamic weight: always unit_weight × qty
@@ -19,7 +21,11 @@ function uniqueOrderCount(orders: Order[]): number {
   return new Set(orders.map((o) => o.orderNo)).size;
 }
 
-export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
+export function SummaryCards({
+  activeTab = "total",
+  hallmarkFromDate,
+  hallmarkToDate,
+}: SummaryCardsProps) {
   const { data: allOrders = [], isLoading } = useGetAllOrders();
 
   const stats = useMemo(() => {
@@ -28,9 +34,30 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
 
     const pending = validOrders.filter((o) => o.status === OrderStatus.Pending);
     const ready = validOrders.filter((o) => o.status === OrderStatus.Ready);
-    const hallmark = validOrders.filter(
+
+    // Hallmark: filter by date range (same logic as HallmarkTab)
+    const allHallmark = validOrders.filter(
       (o) => o.status === OrderStatus.Hallmark,
     );
+    const hallmark = allHallmark.filter((o) => {
+      if (!hallmarkFromDate && !hallmarkToDate) return true;
+      // Handle Option<Time> array format from Motoko
+      let raw: unknown = o.updatedAt;
+      if (Array.isArray(raw)) {
+        if (raw.length === 0) return false;
+        raw = raw[0];
+      }
+      if (!raw) return false;
+      const ms =
+        typeof raw === "bigint"
+          ? Number(raw / BigInt(1_000_000))
+          : Number(raw) / 1_000_000;
+      const dateStr = new Date(ms).toISOString().split("T")[0];
+      const afterFrom = !hallmarkFromDate || dateStr >= hallmarkFromDate;
+      const beforeTo = !hallmarkToDate || dateStr <= hallmarkToDate;
+      return afterFrom && beforeTo;
+    });
+
     // Customer Orders: same filter as CustomerOrdersTab (CO type + Pending status)
     const customerOrders = validOrders.filter(
       (o) => o.orderType === OrderType.CO && o.status === OrderStatus.Pending,
@@ -50,7 +77,7 @@ export function SummaryCards({ activeTab = "total" }: SummaryCardsProps) {
       hallmark: calcStats(hallmark),
       customerOrders: calcStats(customerOrders),
     };
-  }, [allOrders]);
+  }, [allOrders, hallmarkFromDate, hallmarkToDate]);
 
   const cards = [
     {

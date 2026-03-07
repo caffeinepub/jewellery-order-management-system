@@ -6,9 +6,29 @@ interface AgeingBadgeProps {
 }
 
 function getDaysAgo(orderDate?: Time): number | null {
-  if (!orderDate) return null;
-  // Must divide as BigInt first to avoid float64 precision loss on nanosecond timestamps
-  const orderMs = Number(BigInt(orderDate) / BigInt(1_000_000));
+  // Handle Motoko Option<Time> serialised as JS array: [] = None, [bigint] = Some
+  let od: unknown = orderDate;
+  if (Array.isArray(od)) {
+    if (od.length === 0) return null; // None
+    od = od[0]; // Some(value)
+  }
+  if (od == null) return null;
+
+  let orderMs: number;
+  if (typeof od === "bigint") {
+    if (od === BigInt(0)) return null;
+    // Nanosecond timestamp — divide as BigInt to preserve precision
+    orderMs = Number(od / BigInt(1_000_000));
+  } else if (typeof od === "number") {
+    if (od === 0) return null;
+    orderMs = od < 1e13 ? od * 1000 : od / 1_000_000;
+  } else {
+    return null;
+  }
+
+  // Sanity check: year 2000–2100
+  if (orderMs < 946684800000 || orderMs > 4102444800000) return null;
+
   const nowMs = Date.now();
   return Math.floor((nowMs - orderMs) / (1000 * 60 * 60 * 24));
 }

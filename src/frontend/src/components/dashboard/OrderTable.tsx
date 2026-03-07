@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useActor } from "@/hooks/useActor";
+import { useKarigarResolver } from "@/hooks/useQueries";
 import { exportToExcel, exportToJPEG, exportToPDF } from "@/utils/exportUtils";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Trash2 } from "lucide-react";
@@ -52,6 +53,7 @@ export default function OrderTable({
   isDeleting = false,
   enableExport = false,
 }: OrderTableProps) {
+  const resolveKarigar = useKarigarResolver();
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -135,13 +137,13 @@ export default function OrderTable({
     setIsExporting(true);
     try {
       if (format === "excel") {
-        await exportToExcel(orders);
+        await exportToExcel(orders, "orders.xlsx", resolveKarigar);
         toast.success("Exported to Excel");
       } else if (format === "pdf") {
-        exportToPDF(orders);
+        exportToPDF(orders, "orders.pdf", resolveKarigar);
         toast.success("PDF downloaded");
       } else if (format === "jpeg") {
-        await exportToJPEG(orders);
+        await exportToJPEG(orders, undefined, resolveKarigar);
         toast.success("JPEG downloaded");
       }
     } catch {

@@ -28,14 +28,13 @@ import {
 import { useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 
-// Today's ISO date string helper
-function todayStr(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
 interface HallmarkTabProps {
   orders?: Order[];
   isError?: boolean;
+  hallmarkFromDate?: string;
+  hallmarkToDate?: string;
+  onHallmarkFromDateChange?: (date: string) => void;
+  onHallmarkToDateChange?: (date: string) => void;
 }
 
 // Last Action badge component
@@ -61,7 +60,14 @@ function LastActionBadge({ lastAction }: { lastAction?: string }) {
   );
 }
 
-export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
+export function HallmarkTab({
+  orders: propOrders,
+  isError,
+  hallmarkFromDate: fromDateProp,
+  hallmarkToDate: toDateProp,
+  onHallmarkFromDateChange,
+  onHallmarkToDateChange,
+}: HallmarkTabProps) {
   const { data: fetchedOrders = [], isLoading } = useGetAllOrders();
   const allOrders = propOrders ?? fetchedOrders;
   const batchUpdateMutation = useBatchUpdateOrderStatus();
@@ -77,9 +83,23 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
   const [karigarFilter, setKarigarFilter] = useState("");
   const [orderTypeFilter, setOrderTypeFilter] = useState("");
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
-  // Date filter — default to today so Hallmark tab shows only today's moved orders
-  const [hallmarkFromDate, setHallmarkFromDate] = useState<string>(todayStr());
-  const [hallmarkToDate, setHallmarkToDate] = useState<string>(todayStr());
+
+  // Date filter — use lifted state from Dashboard if provided, else manage locally
+  const todayDefault = new Date().toISOString().split("T")[0];
+  const [localFromDate, setLocalFromDate] = useState<string>(todayDefault);
+  const [localToDate, setLocalToDate] = useState<string>(todayDefault);
+  const hallmarkFromDate =
+    fromDateProp !== undefined ? fromDateProp : localFromDate;
+  const hallmarkToDate = toDateProp !== undefined ? toDateProp : localToDate;
+
+  const setHallmarkFromDate = (v: string) => {
+    if (onHallmarkFromDateChange) onHallmarkFromDateChange(v);
+    else setLocalFromDate(v);
+  };
+  const setHallmarkToDate = (v: string) => {
+    if (onHallmarkToDateChange) onHallmarkToDateChange(v);
+    else setLocalToDate(v);
+  };
 
   const hallmarkOrders = useMemo(
     () => allOrders.filter((o) => o.status === OrderStatus.Hallmark),
@@ -194,19 +214,34 @@ export function HallmarkTab({ orders: propOrders, isError }: HallmarkTabProps) {
   const handleExportJpeg = async () => {
     setIsExportingJpeg(true);
     try {
-      await exportOrdersToImage(filtered, "Hallmark", "hallmark-orders.jpg");
+      await exportOrdersToImage(
+        filtered,
+        "Hallmark",
+        "hallmark-orders.jpg",
+        resolveKarigar,
+      );
     } finally {
       setIsExportingJpeg(false);
     }
   };
 
   const handleExportPDFAll = () => {
-    exportAllToPDF(filtered, "hallmark-orders-all.pdf", "Hallmark");
+    exportAllToPDF(
+      filtered,
+      "hallmark-orders-all.pdf",
+      "Hallmark",
+      resolveKarigar,
+    );
   };
 
   const handleExportPDFSelected = () => {
     const sel = filtered.filter((o) => selectedIds.has(o.orderId));
-    exportSelectedToPDF(sel, "hallmark-orders-selected.pdf", "Hallmark");
+    exportSelectedToPDF(
+      sel,
+      "hallmark-orders-selected.pdf",
+      "Hallmark",
+      resolveKarigar,
+    );
   };
 
   if (isError) {

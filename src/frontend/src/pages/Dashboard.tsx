@@ -13,6 +13,11 @@ import { useAuth } from "../context/AuthContext";
 
 type TabKey = "total" | "ready" | "hallmark" | "customer" | "karigars";
 
+// Today's ISO date string
+function todayStr(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function Dashboard() {
   const { currentUser } = useAuth();
   const isStaff = currentUser?.role === AppRole.Staff;
@@ -22,6 +27,10 @@ export default function Dashboard() {
   const defaultTab: TabKey = isKarigar ? "karigars" : "total";
   const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
   const { data: allOrders = [], isLoading, isError } = useGetAllOrders();
+
+  // Hallmark date range — shared between HallmarkTab and SummaryCards
+  const [hallmarkFromDate, setHallmarkFromDate] = useState<string>(todayStr());
+  const [hallmarkToDate, setHallmarkToDate] = useState<string>(todayStr());
 
   // Karigar: render only the Karigars tab view
   if (isKarigar) {
@@ -35,7 +44,13 @@ export default function Dashboard() {
   return (
     <div className="p-3 md:p-6 space-y-3 md:space-y-5 min-w-0 w-full overflow-x-hidden">
       {/* Summary cards and unmapped section: Admin only, not Staff or Karigar */}
-      {!isStaff && <SummaryCards activeTab={activeTab} />}
+      {!isStaff && (
+        <SummaryCards
+          activeTab={activeTab}
+          hallmarkFromDate={hallmarkFromDate}
+          hallmarkToDate={hallmarkToDate}
+        />
+      )}
       {!isStaff && <UnmappedSection />}
 
       <Tabs
@@ -99,7 +114,14 @@ export default function Dashboard() {
               <ReadyTab orders={allOrders} isError={isError} />
             </TabsContent>
             <TabsContent value="hallmark" className="mt-3">
-              <HallmarkTab orders={allOrders} isError={isError} />
+              <HallmarkTab
+                orders={allOrders}
+                isError={isError}
+                hallmarkFromDate={hallmarkFromDate}
+                hallmarkToDate={hallmarkToDate}
+                onHallmarkFromDateChange={setHallmarkFromDate}
+                onHallmarkToDateChange={setHallmarkToDate}
+              />
             </TabsContent>
             <TabsContent value="customer" className="mt-3">
               <CustomerOrdersTab />

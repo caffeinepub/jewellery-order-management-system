@@ -66,9 +66,18 @@ interface DesignGroup {
 
 function safeOrderDateMs(order: Order): number | null {
   try {
-    // Cast to unknown to handle runtime data that may differ from declared type
-    // (e.g. orders uploaded via Excel may have string or number orderDate)
-    const od = order.orderDate as unknown;
+    // Cast to unknown to handle runtime data that may differ from declared type.
+    // Motoko's Option<Time> serializes to JS as:
+    //   [] for None, or [bigint_value] for Some(bigint_value)
+    // We must unwrap these array forms before doing any type checks.
+    let od: unknown = order.orderDate as unknown;
+
+    // Unwrap Motoko Option array format: [] => null, [value] => value
+    if (Array.isArray(od)) {
+      if (od.length === 0) return null; // None
+      od = od[0]; // Some(value) — unwrap
+    }
+
     if (od == null) return null;
 
     let ms: number | null = null;
@@ -78,8 +87,21 @@ function safeOrderDateMs(order: Order): number | null {
       if (od === BigInt(0)) return null;
       ms = Number(od / BigInt(1_000_000));
     } else if (typeof od === "number") {
-      // Already milliseconds
-      ms = od > 1e12 ? od : od * 1000; // handle seconds vs ms
+      if (od === 0) return null;
+      // Handle Excel date serial numbers (usually < 60000), seconds (10 digits), or milliseconds (13 digits)
+      if (od < 100000) {
+        // Likely an Excel date serial — convert via a known base date
+        // Excel serial 1 = 1900-01-01, but JS Date can parse if we offset correctly
+        // Date.UTC for Excel serial: subtract 25569 days from unix epoch (1970-01-01)
+        ms = (od - 25569) * 86400 * 1000;
+      } else if (od < 1e10) {
+        ms = od * 1000; // seconds → ms
+      } else if (od < 1e13) {
+        ms = od; // already ms
+      } else {
+        // nanoseconds stored as number (precision loss possible but handle gracefully)
+        ms = od / 1_000_000;
+      }
     } else if (typeof od === "string" && od.trim().length > 0) {
       const s = od.trim();
       // DD/MM/YYYY or DD-MM-YYYY (Indian date format — most common in this app)
