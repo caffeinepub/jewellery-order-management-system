@@ -2,51 +2,45 @@
 
 ## Current State
 
-Full-stack OMS with Motoko backend and React frontend. Handles SO/CO/RB orders, karigar assignments, design mappings, tag printing, reconciliation, and ageing stock.
+The Reconciliation page allows uploading an Excel file and clicking "Reconcile with Total Orders". However, the duplicate detection is completely broken:
 
-Backend has:
-- `createOrder(...)` — does NOT accept `orderDate`, always stores `null`
-- `markOrdersAsReady(orderIds, updatedBy)` — does NOT write `updatedBy`/`lastAction` fields on order
-- `batchUpdateOrderStatus(orderIds, newStatus, updatedBy)` — does NOT write `updatedBy`/`lastAction` fields on order
-- No `createOrderWithDate` function
-- No `updateOrderQuantity` function
-
-Frontend has:
-- `useUpdateDesignGroupStatus` calls a non-existent `actor.updateDesignGroupStatus` — falls through silently
-- `useBatchSupplyRBOrders` partial supply marks original as Ready with full qty, creates new Pending with remainder — Ready entry shows full qty instead of supplied qty
-- Generic name resolved from `order.genericName` (stored at ingest as null) instead of dynamically from master design mappings
-- Ageing stock shows "No date" because `orderDate` is never saved to backend (no `createOrderWithDate` called)
-- KarigarDetail shows all columns; export buttons visible
-- AppSidebar: Tag Printing and Barcode Scanning are Admin-only; Staff cannot see them
+1. `reconcileMasterFile()` on the backend compares against `masterDesignKarigars` (master design store), NOT existing orders — so it cannot detect duplicate orders.
+2. The frontend ignores the backend result entirely and maps ALL parsed Excel rows as "new lines", meaning every upload shows every row as needing to be added regardless of whether it already exists.
+3. The "Missing in Master" section shows orders in the app not in Excel, but uses the wrong backend data source and never populates correctly. There is no way to select and delete those orders.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `createOrderWithDate` function — same as `createOrder` but accepts `orderDate: ?Time.Time`
-- Backend: `updateOrderQuantity(orderId, newQuantity, updatedBy)` — updates quantity and writes `updatedBy`/`lastAction` fields
-- Backend: `markOrdersAsReady` must write `updatedBy` and `lastAction` fields on the order record
-- Backend: `batchUpdateOrderStatus` must write `updatedBy` and `lastAction` fields on the order record
-- Backend: `markOrdersAsPending` must write `updatedBy` and `lastAction` fields
+- Frontend-only duplicate detection: after parsing Excel, fetch all existing orders via `getAllOrders()`, build a Set of `orderNo_designCode` keys, and filter parsed rows to only show those NOT already in the system (across Pending, Ready, Hallmark, ReturnFromHallmark statuses).
+- "In App, Not in Excel" section: shows all orders currently in the app whose `orderNo_designCode` key is NOT present in the uploaded Excel. Includes select-all checkbox and per-row checkboxes. Has a "Delete Selected" button that calls `deleteOrder()` for each selected order, with a confirmation step.
+- Accurate summary counts: "Already Existing" = parsed rows that already exist in app; "New Lines" = parsed rows not in app; "In App, Not in Excel" = app orders not in Excel.
 
 ### Modify
-- IngestOrders.tsx: call `createOrderWithDate` passing `orderDate` from parsed Excel
-- useQueries.ts `useUpdateDesignGroupStatus`: call `actor.batchUpdateOrderStatus(orderIds, OrderStatus.Hallmark, updatedBy)` instead of non-existent `updateDesignGroupStatus`
-- useQueries.ts `useBatchSupplyRBOrders`: after `markOrdersAsReady` on original orderId, call `updateOrderQuantity(orderId, suppliedQty, updatedBy)` to fix the ready entry quantity to the supplied amount
-- useQueries.ts `useSaveOrder`: call `createOrderWithDate` passing `orderDate` param  
-- All order row displays: resolve `genericName` dynamically from design mappings map (same pattern as `resolveKarigar`) instead of using `order.genericName`
-- KarigarDetail.tsx: show only Generic Name, Weight, Qty columns in the table (remove Order No, Design, Type columns); keep all export buttons
-- AppSidebar.tsx: add `AppRole.Staff` to `roles` array for Tag Printing and Barcode Scanning menu items
+- `handleReconcile` in `Reconciliation.tsx`: replace the broken backend-based reconcile call with a frontend comparison. Fetch `getAllOrders()` directly, build lookup map by `orderNo_designCode`, filter parsed rows into new vs existing.
+- Remove the call to `reconcileMutation.mutateAsync(undefined)` (the backend `reconcileMasterFile()` call) since it operates on master design data, not orders.
+- Summary cards: update "Already Existing" and "New Lines" counts to reflect the corrected logic.
+- "Missing in Master" section renamed to "In App, Not in Excel" with delete capability.
 
 ### Remove
-- Nothing removed
+- Reliance on `useReconcileMasterFile` hook in the reconcile flow (the hook can stay but should not be called for order duplicate detection).
 
 ## Implementation Plan
 
-1. Regenerate backend with `createOrderWithDate`, `updateOrderQuantity`, and updated `markOrdersAsReady`/`batchUpdateOrderStatus`/`markOrdersAsPending` that write `updatedBy`/`lastAction`
-2. Update `IngestOrders.tsx` to call `createOrderWithDate` with parsed `orderDate`
-3. Update `useUpdateDesignGroupStatus` in `useQueries.ts` to call `batchUpdateOrderStatus` with Hallmark status
-4. Update `useBatchSupplyRBOrders` to call `updateOrderQuantity` after marking ready to fix the qty
-5. Add `resolveGenericName` utility (alongside `resolveKarigar`) in `karigarResolver.ts`
-6. Update all order row displays to use dynamic generic name resolution from mappings
-7. Update `KarigarDetail.tsx` table to show only Generic Name, Weight, Qty (keep exports)
-8. Update `AppSidebar.tsx` to allow Staff access to Tag Printing and Barcode Scanning
+1. In `Reconciliation.tsx` `handleReconcile`:
+   - Call `actor.getAllOrders()` directly (via the actor from `useActor`) to get all existing orders.
+   - Build a Set of existing keys: `${order.orderNo}_${order.design}` for all statuses.
+   - Split `parsedRows` into `newRows` (key not in set) and `existingRows` (key in set).
+   - Build `appNotInExcel`: existing orders whose key is NOT in the parsed Excel set.
+   - Set reconcile result with correct counts and both lists.
+
+2. Add `appNotInExcel: Order[]` and `selectedAppNotInExcel: Set<string>` state.
+
+3. Render "In App, Not in Excel" card below "New Lines":
+   - Columns: Order No, Design, Type, Status, Qty, Weight.
+   - Select-all checkbox in header.
+   - Per-row checkbox.
+   - "Delete Selected (N)" button — shows a confirm dialog before deleting.
+   - Calls `useDeleteOrder` mutation for each selected order sequentially.
+   - On success, refreshes the reconcile result (removes deleted rows from the list).
+
+4. Keep all existing UI structure, dark theme, and orange/gold styling unchanged.

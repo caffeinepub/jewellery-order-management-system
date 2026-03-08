@@ -75,9 +75,8 @@ function parseExcelDateSerial(XLSX: any, raw: unknown): bigint | null {
       const ms = Date.UTC(Number(y), Number(m) - 1, Number(d));
       if (!Number.isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
     }
-    // Fallback: try Date.parse (handles MM/DD/YYYY and ISO strings)
-    const ms = Date.parse(s);
-    if (!Number.isNaN(ms)) return BigInt(ms) * BigInt(1_000_000);
+    // NOTE: Do NOT use Date.parse(s) as a fallback — it interprets "12/02/2026"
+    // as December 2 (MM/DD/YYYY) instead of February 12 (DD/MM/YYYY).
   }
   return null;
 }

@@ -20,7 +20,8 @@ import { toast } from "sonner";
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function daysAgo(epochMs: number): number {
-  const diff = Date.now() - epochMs;
+  // All orders are past-dated — negative means a parsing error, so always show positive
+  const diff = Math.abs(Date.now() - epochMs);
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -115,13 +116,8 @@ function safeOrderDateMs(order: Order): number | null {
         if (yyyymmdd) {
           const [, y, m, d] = yyyymmdd;
           ms = Date.UTC(Number(y), Number(m) - 1, Number(d));
-        } else {
-          // Fallback: any format Date can parse
-          const parsed = new Date(s);
-          if (!Number.isNaN(parsed.getTime())) {
-            ms = parsed.getTime();
-          }
         }
+        // NOTE: No Date.parse fallback — it misreads "12/02/2026" as December 2.
       }
     }
 

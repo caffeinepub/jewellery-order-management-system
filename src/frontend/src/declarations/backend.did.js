@@ -149,6 +149,11 @@ export const idlService = IDL.Service({
       [],
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
+  'backfillOrderDates' : IDL.Func(
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Int))],
+      [IDL.Nat],
+      [],
+    ),
   'batchSaveDesignMappings' : IDL.Func(
       [IDL.Vec(MappingRecord), IDL.Text],
       [],
@@ -233,6 +238,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getOrdersByStatus' : IDL.Func([OrderStatus], [IDL.Vec(Order)], ['query']),
+  'getPendingOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getUniqueKarigarsFromDesignMappings' : IDL.Func(
       [],
@@ -430,6 +436,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
+    'backfillOrderDates' : IDL.Func(
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Int))],
+        [IDL.Nat],
+        [],
+      ),
     'batchSaveDesignMappings' : IDL.Func(
         [IDL.Vec(MappingRecord), IDL.Text],
         [],
@@ -518,6 +529,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getOrdersByStatus' : IDL.Func([OrderStatus], [IDL.Vec(Order)], ['query']),
+    'getPendingOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getReadyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getUniqueKarigarsFromDesignMappings' : IDL.Func(
         [],

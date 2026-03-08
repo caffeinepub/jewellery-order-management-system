@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Order } from "../../backend";
 import { useAuth } from "../../context/AuthContext";
 import { useBatchSupplyRBOrders } from "../../hooks/useQueries";
@@ -48,6 +48,18 @@ export default function SuppliedQtyDialog({
     setError(null);
     setSuccess(false);
   };
+
+  // Re-initialize entries whenever the dialog opens (including programmatic open from parent)
+  // This ensures the entries always reflect the latest orders prop when open becomes true
+  useEffect(() => {
+    if (open && orders.length > 0) {
+      setEntries(
+        orders.map((o) => ({ order: o, suppliedQty: Number(o.quantity) })),
+      );
+      setError(null);
+      setSuccess(false);
+    }
+  }, [open, orders]);
 
   const handleOpenChange = (val: boolean) => {
     if (val) resetEntries();

@@ -27,6 +27,49 @@ function dynamicWeight(order: Order): number {
   return order.weight * Number(order.quantity);
 }
 
+// Convert any orderDate format to milliseconds for sorting/display
+function orderDateToMs(orderDate: unknown): number | null {
+  try {
+    let od: unknown = orderDate;
+    // Unwrap Motoko Option array: [] = None, [value] = Some
+    if (Array.isArray(od)) {
+      if (od.length === 0) return null;
+      od = od[0];
+    }
+    if (od == null) return null;
+
+    if (typeof od === "bigint") {
+      if (od === BigInt(0)) return null;
+      return Number(od / BigInt(1_000_000));
+    }
+    if (typeof od === "number") {
+      if (od === 0) return null;
+      if (od < 100000) return (od - 25569) * 86400 * 1000; // Excel serial
+      if (od < 1e10) return od * 1000; // seconds
+      if (od < 1e13) return od; // ms
+      return od / 1_000_000; // nanoseconds
+    }
+    if (typeof od === "string" && od.trim().length > 0) {
+      const s = od.trim();
+      const ddmmyyyy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (ddmmyyyy) {
+        const [, d, m, y] = ddmmyyyy;
+        return Date.UTC(Number(y), Number(m) - 1, Number(d));
+      }
+      const yyyymmdd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (yyyymmdd) {
+        const [, y, m, d] = yyyymmdd;
+        return Date.UTC(Number(y), Number(m) - 1, Number(d));
+      }
+      // NOTE: Do NOT use new Date(s) fallback — it interprets "12/02/2026"
+      // as December 2 (MM/DD/YYYY) instead of February 12 (DD/MM/YYYY).
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Count unique order numbers
 function uniqueOrderCount(orders: Order[]): number {
   return new Set(orders.map((o) => o.orderNo)).size;
@@ -123,12 +166,11 @@ export function TotalOrdersTab({ orders, isError }: TotalOrdersTabProps) {
     // Sort within each group: oldest orderDate first, then by weight desc
     for (const [, groupOrders] of map) {
       groupOrders.sort((a, b) => {
-        const aDate = a.orderDate
-          ? Number(a.orderDate)
-          : Number.POSITIVE_INFINITY;
-        const bDate = b.orderDate
-          ? Number(b.orderDate)
-          : Number.POSITIVE_INFINITY;
+        const aDate = orderDateToMs(a.orderDate);
+        const bDate = orderDateToMs(b.orderDate);
+        if (aDate === null && bDate === null) return 0;
+        if (aDate === null) return 1;
+        if (bDate === null) return -1;
         if (aDate !== bDate) return aDate - bDate;
         return dynamicWeight(b) - dynamicWeight(a);
       });

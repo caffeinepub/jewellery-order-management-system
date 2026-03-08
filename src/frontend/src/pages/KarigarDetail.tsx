@@ -535,7 +535,8 @@ export default function KarigarDetail() {
                 <div className="flex items-center gap-3 px-4 py-2 bg-muted/20 border-b border-border text-xs font-medium text-muted-foreground">
                   <span className="w-4 shrink-0" />
                   <span className="flex-1">Generic Name</span>
-                  <span className="w-20 text-right">Weight</span>
+                  <span className="w-18 text-right">Unit Wt</span>
+                  <span className="w-20 text-right">Total Wt</span>
                   <span className="w-12 text-right">Qty</span>
                   <span className="w-16 text-right">Size</span>
                   <span className="w-32">Remarks</span>
@@ -565,6 +566,9 @@ export default function KarigarDetail() {
                         />
                         <span className="flex-1 text-sm text-foreground">
                           {resolveGenericName(order.design) || order.design}
+                        </span>
+                        <span className="w-18 text-right text-sm text-muted-foreground">
+                          {order.weight.toFixed(2)}g
                         </span>
                         <span className="w-20 text-right text-sm font-medium">
                           {totalOrderWeight.toFixed(2)}g

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Loader2,
+  Trash2,
   Upload,
 } from "lucide-react";
 import type React from "react";
@@ -22,9 +23,10 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { OrderType } from "../backend";
 import type { Order } from "../backend";
+import { useActor } from "../hooks/useActor";
 import {
+  useDeleteOrder,
   usePersistReconciliationRows,
-  useReconcileMasterFile,
 } from "../hooks/useQueries";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,7 +38,7 @@ interface ParsedRow {
   weight: number;
   size: number;
   quantity: number;
-  orderType: OrderType; // REQ-4: preserve parsed type
+  orderType: OrderType;
   orderDate?: bigint;
 }
 
@@ -78,7 +80,6 @@ function parseExcelDateSerial(XLSX: any, raw: unknown): bigint | undefined {
 }
 
 async function parseMasterFile(file: File): Promise<ParsedRow[]> {
-  // Load XLSX from CDN — not in package.json
   const XLSX: any = await import(
     "https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs" as any
   );
@@ -117,7 +118,6 @@ async function parseMasterFile(file: File): Promise<ParsedRow[]> {
   const weightIdx = colIdx(["weight", "wt"]);
   const sizeIdx = colIdx(["size", "sz"]);
   const qtyIdx = colIdx(["quantity", "qty"]);
-  // REQ-4: scan for order type column
   const orderTypeIdx = colIdx([
     "ordertype",
     "order type",
@@ -149,7 +149,6 @@ async function parseMasterFile(file: File): Promise<ParsedRow[]> {
     const quantity =
       qtyIdx >= 0 ? Number.parseInt(String(row[qtyIdx] ?? "1"), 10) || 1 : 1;
 
-    // REQ-4: parse order type from column if present, else default CO
     const orderType: OrderType =
       orderTypeIdx >= 0 ? parseOrderType(row[orderTypeIdx]) : OrderType.CO;
 
@@ -180,20 +179,24 @@ const Reconciliation: React.FC = () => {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [isParsing, setIsParsing] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
   const [reconcileResult, setReconcileResult] = useState<{
     newLines: ParsedRow[];
-    missingInMaster: Order[];
-    totalUploadedRows: bigint;
-    alreadyExistingRows: bigint;
-    newLinesCount: bigint;
-    missingInMasterCount: bigint;
+    alreadyExisting: number;
+    appNotInExcel: Order[];
   } | null>(null);
   const [selectedNewLines, setSelectedNewLines] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedAppNotInExcel, setSelectedAppNotInExcel] = useState<
+    Set<string>
+  >(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const reconcileMutation = useReconcileMasterFile();
+  const { actor } = useActor();
   const persistMutation = usePersistReconciliationRows();
+  const deleteOrderMutation = useDeleteOrder();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -202,6 +205,7 @@ const Reconciliation: React.FC = () => {
     setFileName(file.name);
     setReconcileResult(null);
     setSelectedNewLines(new Set());
+    setSelectedAppNotInExcel(new Set());
     setIsParsing(true);
 
     try {
@@ -213,70 +217,66 @@ const Reconciliation: React.FC = () => {
       setParsedRows([]);
     } finally {
       setIsParsing(false);
-      // Reset so same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleReconcile = async () => {
-    if (parsedRows.length === 0) return;
+    if (parsedRows.length === 0 || !actor) return;
 
+    setIsReconciling(true);
     try {
-      // reconcileMasterFile() now takes NO args - reconciles against stored data
-      // We build a synthetic result from parsedRows vs existing orders
-      // For the new API: just call with no args and map the result
-      const apiResult = await reconcileMutation.mutateAsync(undefined);
+      // Fetch all existing orders from the app
+      const allOrders = await actor.getAllOrders();
 
-      // Map MasterReconciliationResult to our internal shape
-      // missingInSystem = rows in Excel but not in system (new lines to add)
-      // missingInExcel = rows in system but not in Excel
-      const newLines = (apiResult.missingInSystem ?? []).map((row) => ({
-        orderNo: row.designCode, // use designCode as proxy key
-        designCode: row.designCode,
-        karigar: row.karigar,
-        weight: 0,
-        quantity: BigInt(1),
-        orderType: OrderType.CO,
-        orderDate: undefined as bigint | undefined,
-      }));
-
-      // Try to enrich from parsedRows if available
-      const parsedMap = new Map(
-        parsedRows.map((r) => [`${r.orderNo}_${r.designCode}`, r]),
+      // Build a set of existing keys: orderNo_designCode
+      const existingKeys = new Set<string>(
+        allOrders.map(
+          (o) =>
+            `${String(o.orderNo ?? "").trim()}_${String(o.design ?? "")
+              .trim()
+              .toUpperCase()}`,
+        ),
       );
 
-      // Build enriched new lines from parsedRows not in existing system
-      // The best approach: compare parsedRows against what reconcile says
-      // Actually, for the new API we just add ALL parsed rows (since reconcile
-      // tells us what's missing, we use parsedRows as the source of truth for new lines)
-      const enrichedNewLines: ParsedRow[] = parsedRows.map((row) => ({
-        orderNo: row.orderNo,
-        designCode: row.designCode,
-        karigar: row.karigar,
-        weight: row.weight,
-        size: row.size,
-        quantity: row.quantity,
-        orderType: row.orderType,
-        orderDate: row.orderDate,
-      }));
-      void newLines; // suppress unused
-      void parsedMap; // suppress unused
+      // Build a set of Excel keys for reverse lookup
+      const excelKeys = new Set<string>(
+        parsedRows.map(
+          (r) => `${r.orderNo.trim()}_${r.designCode.trim().toUpperCase()}`,
+        ),
+      );
 
-      setReconcileResult({
-        newLines: enrichedNewLines,
-        missingInMaster: [],
-        totalUploadedRows: BigInt(parsedRows.length),
-        alreadyExistingRows: BigInt(apiResult.matchedRows?.length ?? 0),
-        newLinesCount: BigInt(enrichedNewLines.length),
-        missingInMasterCount: BigInt(apiResult.missingInExcel?.length ?? 0),
-      });
+      // New lines: parsed rows NOT already in the app (across all statuses)
+      const newLines = parsedRows.filter(
+        (r) =>
+          !existingKeys.has(
+            `${r.orderNo.trim()}_${r.designCode.trim().toUpperCase()}`,
+          ),
+      );
+
+      const alreadyExisting = parsedRows.length - newLines.length;
+
+      // App not in Excel: orders in app whose key is NOT in the Excel
+      const appNotInExcel = allOrders.filter(
+        (o) =>
+          !excelKeys.has(
+            `${String(o.orderNo ?? "").trim()}_${String(o.design ?? "")
+              .trim()
+              .toUpperCase()}`,
+          ),
+      );
+
+      setReconcileResult({ newLines, alreadyExisting, appNotInExcel });
 
       // Pre-select all new lines
       setSelectedNewLines(
-        new Set(enrichedNewLines.map((r) => `${r.orderNo}_${r.designCode}`)),
+        new Set(newLines.map((r) => `${r.orderNo}_${r.designCode}`)),
       );
+      setSelectedAppNotInExcel(new Set());
     } catch {
-      toast.error("Reconciliation failed");
+      toast.error("Reconciliation failed. Please try again.");
+    } finally {
+      setIsReconciling(false);
     }
   };
 
@@ -292,38 +292,79 @@ const Reconciliation: React.FC = () => {
       return;
     }
 
-    // Build a lookup map from parsedRows to retrieve size per orderNo+designCode
-    const parsedRowsMap = new Map<string, ParsedRow>(
-      parsedRows.map((r) => [`${r.orderNo}_${r.designCode}`, r]),
-    );
-
-    // Merge with size from parsedRows
-    const rowsToAdd = filteredNewLines.map((r) => {
-      const parsed = parsedRowsMap.get(`${r.orderNo}_${r.designCode}`);
-      return {
-        orderNo: r.orderNo,
-        designCode: r.designCode,
-        karigar: r.karigar,
-        weight: r.weight,
-        size: parsed?.size ?? 0,
-        quantity: Number(r.quantity),
-        orderType: r.orderType,
-        orderDate: r.orderDate,
-      };
-    });
-
     try {
-      const response = await persistMutation.mutateAsync(rowsToAdd);
+      const response = await persistMutation.mutateAsync(
+        filteredNewLines.map((r) => ({
+          orderNo: r.orderNo,
+          designCode: r.designCode,
+          karigar: r.karigar,
+          weight: r.weight,
+          size: r.size,
+          quantity: r.quantity,
+          orderType: r.orderType,
+          orderDate: r.orderDate,
+        })),
+      );
       toast.success(
         `Added ${response.persisted.length} orders to Total Orders`,
       );
-      setReconcileResult(null);
-      setParsedRows([]);
-      setFileName("");
+
+      // Remove added rows from newLines
+      const addedKeys = new Set(
+        filteredNewLines.map((r) => `${r.orderNo}_${r.designCode}`),
+      );
+      setReconcileResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              newLines: prev.newLines.filter(
+                (r) => !addedKeys.has(`${r.orderNo}_${r.designCode}`),
+              ),
+              alreadyExisting: prev.alreadyExisting + filteredNewLines.length,
+            }
+          : null,
+      );
       setSelectedNewLines(new Set());
     } catch {
       toast.error("Failed to add orders");
     }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!reconcileResult || selectedAppNotInExcel.size === 0) return;
+
+    setIsDeleting(true);
+    setShowDeleteConfirm(false);
+
+    const toDelete = reconcileResult.appNotInExcel.filter((o) =>
+      selectedAppNotInExcel.has(o.orderId),
+    );
+
+    let deleted = 0;
+    for (const order of toDelete) {
+      try {
+        await deleteOrderMutation.mutateAsync(order.orderId);
+        deleted++;
+      } catch {
+        // continue deleting others
+      }
+    }
+
+    toast.success(`Deleted ${deleted} order${deleted !== 1 ? "s" : ""}`);
+
+    const deletedIds = new Set(toDelete.map((o) => o.orderId));
+    setReconcileResult((prev) =>
+      prev
+        ? {
+            ...prev,
+            appNotInExcel: prev.appNotInExcel.filter(
+              (o) => !deletedIds.has(o.orderId),
+            ),
+          }
+        : null,
+    );
+    setSelectedAppNotInExcel(new Set());
+    setIsDeleting(false);
   };
 
   const toggleNewLine = (key: string) => {
@@ -348,10 +389,37 @@ const Reconciliation: React.FC = () => {
     }
   };
 
-  function orderTypeBadgeColor(type: OrderType): string {
-    if (type === OrderType.RB) return "bg-blue-600 text-white";
-    if (type === OrderType.SO) return "bg-purple-600 text-white";
+  const toggleAppNotInExcel = (id: string) => {
+    setSelectedAppNotInExcel((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllAppNotInExcel = (checked: boolean) => {
+    if (!reconcileResult) return;
+    if (checked) {
+      setSelectedAppNotInExcel(
+        new Set(reconcileResult.appNotInExcel.map((o) => o.orderId)),
+      );
+    } else {
+      setSelectedAppNotInExcel(new Set());
+    }
+  };
+
+  function orderTypeBadgeColor(type: OrderType | string): string {
+    if (type === OrderType.RB || type === "RB") return "bg-blue-600 text-white";
+    if (type === OrderType.SO || type === "SO")
+      return "bg-purple-600 text-white";
     return "bg-green-600 text-white";
+  }
+
+  function statusLabel(status: unknown): string {
+    if (!status || typeof status !== "object") return String(status ?? "");
+    const key = Object.keys(status as object)[0] ?? "";
+    return key;
   }
 
   const allNewLinesSelected =
@@ -361,7 +429,14 @@ const Reconciliation: React.FC = () => {
       selectedNewLines.has(`${r.orderNo}_${r.designCode}`),
     );
 
-  const isLoading = isParsing || reconcileMutation.isPending;
+  const allAppNotInExcelSelected =
+    reconcileResult !== null &&
+    reconcileResult.appNotInExcel.length > 0 &&
+    reconcileResult.appNotInExcel.every((o) =>
+      selectedAppNotInExcel.has(o.orderId),
+    );
+
+  const isLoading = isParsing || isReconciling;
 
   return (
     <div className="flex flex-col gap-4 p-4 w-full max-w-4xl mx-auto">
@@ -374,6 +449,7 @@ const Reconciliation: React.FC = () => {
           <div
             className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-border hover:border-gold/50"
             onClick={() => !isLoading && fileInputRef.current?.click()}
+            data-ocid="reconciliation.dropzone"
           >
             <input
               ref={fileInputRef}
@@ -382,6 +458,7 @@ const Reconciliation: React.FC = () => {
               className="hidden"
               onChange={handleFileChange}
               disabled={isLoading}
+              data-ocid="reconciliation.upload_button"
             />
             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             {fileName ? (
@@ -397,7 +474,7 @@ const Reconciliation: React.FC = () => {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Click to upload master Excel file
+                  Click to upload order Excel file
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   .xlsx or .xls
@@ -418,9 +495,10 @@ const Reconciliation: React.FC = () => {
             <Button
               className="mt-3 w-full bg-gold hover:bg-gold-hover text-white"
               onClick={handleReconcile}
-              disabled={reconcileMutation.isPending}
+              disabled={isReconciling || !actor}
+              data-ocid="reconciliation.primary_button"
             >
-              {reconcileMutation.isPending ? (
+              {isReconciling ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Reconciling...
@@ -437,36 +515,27 @@ const Reconciliation: React.FC = () => {
       {reconcileResult && (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[
               {
                 label: "Total Uploaded",
-                value: String(reconcileResult.totalUploadedRows),
+                value: String(parsedRows.length),
               },
               {
                 label: "Already Existing",
-                value: String(reconcileResult.alreadyExistingRows),
+                value: String(reconcileResult.alreadyExisting),
               },
               {
                 label: "New Lines",
-                value: String(reconcileResult.newLinesCount),
+                value: String(reconcileResult.newLines.length),
                 highlight: true,
-              },
-              {
-                label: "Missing in Master",
-                value: String(reconcileResult.missingInMasterCount),
-                warn: true,
               },
             ].map((item) => (
               <Card key={item.label}>
                 <CardContent className="pt-3 pb-3 text-center">
                   <div
                     className={`text-2xl font-bold ${
-                      item.highlight
-                        ? "text-gold"
-                        : item.warn
-                          ? "text-destructive"
-                          : "text-foreground"
+                      item.highlight ? "text-gold" : "text-foreground"
                     }`}
                   >
                     {item.value}
@@ -497,6 +566,7 @@ const Reconciliation: React.FC = () => {
                       selectedNewLines.size === 0 || persistMutation.isPending
                     }
                     className="bg-gold hover:bg-gold-hover text-white"
+                    data-ocid="reconciliation.new_lines.primary_button"
                   >
                     {persistMutation.isPending ? (
                       <>
@@ -511,13 +581,14 @@ const Reconciliation: React.FC = () => {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table data-ocid="reconciliation.new_lines.table">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">
                           <Checkbox
                             checked={allNewLinesSelected}
                             onCheckedChange={(v) => toggleAllNewLines(!!v)}
+                            data-ocid="reconciliation.new_lines.checkbox"
                           />
                         </TableHead>
                         <TableHead>Order No</TableHead>
@@ -530,19 +601,15 @@ const Reconciliation: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reconcileResult.newLines.map((row) => {
+                      {reconcileResult.newLines.map((row, idx) => {
                         const key = `${row.orderNo}_${row.designCode}`;
                         const isSelected = selectedNewLines.has(key);
-                        const parsedRow = parsedRows.find(
-                          (p) =>
-                            p.orderNo === row.orderNo &&
-                            p.designCode === row.designCode,
-                        );
                         return (
                           <TableRow
                             key={key}
                             className={`cursor-pointer ${isSelected ? "bg-gold/10" : ""}`}
                             onClick={() => toggleNewLine(key)}
+                            data-ocid={`reconciliation.new_lines.row.${idx + 1}`}
                           >
                             <TableCell onClick={(e) => e.stopPropagation()}>
                               <Checkbox
@@ -558,9 +625,7 @@ const Reconciliation: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               <span
-                                className={`text-xs font-bold px-2 py-0.5 rounded ${orderTypeBadgeColor(
-                                  row.orderType,
-                                )}`}
+                                className={`text-xs font-bold px-2 py-0.5 rounded ${orderTypeBadgeColor(row.orderType)}`}
                               >
                                 {row.orderType}
                               </span>
@@ -569,13 +634,13 @@ const Reconciliation: React.FC = () => {
                               {row.karigar}
                             </TableCell>
                             <TableCell className="text-sm">
-                              {String(row.quantity)}
+                              {row.quantity}
                             </TableCell>
                             <TableCell className="text-sm">
                               {row.weight.toFixed(2)}g
                             </TableCell>
                             <TableCell className="text-sm">
-                              {parsedRow?.size ? parsedRow.size : "—"}
+                              {row.size ? row.size : "—"}
                             </TableCell>
                           </TableRow>
                         );
@@ -587,22 +652,90 @@ const Reconciliation: React.FC = () => {
             </Card>
           )}
 
-          {/* Missing in Master table */}
-          {reconcileResult.missingInMaster.length > 0 && (
+          {reconcileResult.newLines.length === 0 && (
             <Card>
-              <CardHeader className="pb-2">
+              <CardContent className="pt-4 pb-4 text-center">
+                <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                <p className="text-sm text-muted-foreground">
+                  All rows in the Excel already exist in the app. Nothing new to
+                  add.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* In App, Not in Excel */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-destructive" />
                   <span className="font-semibold text-foreground">
-                    Missing in Master ({reconcileResult.missingInMaster.length})
+                    In App, Not in Excel ({reconcileResult.appNotInExcel.length}
+                    )
                   </span>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
+                {reconcileResult.appNotInExcel.length > 0 &&
+                  (showDeleteConfirm ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-destructive font-medium">
+                        Delete {selectedAppNotInExcel.size} order
+                        {selectedAppNotInExcel.size !== 1 ? "s" : ""}?
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleDeleteSelected}
+                        disabled={isDeleting}
+                        data-ocid="reconciliation.app_not_in_excel.confirm_button"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Confirm Delete"
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        disabled={isDeleting}
+                        data-ocid="reconciliation.app_not_in_excel.cancel_button"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={selectedAppNotInExcel.size === 0}
+                      data-ocid="reconciliation.app_not_in_excel.delete_button"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete Selected ({selectedAppNotInExcel.size})
+                    </Button>
+                  ))}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {reconcileResult.appNotInExcel.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  All app orders are present in the Excel. No discrepancies.
+                </div>
+              ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table data-ocid="reconciliation.app_not_in_excel.table">
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={allAppNotInExcelSelected}
+                            onCheckedChange={(v) => toggleAllAppNotInExcel(!!v)}
+                            data-ocid="reconciliation.app_not_in_excel.checkbox"
+                          />
+                        </TableHead>
                         <TableHead>Order No</TableHead>
                         <TableHead>Design</TableHead>
                         <TableHead>Type</TableHead>
@@ -612,42 +745,58 @@ const Reconciliation: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reconcileResult.missingInMaster.map((order) => (
-                        <TableRow key={order.orderId}>
-                          <TableCell className="text-sm font-medium">
-                            {order.orderNo}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {order.design}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`text-xs font-bold px-2 py-0.5 rounded ${orderTypeBadgeColor(
-                                order.orderType,
-                              )}`}
-                            >
-                              {order.orderType}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {order.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {String(order.quantity)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {order.weight.toFixed(2)}g
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {reconcileResult.appNotInExcel.map((order, idx) => {
+                        const isSelected = selectedAppNotInExcel.has(
+                          order.orderId,
+                        );
+                        return (
+                          <TableRow
+                            key={order.orderId}
+                            className={`cursor-pointer ${isSelected ? "bg-destructive/10" : ""}`}
+                            onClick={() => toggleAppNotInExcel(order.orderId)}
+                            data-ocid={`reconciliation.app_not_in_excel.row.${idx + 1}`}
+                          >
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() =>
+                                  toggleAppNotInExcel(order.orderId)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="text-sm font-medium">
+                              {order.orderNo}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {order.design}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`text-xs font-bold px-2 py-0.5 rounded ${orderTypeBadgeColor(String(order.orderType))}`}
+                              >
+                                {String(order.orderType)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {statusLabel(order.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {String(order.quantity)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {Number(order.weight).toFixed(2)}g
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

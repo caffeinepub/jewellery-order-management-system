@@ -14,23 +14,53 @@ function getDaysAgo(orderDate?: Time): number | null {
   }
   if (od == null) return null;
 
-  let orderMs: number;
+  let orderMs: number | null = null;
+
   if (typeof od === "bigint") {
     if (od === BigInt(0)) return null;
     // Nanosecond timestamp — divide as BigInt to preserve precision
     orderMs = Number(od / BigInt(1_000_000));
   } else if (typeof od === "number") {
     if (od === 0) return null;
-    orderMs = od < 1e13 ? od * 1000 : od / 1_000_000;
+    if (od < 100000) {
+      // Excel date serial
+      orderMs = (od - 25569) * 86400 * 1000;
+    } else if (od < 1e10) {
+      orderMs = od * 1000; // seconds → ms
+    } else if (od < 1e13) {
+      orderMs = od; // already ms
+    } else {
+      orderMs = od / 1_000_000; // nanoseconds as number
+    }
+  } else if (typeof od === "string" && od.trim().length > 0) {
+    const s = od.trim();
+    // DD/MM/YYYY or DD-MM-YYYY (primary format used in this app)
+    const ddmmyyyy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (ddmmyyyy) {
+      const [, d, m, y] = ddmmyyyy;
+      orderMs = Date.UTC(Number(y), Number(m) - 1, Number(d));
+    } else {
+      // YYYY-MM-DD (ISO)
+      const yyyymmdd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (yyyymmdd) {
+        const [, y, m, d] = yyyymmdd;
+        orderMs = Date.UTC(Number(y), Number(m) - 1, Number(d));
+      }
+      // NOTE: Do NOT use new Date(s) fallback — it interprets "12/02/2026"
+      // as December 2 (MM/DD/YYYY) instead of February 12 (DD/MM/YYYY).
+    }
   } else {
     return null;
   }
+
+  if (orderMs === null || Number.isNaN(orderMs)) return null;
 
   // Sanity check: year 2000–2100
   if (orderMs < 946684800000 || orderMs > 4102444800000) return null;
 
   const nowMs = Date.now();
-  return Math.floor((nowMs - orderMs) / (1000 * 60 * 60 * 24));
+  // All orders are past-dated — negative days means a parsing error; always show positive
+  return Math.floor(Math.abs(nowMs - orderMs) / (1000 * 60 * 60 * 24));
 }
 
 export function AgeingBadge({ orderDate, className = "" }: AgeingBadgeProps) {

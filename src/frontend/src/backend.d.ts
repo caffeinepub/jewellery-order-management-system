@@ -116,6 +116,7 @@ export enum OrderType {
     SO = "SO"
 }
 export interface backendInterface {
+    backfillOrderDates(entries: Array<[string, bigint]>): Promise<bigint>;
     batchSaveDesignMappings(mappings: Array<MappingRecord>, createdBy: string): Promise<void>;
     batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus, updatedBy: string): Promise<void>;
     clearAllDesignMappings(): Promise<void>;
@@ -137,6 +138,7 @@ export interface backendInterface {
     getOrder(orderId: string): Promise<Order | null>;
     getOrderStatusLog(orderId: string): Promise<Array<OrderStatusLog>>;
     getOrdersByStatus(status: OrderStatus): Promise<Array<Order>>;
+    getPendingOrders(): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     getUser(id: string): Promise<AppUser | null>;

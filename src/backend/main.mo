@@ -472,7 +472,15 @@ actor {
     orderId;
   };
 
-  // UPDATE ORDER QUANTITY
+  public query ({ caller }) func getPendingOrders() : async [Order] {
+    let filtered = orders.values().toArray().filter(
+      func(order) {
+        order.status == #Pending;
+      }
+    );
+    filtered;
+  };
+
   public shared ({ caller }) func updateOrderQuantity(orderId : Text, newQuantity : Nat, updatedBy : Text) : async () {
     switch (orders.get(orderId)) {
       case (null) { Runtime.trap("Order not found") };
@@ -501,7 +509,6 @@ actor {
             order with
             status = #Ready;
             updatedAt = Time.now();
-            readyDate = ?Time.now();
             updatedBy = ?updatedBy;
             lastAction = ?("Ready • " # updatedBy);
           };
@@ -524,7 +531,6 @@ actor {
             order with
             status = #Pending;
             updatedAt = Time.now();
-            readyDate = null;
             updatedBy = ?updatedBy;
             lastAction = ?("Pending • " # updatedBy);
           };
@@ -766,5 +772,19 @@ actor {
     karigarSet.keys().toArray();
   };
 
-  // END OF EXISTING FUNCTIONS
+  // End of preserved functions
+
+  // New backfillOrderDates function
+  public shared ({ caller }) func backfillOrderDates(entries : [(Text, Int)]) : async Nat {
+    var updatedCount = 0;
+    for ((orderNo, date) in entries.values()) {
+      let matches = orders.toArray().filter(func((_, order)) { order.orderNo == orderNo });
+      for ((id, order) in matches.values()) {
+        let updated : Order = { order with orderDate = ?date };
+        orders.add(id, updated);
+        updatedCount += 1;
+      };
+    };
+    updatedCount;
+  };
 };

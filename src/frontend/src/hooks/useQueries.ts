@@ -28,6 +28,7 @@ export function useGetAllOrders() {
       return actor.getAllOrders();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 15_000, // 15s — avoids redundant refetches on tab switches
   });
 }
 
@@ -69,6 +70,7 @@ export function useGetReadyOrders() {
       return actor.getReadyOrders();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 15_000,
   });
 }
 
@@ -120,6 +122,7 @@ export function useGetAllDesignMappings() {
       return actor.getAllMasterDesignMappings();
     },
     enabled: !!actor && !isFetching,
+    staleTime: 60_000, // 60s — master design mappings change rarely
   });
 }
 
@@ -199,6 +202,7 @@ export function useGetDesignImage(designCode: string) {
       }
     },
     enabled: !!actor && !isFetching && !!designCode,
+    staleTime: 5 * 60_000, // 5 min — design images rarely change
   });
 }
 

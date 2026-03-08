@@ -9,12 +9,14 @@ import {
 } from "@/components/ui/card";
 import {
   AlertCircle,
+  CalendarClock,
   CheckCircle,
   Loader2,
   Upload,
   XCircle,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { OrderType } from "../backend";
 import { useActor } from "../hooks/useActor";
 import { parseOrdersExcel } from "../utils/excelParser";
@@ -25,13 +27,25 @@ interface UploadResult {
   errors: { row: number; message: string }[];
 }
 
+interface BackfillResult {
+  updated: number;
+  skipped: number;
+}
+
 export default function IngestOrders() {
   const { actor } = useActor();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backfillFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [backfillFile, setBackfillFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(
+    null,
+  );
   const [parseError, setParseError] = useState<string | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
   const [hasOrderDateColumn, setHasOrderDateColumn] = useState(false);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -43,13 +57,21 @@ export default function IngestOrders() {
 
     if (file) {
       try {
-        // Quick peek to detect Order Date column
         const parsed = await parseOrdersExcel(file);
         setHasOrderDateColumn(parsed.some((o) => o.orderDate !== null));
       } catch {
-        // ignore peek errors — full validation happens on upload
+        // ignore peek errors
       }
     }
+  }
+
+  async function handleBackfillFileChange(
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = e.target.files?.[0] ?? null;
+    setBackfillFile(file);
+    setBackfillResult(null);
+    setBackfillError(null);
   }
 
   async function handleUpload() {
@@ -60,7 +82,6 @@ export default function IngestOrders() {
     setParseError(null);
 
     try {
-      // Parse the file — parseOrdersExcel accepts a File directly
       const parsedOrders = await parseOrdersExcel(selectedFile);
 
       if (parsedOrders.length === 0) {
@@ -73,10 +94,9 @@ export default function IngestOrders() {
       let failed = 0;
       const errors: { row: number; message: string }[] = [];
 
-      // Process orders sequentially to avoid instruction limit issues on the canister
       for (let i = 0; i < parsedOrders.length; i++) {
         const order = parsedOrders[i];
-        const rowNum = i + 2; // Excel rows start at 2 (row 1 is header)
+        const rowNum = i + 2;
 
         try {
           if (!order.orderNo || order.orderNo.trim() === "") {
@@ -93,7 +113,6 @@ export default function IngestOrders() {
                 ? OrderType.SO
                 : OrderType.CO;
 
-          // Use createOrderWithDate to persist the order date from Excel
           await actor.createOrderWithDate(
             order.orderNo.trim(),
             orderType,
@@ -103,8 +122,8 @@ export default function IngestOrders() {
             order.size ?? 0,
             BigInt(order.quantity),
             (order.remarks ?? "").trim(),
-            null, // genericName — resolved dynamically from master design mappings
-            null, // karigarName — resolved dynamically from master design mappings
+            null,
+            null,
             order.orderDate ?? null,
           );
 
@@ -138,6 +157,66 @@ export default function IngestOrders() {
     }
   }
 
+  async function handleBackfillDates() {
+    if (!actor || !backfillFile) return;
+
+    setIsBackfilling(true);
+    setBackfillResult(null);
+    setBackfillError(null);
+
+    try {
+      const parsedOrders = await parseOrdersExcel(backfillFile);
+
+      // Only keep orders that have a valid date
+      const ordersWithDates = parsedOrders.filter((o) => o.orderDate !== null);
+
+      if (ordersWithDates.length === 0) {
+        setBackfillError(
+          "No orders with a valid Order Date column found in this file. Make sure the Excel has an 'Order Date' column in DD/MM/YYYY format.",
+        );
+        setIsBackfilling(false);
+        return;
+      }
+
+      // Build (orderNo, dateNanoseconds) pairs — deduplicated by orderNo
+      const seen = new Set<string>();
+      const entries: Array<[string, bigint]> = [];
+      for (const o of ordersWithDates) {
+        if (!seen.has(o.orderNo) && o.orderDate !== null) {
+          seen.add(o.orderNo);
+          entries.push([o.orderNo, o.orderDate]);
+        }
+      }
+
+      const updated = await actor.backfillOrderDates(entries);
+      const updatedCount = Number(updated);
+      // skipped = orders in Excel with no matching order number in the system
+      const skippedCount =
+        entries.length - Math.min(updatedCount, entries.length);
+
+      setBackfillResult({
+        updated: updatedCount,
+        skipped: skippedCount,
+      });
+
+      if (updatedCount > 0) {
+        toast.success(
+          `${updatedCount} order record${updatedCount !== 1 ? "s" : ""} updated with correct order dates.`,
+        );
+      } else {
+        toast.info(
+          "No matching orders found in the system for the uploaded file.",
+        );
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to backfill dates";
+      setBackfillError(message);
+    } finally {
+      setIsBackfilling(false);
+    }
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 p-4">
       <div>
@@ -147,6 +226,7 @@ export default function IngestOrders() {
         </p>
       </div>
 
+      {/* Upload new orders */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Upload Orders Excel</CardTitle>
@@ -274,6 +354,86 @@ export default function IngestOrders() {
           )}
         </>
       )}
+
+      {/* Backfill Dates section */}
+      <Card className="border-amber-500/30">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-amber-500" />
+            Fix Missing Order Dates
+          </CardTitle>
+          <CardDescription>
+            Upload the full orders Excel here to fix overdue day calculations.
+            This will update the order date for every matching order in the
+            system — including correcting previously wrong dates — without
+            creating duplicates.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => backfillFileInputRef.current?.click()}
+              disabled={isBackfilling}
+            >
+              Choose File
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {backfillFile ? backfillFile.name : "No file chosen"}
+            </span>
+            <input
+              ref={backfillFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleBackfillFileChange}
+            />
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+            onClick={handleBackfillDates}
+            disabled={!backfillFile || isBackfilling || !actor}
+          >
+            {isBackfilling ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Backfilling Dates...
+              </>
+            ) : (
+              <>
+                <CalendarClock className="h-4 w-4 mr-2" />
+                Backfill Dates Only
+              </>
+            )}
+          </Button>
+
+          {backfillError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{backfillError}</AlertDescription>
+            </Alert>
+          )}
+
+          {backfillResult && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-1">
+              <p className="text-sm font-medium text-emerald-400">
+                {backfillResult.updated} order record
+                {backfillResult.updated !== 1 ? "s" : ""} updated with dates
+              </p>
+              {backfillResult.skipped > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {backfillResult.skipped} order
+                  {backfillResult.skipped !== 1 ? "s" : ""} in Excel had no
+                  match in the system (skipped)
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

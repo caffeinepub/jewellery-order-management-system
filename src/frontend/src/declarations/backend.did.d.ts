@@ -131,6 +131,7 @@ export interface _SERVICE {
     _CaffeineStorageRefillResult
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
+  'backfillOrderDates' : ActorMethod<[Array<[string, bigint]>], bigint>,
   'batchSaveDesignMappings' : ActorMethod<
     [Array<MappingRecord>, string],
     undefined
@@ -190,6 +191,7 @@ export interface _SERVICE {
   'getOrder' : ActorMethod<[string], [] | [Order]>,
   'getOrderStatusLog' : ActorMethod<[string], Array<OrderStatusLog>>,
   'getOrdersByStatus' : ActorMethod<[OrderStatus], Array<Order>>,
+  'getPendingOrders' : ActorMethod<[], Array<Order>>,
   'getReadyOrders' : ActorMethod<[], Array<Order>>,
   'getUniqueKarigarsFromDesignMappings' : ActorMethod<[], Array<string>>,
   'getUser' : ActorMethod<[string], [] | [AppUser]>,

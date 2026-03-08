@@ -208,6 +208,7 @@ export interface backendInterface {
     _caffeineStorageCreateCertificate(blobHash: string): Promise<_CaffeineStorageCreateCertificateResult>;
     _caffeineStorageRefillCashier(refillInformation: _CaffeineStorageRefillInformation | null): Promise<_CaffeineStorageRefillResult>;
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
+    backfillOrderDates(entries: Array<[string, bigint]>): Promise<bigint>;
     batchSaveDesignMappings(mappings: Array<MappingRecord>, createdBy: string): Promise<void>;
     batchUpdateOrderStatus(orderIds: Array<string>, newStatus: OrderStatus, updatedBy: string): Promise<void>;
     clearAllDesignMappings(): Promise<void>;
@@ -229,6 +230,7 @@ export interface backendInterface {
     getOrder(orderId: string): Promise<Order | null>;
     getOrderStatusLog(orderId: string): Promise<Array<OrderStatusLog>>;
     getOrdersByStatus(status: OrderStatus): Promise<Array<Order>>;
+    getPendingOrders(): Promise<Array<Order>>;
     getReadyOrders(): Promise<Array<Order>>;
     getUniqueKarigarsFromDesignMappings(): Promise<Array<string>>;
     getUser(id: string): Promise<AppUser | null>;
@@ -344,6 +346,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor._caffeineStorageUpdateGatewayPrincipals();
+            return result;
+        }
+    }
+    async backfillOrderDates(arg0: Array<[string, bigint]>): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.backfillOrderDates(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.backfillOrderDates(arg0);
             return result;
         }
     }
@@ -638,6 +654,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getOrdersByStatus(to_candid_OrderStatus_n8(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getPendingOrders(): Promise<Array<Order>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPendingOrders();
+                return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPendingOrders();
             return from_candid_vec_n21(this._uploadFile, this._downloadFile, result);
         }
     }
